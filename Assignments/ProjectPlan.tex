@@ -1,0 +1,143 @@
+\documentclass[aip,twocolumn,10pt,graphicx]{revtex4-1}
+
+
+\draft % marks overfull lines with a black rule on the right
+
+\begin{document}
+
+% Use the \preprint command to place your local institutional report number 
+% on the title page in preprint mode.
+% Multiple \preprint commands are allowed.
+%\preprint{}
+
+\title{Design and Optimisation of a Polarizer Ring for Precision Energy Calibration of the FCC-ee Collider} %Title of paper
+
+% repeat the \author .. \affiliation  etc. as needed
+% \email, \thanks, \homepage, \altaffiliation all apply to the current author.
+% Explanatory text should go in the []'s, 
+% actual e-mail address or url should go in the {}'s for \email and \homepage.
+% Please use the appropriate macro for the type of information
+
+% \affiliation command applies to all authors since the last \affiliation command. 
+% The \affiliation command should follow the other information.
+
+\author{Madeleine Watson}
+\email[]{madeleine.laura.watson@cern.ch}
+%\homepage[]{Your web page}
+%\thanks{}
+\altaffiliation{University of Surrey}
+\affiliation{CERN}
+
+% Collaboration name, if desired (requires use of superscriptaddress option in \documentclass). 
+% \noaffiliation is required (may also be used with the \author command).
+%\collaboration{}
+%\noaffiliation
+
+\date{\today}
+
+\begin{abstract}
+The FCC-ee collider is a proposed electron and positron collider requiring extremely precise beam energy calibration. Accurate determination of beam energy can be achieved using resonant depolarization of polarized electron-positron bunches. While the baseline strategy is to generate polarized bunches directly in the collider, a dedicated lower-energy polarizer ring has been proposed to improve operational efficiency. This project aims to refine and optimise the design of such a polarizer ring through beam dynamics simulations in Xsuite. This will determine key parameters such as ring geometry, lattice configuration, magnet strengths, polarization time, equilibrium polarization, and chromaticity correction.
+\end{abstract}
+
+\pacs{}% insert suggested PACS numbers in braces on next line
+
+\maketitle %\maketitle must follow title, authors, abstract and \pacs
+
+% Body of paper goes here. Use proper sectioning commands. 
+% References should be done using the \cite, \ref, and \label commands
+\section{Project Aims}
+%\label{}
+\subsection{Introduction to the Project Area}
+The FCC-ee is a proposed 90 km circumference electron–positron collider designed to operate at multiple beam energies. Precision measurements of electroweak observables require extremely accurate beam energy determination. This can be achieved using resonant depolarization of polarized electron-positron bunches.
+
+In storage rings, beams naturally polarize through the Sokolov–Ternov effect due to synchrotron radiation. However, polarization build-up time can be long and may interfere with collider operation. A dedicated lower-energy polarizer ring has therefore been proposed to generate polarized bunches more efficiently.
+
+Initial lattice concepts exist but require refinement in optics design, chromaticity correction, nonlinear dynamics, radiation integrals, and polarization optimization.
+% If in two-column mode, this environment will change to single-column format so that long equations can be displayed. 
+% Use only when necessary.
+%\begin{widetext}
+%$$\mbox{put long equation here}$$
+%\end{widetext}
+\subsection{Description of Aims and Objectives}
+The overall aim is to design and characterize a viable polarizer ring lattice using numerical simulations.
+
+Objectives include:
+\begin{itemize}
+\item \textbf{Lattice Construction:} Developing and testing configurations in Xsuite to determine magnet placement and strengths for dipoles, quadrupoles, and sextupoles.
+\item \textbf{Evaluation of Realistic Properties:} Assessing a ring with realistic imperfections, such as alignment errors and unwanted magnet multipolar components, and developing their corrections.
+    \begin{itemize}
+    \item Studying nonlinear beam dynamics and dynamic aperture.
+    \item Evaluating momentum acceptance through chromaticity correction
+\end{itemize}
+
+\item \textbf{Polarization Performance:} Estimating polarization build-up time and equilibrium polarization. \textit{Note: These studies will be conducted alongside closed orbit perturbations, as polarization results are only meaningful in the presence of such effects.}
+\item \textbf{Outcome:} A technically documented lattice proposal with quantified performance characteristics.
+\end{itemize}
+
+
+\subsection{Motivation and Beneficiaries}
+The project is of interest to the FCC-ee collaboration, with the potential for the design to become a baseline concept for further accelerator development. A dedicated polarizer ring would increase efficiency of collider operation by separating polarization generation from physics data-taking.
+
+\section{Project Plan}
+
+\subsection{Lattice Design and Simulation}
+
+The work will be carried out primarily using Xsuite. A baseline lattice will be constructed and analysed to determine Twiss parameters and tunes.
+
+\subsection{Chromaticity and Nonlinear Optimisation}
+
+Sextupoles will be implemented to correct chromaticity and increase momentum acceptance. Tracking simulations will assess dynamic aperture. Misalignments and their subsequent corrections will be implemented early in the schedule, immediately following initial dynamic aperture and momentum acceptance studies.
+\subsection{Radiation and Polarization Studies}
+
+Synchrotron radiation effects will be included to estimate polarization build-up time and equilibrium polarization. Where feasible, spin tracking tools in Xsuite will be used to evaluate performance, ensuring that orbit perturbations are factored in to maintain physical relevance.
+
+\section{Project Dependencies and Training Needs}
+The successful execution of this project depends on the understanding of the following concepts:
+\begin{itemize}
+\item General accelerator physics and beam dynamics.
+\item Specialised domains such as synchrotron radiation and polarization mechanisms.
+\item Proficiency in Xsuite and access to sufficient computational resources.
+\end{itemize}
+\section{Risk Register}
+\begin{itemize}
+\item \textbf{Technical obstacles:} Potential for insufficient dynamic aperture, excessive chromaticity, or long polarization build-up times.
+\item \textbf{Operational Integration:} A risk exists that, contrary to initial studies, sufficient polarization cannot be maintained during the transfer/injection into the main collider, as this has not yet been studied.
+\item \textbf{Mitigation:} Risks will be mitigated through iterative lattice optimization and sensitivity studies.
+\end{itemize}
+% Figures should be put into the text as floats. 
+% Use the graphics or graphicx packages (distributed with LaTeX2e).
+% See the LaTeX Graphics Companion by Michel Goosens, Sebastian Rahtz, and Frank Mittelbach for examples. 
+%
+% Here is an example of the general form of a figure:
+% Fill in the caption in the braces of the \caption{} command. 
+% Put the label that you will use with \ref{} command in the braces of the \label{} command.
+%
+% \begin{figure}
+% \includegraphics{}%
+% \caption{\label{}}%
+% \end{figure}
+
+% Tables may be be put in the text as floats.
+% Here is an example of the general form of a table:
+% Fill in the caption in the braces of the \caption{} command. Put the label
+% that you will use with \ref{} command in the braces of the \label{} command.
+% Insert the column specifiers (l, r, c, d, etc.) in the empty braces of the
+% \begin{tabular}{} command.
+%
+% \begin{table}
+% \caption{\label{} }
+% \begin{tabular}{}
+% \end{tabular}
+% \end{table}
+
+% If you have acknowledgments, this puts in the proper section head.
+%\begin{acknowledgments}
+% Put your acknowledgments here.
+%\end{acknowledgments}
+
+% Create the reference section using BibTeX:
+\bibliography{your-bib-file}
+
+\end{document}
+%
+% ****** End of file aiptemplate.tex ******
