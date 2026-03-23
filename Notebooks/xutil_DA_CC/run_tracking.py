@@ -7,7 +7,7 @@ import xpart as xp
 import xtrack as xt
 import xcoll as xc
 import xobjects as xo
-import xsuite_utilities as xutil
+import xutil_DA_CC.xsuite_utilities as xutil
 import scipy.constants as const
 
 
@@ -90,7 +90,7 @@ dic_particles_all = xutil.tracking_data_process (tracking_data=line.record_last_
 
 
 
-import xsuite_plot_functions as my_xpf
+import xutil_DA_CC.xsuite_plot_functions as my_xpf
 # liftime = my_xpf.particle_population_vs_turns (dic_particles_all['state'], T_rev0=tw.T_rev0)
 # my_xpf.phase_space_evolution_difference (dic_particles_all['zeta'][:,0], dic_particles_all['delta'][:,0], dic_particles_all['zeta'][:,-1], dic_particles_all['delta'][:,-1], x_axis_label=r'$z~[m]$', y_axis_label=r'$\delta$')
 # my_xpf.phase_space_evolution_difference (dic_particles_all['x'][:,0], dic_particles_all['px'][:,0], dic_particles_all['x'][:,-1], dic_particles_all['px'][:,-1], x_axis_label=r'$x~[m]$', y_axis_label=r'$px$')
