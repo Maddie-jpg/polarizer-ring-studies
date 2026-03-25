@@ -31,15 +31,15 @@ polarizer-ring-studies/
 └── README.md                
 ```
 ## Useful Reference Material
-*[Low-emittance storage rings](https://github.com/user-attachments/files/26247579/Low-emittance.storage.rings.pdf)
+* [Low-emittance storage rings](https://github.com/user-attachments/files/26247579/Low-emittance.storage.rings.pdf)
 
-*[Polarized Beam Dynamics and Instrumentation in Particle Accelerators](https://github.com/user-attachments/files/26247593/Polarized.Beam.Dynamics.and.Instrumentation.in.Particle.Accelerators._.pdf)
+* [Polarized Beam Dynamics and Instrumentation in Particle Accelerators](https://github.com/user-attachments/files/26247593/Polarized.Beam.Dynamics.and.Instrumentation.in.Particle.Accelerators._.pdf)
 
-*[Radiative Polarization, Computer Algorithms and Spin Matching in Electron Storage Rings](https://github.com/user-attachments/files/26247598/Radiative.Polarization.Computer.Algorithms.and.Spin.Matching.in.Electron.Storage.Rings.pdf)
+* [Radiative Polarization, Computer Algorithms and Spin Matching in Electron Storage Rings](https://github.com/user-attachments/files/26247598/Radiative.Polarization.Computer.Algorithms.and.Spin.Matching.in.Electron.Storage.Rings.pdf)
 
-*[Spin-Orbit Maps and Electron Spin Dynamics for the Luminosity Upgrade Project at HERA](https://github.com/user-attachments/files/26247600/Spin-Orbit.Maps.and.Electron.Spin.Dynamics.for.the.Luminosity.Upgrade.Project.at.HERA.pdf)
+* [Spin-Orbit Maps and Electron Spin Dynamics for the Luminosity Upgrade Project at HERA](https://github.com/user-attachments/files/26247600/Spin-Orbit.Maps.and.Electron.Spin.Dynamics.for.the.Luminosity.Upgrade.Project.at.HERA.pdf)
 
-*[The Physics of Electron Storage Rings_ An Introduction](https://github.com/user-attachments/files/26247602/The.Physics.of.Electron.Storage.Rings_.An.Introduction.pdf)
+* [The Physics of Electron Storage Rings_ An Introduction](https://github.com/user-attachments/files/26247602/The.Physics.of.Electron.Storage.Rings_.An.Introduction.pdf)
 
-*[Future Circular Collider Feasibility Study Report: Volume 2, Accelerators, Technical Infrastructure and Safety](https://arxiv.org/pdf/2505.00274)
+* [Future Circular Collider Feasibility Study Report: Volume 2, Accelerators, Technical Infrastructure and Safety](https://arxiv.org/pdf/2505.00274)
 
