@@ -7,6 +7,7 @@ FCC-ee is a study on an electron-positron collider with a circumference of bout 
 **Aims and objectives are further outlined in the [project plan](/Assignments/Project%20Plan/ProjectPlan.pdf).**
 
 ## Folder Structure
+```
 polarizer-ring-studies/
 ├── assignments/                           # University related work goes in the assignments folder
 │   ├── final dissertation/
@@ -28,4 +29,4 @@ polarizer-ring-studies/
 ├── notebooks/   
 ├── .gitignore              
 └── README.md                
-
+```
