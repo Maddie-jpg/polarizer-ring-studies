@@ -31,6 +31,8 @@ polarizer-ring-studies/
 └── README.md                
 ```
 ## Useful Reference Material
+* [Xsuite Documentation](https://xsuite.readthedocs.io/en/latest/index.html)
+
 * [Low-emittance storage rings](https://github.com/user-attachments/files/26247579/Low-emittance.storage.rings.pdf)
 
 * [Polarized Beam Dynamics and Instrumentation in Particle Accelerators](https://github.com/user-attachments/files/26247593/Polarized.Beam.Dynamics.and.Instrumentation.in.Particle.Accelerators._.pdf)
@@ -43,3 +45,4 @@ polarizer-ring-studies/
 
 * [Future Circular Collider Feasibility Study Report: Volume 2, Accelerators, Technical Infrastructure and Safety](https://arxiv.org/pdf/2505.00274)
 
+* [Compilation of papers on RF electronics](https://cds.cern.ch/record/1407402/files/p223.pdf)
