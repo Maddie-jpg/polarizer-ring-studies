@@ -1607,10 +1607,10 @@ def set_integrator (line):
         (tt.element_type=='ThickSliceQuadrupole')]
     tt_sext = tt.rows[(tt.element_type=='Sextupole')]
 
-    line.set(tt_bend, integrator='uniform', num_multipole_kicks=18, model='mat-kick-mat') #'drift-kick-drift-exact')
+    line.set(tt_bend, integrator='uniform', num_multipole_kicks=3, model='mat-kick-mat') #'drift-kick-drift-exact')
     line.set(tt_wigg, integrator='teapot', num_multipole_kicks=11, model='mat-kick-mat')
-    line.set(tt_quad, integrator='uniform', num_multipole_kicks=18, model='mat-kick-mat')
-    line.set(tt_sext, integrator='yoshida4', num_multipole_kicks=16)
+    line.set(tt_quad, integrator='uniform', num_multipole_kicks=7, model='mat-kick-mat')
+    line.set(tt_sext, integrator='yoshida4', num_multipole_kicks=1)
 
     # line.set(tt_bend, integrator='yoshida4', num_multipole_kicks=1)
     # line.set(tt_quad, integrator='yoshida4', num_multipole_kicks=1)
