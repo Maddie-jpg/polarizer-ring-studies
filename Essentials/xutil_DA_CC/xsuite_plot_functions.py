@@ -1453,8 +1453,9 @@ def tune_diffusion (Qx_in, Qx_fi, Qy_in, Qy_fi, initial_conditions_x_axis=None, 
     if resonance_orders is not None:
         dQx=np.abs(np.max(Qx_in)-np.min(Qx_in))*0.1
         dQy=np.abs(np.max(Qy_in)-np.min(Qy_in))*0.1
-        # plot_resonance_lines(Qxmin=np.min(Qx_in)-dQx, Qxmax=np.max(Qx_in)+dQx, Qymin=np.min(Qy_in)-dQy, Qymax=np.max(Qy_in)+dQy,orders=resonance_orders)
-        rp.plot_res_of_orders(resonance_orders, c1='gray',lst1='-',c2='gray',lst2='--',c3='gray',annotate=annotate)
+        
+        plot_resonance_lines(Qxmin=np.min(Qx_in)-dQx, Qxmax=np.max(Qx_in)+dQx, Qymin=np.min(Qy_in)-dQy, Qymax=np.max(Qy_in)+dQy,orders=resonance_orders)
+        #rp.plot_res_of_orders(resonance_orders, c1='gray',lst1='-',c2='gray',lst2='--',c3='gray',annotate=annotate)
     if delta_value is not None:
         plt.plot(np.nan, np.nan, '>', color='k', label='$\delta$=%.1E'%(delta_value))
     plt.xlabel(r'$Q_x$')
