@@ -86,7 +86,7 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     return axt
 
 # Routine generating graphical and text output describing the ring    
-def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1, grname='NoGraph' ):
+def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
     axt = addSketchBL( acc_tw, acc, lims, limy1, limy2, scK1 )
     axt.text( 0.0, .7, f'C ={3*acc_tw.circumference:8.4f} m', horizontalalignment='left' )
     axt.text( 1.0, .7, f'T ={3e6*acc_tw.T_rev0:8.4f} us', horizontalalignment='left')

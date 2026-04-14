@@ -188,7 +188,7 @@ def config_D2(pdr):
 
     ringS1_chroma = ring.match( method='6d', solve=True,
     vary = [ xt.VaryList(['k2XF2arc', 'k2XD2arc','k2XF2arc2'], step=1e-4 )],
-    targets = [ xt.TargetSet(dqx=0, dqy=0, tol=1e-5 ) ]  )
+    targets = [ xt.TargetSet(dqx=0, dqy=0,ddqx=367/2,ddqy=200, tol=1e-5 ) ]  )
 
     ringS1_chroma.run_jacobian(10)
 

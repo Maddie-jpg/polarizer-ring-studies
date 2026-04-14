@@ -25,16 +25,16 @@ E0 = constants.E0; VRF = constants.VRF # beam energy in eV and RF voltage (1 cav
 
 #Uncomment vars depending on config
 
-'''pdr.vars({'l_cell': 3.4,'l_bend': 0.40,'l_bendDS': 0.55,'dl_noben': 0.25, 'l_quad': 0.30,
+pdr.vars({'l_cell': 3.4,'l_bend': 0.40,'l_bendDS': 0.55,'dl_noben': 0.25, 'l_quad': 0.30,
   'l_drift': '(l_cell - 2*l_bend - 2*l_quad)/4.','dl_drift': -0.1, 'dl_trans': 0.00,
-  'l_doub':  0.25, 'l_tripl': 2.7, 'l_trips': 0.40, 'l_sext': 0.20, })'''
+  'l_doub':  0.25, 'l_tripl': 2.7, 'l_trips': 0.40, 'l_sext': 0.20, })
 
 #Currently for config 1
-pdr.vars({ 
+'''pdr.vars({ 
 'l_cell':   3.5000,
 'dl_drift':  -0.1500,
 'l_tripl':   2.7000,
-})
+})'''
 
 pdr.vars({'N_cells_S': 8,'hBarc' : '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
   'kQFarc': 2.9478, 'kQDarc':-2.9231,'kQFarcM': 2.8846, 'kQDarcM':-2.7567, 
