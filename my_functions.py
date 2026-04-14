@@ -1,0 +1,125 @@
+import xtrack as xt
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import os
+import numpy as np
+
+pdr=xt.Environment()
+
+def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
+    # Added a 4th row for Chromatic Functions (axw)
+    fig, ax = plt.subplots(4, 1, figsize=(12, 12), 
+                           height_ratios=(1, 3, 2, 2))
+    axl, axp, axw, axt = ax  # Lattice, Optics, W-functions, Text Table
+    
+    # Link the x-axes so zooming on one zooms all
+    axp.sharex(axl)
+    axw.sharex(axl)
+    fig.subplots_adjust(hspace=0.1, top=0.95, bottom=0.05, left=.1)
+
+    # --- Subplot 2: Beta and Dispersion ---
+    axp.set_ylabel(r'$\beta_x, \beta_y$ [m]')
+    indm = np.argmin(np.abs(acc_tw.s - lims[-1])) + 1
+    
+    axp.plot(acc_tw.s[:indm], acc_tw.betx[:indm], color='red', label=r'$\beta_x$')
+    axp.plot(acc_tw.s[:indm], acc_tw.bety[:indm], color='blue', label=r'$\beta_y$')
+    axp.set_ylim(limy1)
+    
+    axp2 = axp.twinx()
+    axp2.plot(acc_tw.s[:indm], acc_tw.dx[:indm], color='black', linestyle='--', label='$D_x$')
+    axp2.set_ylabel(r'$D_x$ [m]')
+    axp2.set_ylim(limy2)
+    axp.set_xlim(lims)
+
+    # --- Subplot 3: Chromatic W Functions and second order dispersion ---
+    axw.plot(acc_tw.s[:indm], acc_tw.wx_chrom[:indm], label='$W_x$', color='red')
+    axw.plot(acc_tw.s[:indm], acc_tw.wy_chrom[:indm], label='$W_y$', color='blue')
+    axw2 = axw.twinx()
+    axw2.plot(acc_tw.s[:indm], acc_tw.ddx[:indm], color='black', linestyle='--', label="$D'_x$")
+    
+
+    '''tt_sliced = acc.get_table(attr=True)
+    tbends = tt_sliced.rows[tt_sliced.element_type == 'Bend']
+    
+    # Apply shading ONLY to the Chromatic W-functions axis
+    for nn in tbends.name:
+        axw.axvspan(
+            tbends['s', nn], 
+            tbends['s', nn] + tbends['length', nn],
+            color='tab:blue', 
+            alpha=0.15,       # Subtle enough to see the Wx/Wy lines
+            linewidth=0
+        )'''
+    
+    axw.set_ylabel('Chromatic $W$')
+    axw.set_xlabel('Position s [m]')
+    axw.legend(loc='upper right', fontsize=8)
+    axw2.legend(loc='upper right', fontsize=8)
+    axw2.set_ylabel(r"$D'_x$ [m]")
+    
+    # --- Subplot 1: Lattice Sketch ---
+    axl.set_ylim(-0.5, 1.5)
+    axl.axis('off')
+    tab_pan = acc.get_table(attr=True).to_pandas()
+    for ind in range( len(tab_pan.T.columns) -1 ):
+        if tab_pan['element_type'][ind].find('Drift') >= 0:
+           axl.plot( [tab_pan['s'][ind], tab_pan['s'][ind+1]], [0, 0], color='black' )
+        if tab_pan['element_type'][ind].find('Bend') >= 0:
+           axl.add_patch( patches.Rectangle( (tab_pan['s'][ind], -0.08), 
+               tab_pan['s'][ind+1] - tab_pan['s'][ind], 0.16, fill=True, color='tab:blue' ) ) 
+        if tab_pan['element_type'][ind].find('Quad') >= 0:
+           kstr = scK1*tab_pan['k1l'][ind]/tab_pan['length'][ind]
+           axl.add_patch( patches.Rectangle( (tab_pan['s'][ind], min(0.0, kstr)),
+               tab_pan['s'][ind+1] - tab_pan['s'][ind], abs(kstr), fill=True, color='tab:orange' ) )   
+        if tab_pan['element_type'][ind].find('Sext') >= 0:
+           kstr = scK1*tab_pan['k2l'][ind]/tab_pan['length'][ind]*0.05
+           axl.add_patch( patches.Rectangle( (tab_pan['s'][ind], min(0.0, kstr)) ,
+               tab_pan['s'][ind+1] - tab_pan['s'][ind], abs(kstr), fill=True, color='tab:green' ) )     
+    axp.plot( [acc.get_length(), acc.get_length()], limy1, color='black', 
+              linestyle=(0, (8, 8)), linewidth=.5 )
+
+    # --- Subplot 4: Text Area ---
+    axt.axis('off')
+    axt.set_xlim(-0.3, 4.0)
+    axt.set_ylim(0, 1.5)
+    
+    return axt
+
+# Routine generating graphical and text output describing the ring    
+def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1, grname='NoGraph' ):
+    axt = addSketchBL( acc_tw, acc, lims, limy1, limy2, scK1 )
+    axt.text( 0.0, .7, f'C ={3*acc_tw.circumference:8.4f} m', horizontalalignment='left' )
+    axt.text( 1.0, .7, f'T ={3e6*acc_tw.T_rev0:8.4f} us', horizontalalignment='left')
+    axt.text( 2.0, .7, r'($Q_x$, $Q_y$)' + f' = ({3*acc_tw.qx:9.5f}, {3*acc_tw.qy:9.5f})',horizontalalignment='left')
+
+    
+    pos=0
+    for item in pdr.vars.keys()[2:]:
+       print( "'" + item + f"': {pdr[item]:8.4f}," )
+       axt.text( pos%4 , .6 - .1*int( pos/4 ),
+          "'" + item + f"': {pdr[item]:8.4f},", horizontalalignment='left' )
+       pos += 1
+    file=os.getcwd()
+    if grname != 'NoGraph': 
+       if grname in file:
+          print( ' Error: file ' + grname + ' exists <<<<<<<<<<<================' )
+       else:
+          plt.savefig( f"{file}/{grname}" )
+    tab_pan = acc.get_table(attr=True).to_pandas()
+    print('  Name        Type      L(m)     sin(m)   sout(m)  driftl  driftr    k1(1/m^2)')
+    for ind in range( len(tab_pan.T.columns) - 1 ):
+       eltyp = tab_pan['element_type'][ind]
+       if eltyp.find('Drift') < 0:
+          elnam = tab_pan['name'][ind]
+          if ind < 1: sin = '  0.0000'
+          else: sin = f"{tab_pan['length'][ind-1]:8.4f}"         
+          k1expr = pdr.element_refs[elnam].k1._expr
+          if k1expr == None: k1expr = ' None'
+          else: k1expr = str(k1expr)[5:-1]
+          print(  "  " + elnam.ljust( 12 ) + eltyp.ljust(12)[:8] + f" {tab_pan['length'][ind]:7.4f} " + 
+               f"{tab_pan['s'][ind]:8.4f} {tab_pan['s'][ind+1]:8.4f} " + sin +
+               f"{tab_pan['length'][ind+1]:8.4f} " + k1expr.ljust(9) + 
+               f"= {tab_pan['k1l'][ind]/max(tab_pan['length'][ind],1e-6):7.4f}  " )
+          
+    return axt
+
