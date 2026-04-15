@@ -312,7 +312,7 @@ plt.ylim(0,20)
 plt.savefig(f"config_D{n}/DA_plot_{n}_WP{constants.WP}.png")
 
 # %%
-'''line.configure_radiation(model=None)
+line.configure_radiation(model=None)
 
 
 ## Change context for multy CPU for tracking
@@ -341,7 +341,7 @@ Qy_end = xutil.nafflib_tune_calculation(tracking_data['y'][:, 1500:2500], pq_coo
 
 
 
-my_xpf.tune_diffusion (Qx_start['Q1'], Qx_end['Q1'], Qy_start['Q1'], Qy_end['Q1'], initial_conditions_x_axis=grid_details['x_normalized'], initial_conditions_y_axis=grid_details['y_normalized'], xlabel='x [m]', ylabel='y [m]', resonance_orders=(1,2,3,4), annotate=False, delta_value= None)'''
+my_xpf.tune_diffusion (Qx_start['Q1'], Qx_end['Q1'], Qy_start['Q1'], Qy_end['Q1'], initial_conditions_x_axis=grid_details['x_normalized'], initial_conditions_y_axis=grid_details['y_normalized'], xlabel='x [m]', ylabel='y [m]', resonance_orders=(1,2,3,4), annotate=False, delta_value= None)
 
 # %%
 line.configure_radiation(model=None)
