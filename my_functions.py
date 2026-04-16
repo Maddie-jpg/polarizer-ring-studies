@@ -126,107 +126,19 @@ def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
     return axt
 
 
-def DA_vs_turns_delta(particles, num_r_steps, num_theta_steps, x_norm, y_norm, delta_initial, delta_plots=False):
 
-    if isinstance(particles, dict):
-        max_turns = np.shape(particles['x'])[1]-1 # minus 1 for the initial condition
-        part_at_turn = np.nanmax(particles['at_turn'],axis=1)
-    else:
-        max_turns = np.max(particles.filter(particles.at_element==0).at_turn) # normally I should pass the maximum number (n_turn) of asked turns
-        part_at_turn = particles.at_turn
 
-    if delta_plots and np.size(delta_initial) > 1:
+def misalignments(line):
+   sigma=50e-6
 
-        for ii in np.unique(delta_initial):
-            delta_index = np.where(delta_initial==ii)[0]
-            
-            x_norm_1d = x_norm[delta_index]
-            y_norm_1d = y_norm[delta_index]
-            part_at_turn_1d = part_at_turn[delta_index]
-            x_norm_2d = x_norm_1d.reshape(num_r_steps, num_theta_steps)
-            y_norm_2d = y_norm_1d.reshape(num_r_steps, num_theta_steps)
-            part_at_turn_2d = part_at_turn_1d.reshape(num_r_steps, num_theta_steps)
-                        
-            x_DA = np.full(num_theta_steps, np.nan)
-            y_DA = np.full(num_theta_steps, np.nan)
-            for jj in range(num_theta_steps):
-                for ii in range(num_r_steps):
-                    if part_at_turn_2d[ii,jj] != max_turns:
-                        x_DA[jj] = x_norm_2d[ii,jj]
-                        y_DA[jj] = y_norm_2d[ii,jj]
-                        break
+   
+   #Quad and sextupole misalignments
+   quads = line[line.element_type == 'Quadrupole'].index.tolist()
+   sexts = line[line.element_type == 'Sextupole'].index.tolist()
+   bends = line[line.element_type == 'Bend'].index.tolist()
 
-            min_DA = np.nanmin(np.round(np.sqrt(x_DA**2+y_DA**2),1)) 
-            where_min_DA = np.where(np.round(np.sqrt(x_DA**2+y_DA**2),1) == min_DA)[0]
-            
-            # Plot DA using scatter and pcolormesh
-            fig = plt.subplots()
-            plt.scatter(x_norm_1d, y_norm_1d, c=part_at_turn_1d)
-            plt.plot(x_DA, y_DA, '-', color='r', label='DA for $\delta$=%.1E'%(ii))
-            plt.plot(x_DA[where_min_DA], y_DA[where_min_DA], 'o', color='r', label='DA$_{min}$=%.1f$\sigma$'%(min_DA))
-            plt.xlabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
-            plt.ylabel(r'$\hat{y}$ [$\sqrt{\varepsilon_y}$]')
-            cb = plt.colorbar()
-            cb.set_label('Lost at turn')
-            plt.legend(fontsize='small', loc='best')
-
-            fig = plt.subplots()
-            plt.pcolormesh(x_norm_2d, y_norm_2d, part_at_turn_2d, shading='gouraud')
-            plt.plot(x_DA, y_DA, '-', color='r', label='DA for $\delta$=%.1E'%(ii))
-            plt.plot(x_DA[where_min_DA], y_DA[where_min_DA], 'o', color='r', label='DA$_{min}$=%.1f$\sigma$'%(min_DA))    
-            plt.xlabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
-            plt.ylabel(r'$\hat{y}$ [$\sqrt{\varepsilon_y}$]')
-            ax = plt.colorbar()
-            ax.set_label('Lost at turn')
-            plt.legend(fontsize='small', loc='best')
-    
-    else:
-
-        if not delta_plots and np.size(delta_initial) > 1:
-            closest_to_zero_delta = delta_initial[(np.abs(delta_initial - 0)).argmin()]
-            delta_index = np.where(delta_initial==closest_to_zero_delta)[0]
-            x_norm_1d = x_norm[delta_index]
-            y_norm_1d = y_norm[delta_index]
-            part_at_turn_1d = part_at_turn[delta_index]
-        else:
-            x_norm_1d = x_norm
-            y_norm_1d = y_norm      
-            part_at_turn_1d = part_at_turn
-
-        x_norm_2d = x_norm_1d.reshape(num_r_steps, num_theta_steps)
-        y_norm_2d = y_norm_1d.reshape(num_r_steps, num_theta_steps)
-        part_at_turn_2d = part_at_turn_1d.reshape(num_r_steps, num_theta_steps)
-        x_DA = np.full(num_theta_steps, np.nan)
-        y_DA = np.full(num_theta_steps, np.nan)
-        for jj in range(num_theta_steps):
-            for ii in range(num_r_steps):
-                if part_at_turn_2d[ii,jj] != max_turns:
-                    x_DA[jj] = x_norm_2d[ii,jj]
-                    y_DA[jj] = y_norm_2d[ii,jj]
-                    break
-
-        min_DA = np.nanmin(np.round(np.sqrt(x_DA**2+y_DA**2),1)) 
-        where_min_DA = np.where(np.round(np.sqrt(x_DA**2+y_DA**2),1) == min_DA)[0]
-        
-        # Plot DA using scatter and pcolormesh
-        fig = plt.subplots()
-        plt.scatter(x_norm_1d, y_norm_1d, c=part_at_turn_1d)
-        plt.plot(x_DA, y_DA, '-', color='r', label='DA')
-        plt.plot(x_DA[where_min_DA], y_DA[where_min_DA], 'o', color='r', label='DA$_{min}$=%.1f$\sigma$'%(min_DA))
-        plt.xlabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
-        plt.ylabel(r'$\hat{y}$ [$\sqrt{\varepsilon_y}$]')
-        cb = plt.colorbar()
-        cb.set_label('Lost at turn')
-        plt.legend(fontsize='small', loc='best')
-
-        fig = plt.subplots()
-        plt.pcolormesh(x_norm_2d, y_norm_2d, part_at_turn_2d, shading='gouraud')
-        plt.plot(x_DA, y_DA, '-', color='r', label='DA')
-        plt.plot(x_DA[where_min_DA], y_DA[where_min_DA], 'o', color='r', label='DA$_{min}$=%.1f$\sigma$'%(min_DA))    
-        plt.xlabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
-        plt.ylabel(r'$\hat{y}$ [$\sqrt{\varepsilon_y}$]')
-        ax = plt.colorbar()
-        ax.set_label('Lost at turn')
-        plt.legend(fontsize='small', loc='best')
-
-    return (x_DA, y_DA, where_min_DA)
+   for name in quads + sexts + bends:
+        line.at[name, 'shift_x'] = np.random.normal(0, sigma)
+        line.at[name, 'shift_y'] = np.random.normal(0, sigma)
+        line.at[name, 'rot_y_rad'] = np.random.normal(0, sigma)
+        line.at[name, 'knl'][2]=np.random.normal(0,1e-3)

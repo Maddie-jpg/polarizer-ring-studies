@@ -425,3 +425,32 @@ def config_D6(pdr):
     ChromCorrect_ddq(ring, pdr, 'k2XF2arc', 'k2XD2arc', MakePlot=False)
 
     return pdr
+
+
+def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
+   
+   bpm=xt.BeamPositionMonitor(start_at_turn=start_at_turn, stop_at_turn=stop_at_turn, frev=fRev)
+   
+   ring=pdr.lines['ring']
+   tab_r=ring.get_table()
+   quads_ring = tab_r.rows[tab_r.element_type == 'Quadrupole'].name
+
+   for elem in quads_ring:
+        ring.insert_element(
+            element=bpm,
+            name='BPM_'+elem,
+            at_s=ring.get_s_position(elem) + (ring[elem].length / 2)
+        )
+
+   period=pdr.lines['period']
+   tab_p=period.get_table()
+   quads_period = tab_p.rows[tab_p.element_type == 'Quadrupole'].name
+
+   for elem in quads_period:
+        period.insert_element(
+            element=bpm,
+            name='BPM_'+elem,
+            at_s=period.get_s_position(elem) + (period[elem].length / 2)
+        )
+
+   return pdr
