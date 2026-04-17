@@ -129,7 +129,7 @@ def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
 
 
 def misalignments(line):
-   sigma=0.3e-3
+   sigma=50e-6
 
    tab=line.get_table()
    #Quad and sextupole misalignments

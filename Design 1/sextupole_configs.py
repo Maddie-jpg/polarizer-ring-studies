@@ -429,17 +429,17 @@ def config_D6(pdr):
 
 def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
    
-   bpm=xt.BeamPositionMonitor(start_at_turn=start_at_turn, stop_at_turn=stop_at_turn, frev=fRev)
-   
    ring=pdr.lines['ring']
-   tab_r=ring.get_table()
+   ''' tab_r=ring.get_table()
    quads_ring = tab_r.rows[tab_r.element_type == 'Quadrupole'].name
 
    for elem in quads_ring:
-        ring.insert_element(
-            element=bpm,
-            name='BPM_'+elem,
-            at_s=ring.get_s_position(elem) + (ring[elem].length / 2)
+        ring.insert(
+            'BPM_'+elem,
+            bpm,
+            at=0.0,
+            from_=f'{elem}',
+            from_anchor='end'
         )
 
    period=pdr.lines['period']
@@ -447,10 +447,170 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
    quads_period = tab_p.rows[tab_p.element_type == 'Quadrupole'].name
 
    for elem in quads_period:
-        period.insert_element(
-            element=bpm,
-            name='BPM_'+elem,
-            at_s=period.get_s_position(elem) + (period[elem].length / 2)
-        )
+        period.insert(
+            'BPM_'+elem,
+            bpm,
+            at=0.0,
+            from_=f'{elem}',
+            from_anchor='end'
+        )'''
+   offset=0.0
+
+   bpm = xt.BeamPositionMonitor(
+    start_at_turn=start_at_turn, 
+    stop_at_turn=stop_at_turn, 
+    frev=fRev
+   )
+    
+   ring=pdr.lines['ring']
+     # Defocusing (QDA)
+   for elem in ([ [el, '-'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7'] ] +
+                 [ [el, '+'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7'] ]):
+
+        ring.insert( 'BPMy_'+elem[0], bpm, 
+                        at=elem[1] + str(offset), from_='QDA_' + elem[0], from_anchor='start' )
+        
+   for elem in ([[el, '-'] for el in ['1R8','2R8','3R8']]+
+                 [[el, '+'] for el in ['1L8','2L8','3L8']]):
+        ring.insert( 'BPMy_'+elem[0],bpm,  
+                        at=elem[1] + str(offset), from_='QDA_M' + elem[0] , from_anchor='start')
+        
+   for elem in ([ [el, '-'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1RC','2R1','2R2','2R3','2R4','2R5','2R6','2RC','3R1','3R2','3R3','3R4','3R5','3R6','3RC'] ] +
+                 [ [el, '+'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6'] ]):
+
+        ring.insert( 'BPMx_'+elem[0],bpm,
+                        at=elem[1] + str(offset), from_='QFA_' + elem[0], from_anchor='start' )
+        
+   for elem in ([[el, '+'] for el in ['1R','2R','3R']] +
+        [[el, '-'] for el in ['1L','2L','3L']]):
+
+        ring.insert( 'BPMx_'+elem[0],bpm,
+                        at=elem[1] + str(offset), from_='QFDoub_' + elem[0], from_anchor='start' )
+
+
+
+    # Matching quads
+   for elem in [['1R7','-'], ['2R7','-'], ['3R7','-'],['1L7','+'], ['2L7','+'], ['3L7','+']]:
+        ring.insert( 'BPMx_'+elem[0],bpm, 
+                        at=elem[1] + str(offset), from_='QFA_M' + elem[0] , from_anchor='start')
+
+   period=pdr.lines['period']
+    
+   for elem in [['PR1','-'], ['PR2','-'],['PR3','-'], ['PR4','-'],['PR5','-'], ['PR6','-'],['PR7','-'], ['PL1','+'], ['PL2','+'], ['PL3','+'], ['PL4','+'], ['PL5','+'], ['PL6','+'], ['PL7','+']]:
+            period.insert( 'BPMy_'+elem[0],  bpm,
+                        at=elem[1] + str(offset), from_='QDA_' + elem[0] , from_anchor='start')
+            
+   for elem in ([[el, '+'] for el in ['PR8']]+
+                 [[el, '-'] for el in ['PL8']]):
+        period.insert(  'BPMy_'+elem[0], bpm,
+                        at=elem[1] + str(offset), from_='QDA_M' + elem[0] , from_anchor='start')
+
+    # Focusing
+   for elem in [['PR1','-'], ['PR2','-'],['PR3','-'], ['PR4','-'],['PR5','-'], ['PR6','-'],['PRCH','-'], ['PL1','+'], ['PL2','+'], ['PL3','+'], ['PL4','+'], ['PL5','+'], ['PL6','+'], ['PLCH','+']]:
+            period.insert( 'BPMx_'+elem[0],bpm,
+                        at=elem[1] + str(offset), from_='QFA_' + elem[0], from_anchor='start' )
+    
+   for elem in [['PR','-'],['PL','+']]:
+            period.insert( 'BPMx_'+elem[0],bpm,
+                        at=elem[1] + str(offset), from_='QFDoub_' + elem[0], from_anchor='start' )
+            
+    # Matching
+   for elem in [['PR7','-'],['PL7','+']]:
+            period.insert( 'BPMx_'+elem[0],bpm,
+                        at=elem[1] + str(offset), from_='QFA_M' + elem[0] , from_anchor='start')  
 
    return pdr
+
+
+
+def insert_correctors(pdr):
+    offset = 0.0
+    ring = pdr.lines['ring']
+    period = pdr.lines['period']
+
+    #vertical correctors
+    qy_ring_list = (
+        [[el, '+', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
+        [[el, '-', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
+        [[el, '+', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
+        [[el, '-', 'QDA_M'] for el in ['1L8','2L8','3L8']]
+    )
+
+    for elem, sign, prefix in qy_ring_list:
+        v_name = f'vk_ring_{elem}'
+        pdr[v_name] = 0.0  # Unique vertical kick variable
+        ring.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]]), #edge_entry_active=True, edge_exit_active=True), 
+                    at=sign + str(offset), from_=prefix + elem, from_anchor='end')
+
+    # horizontal correctors
+    qx_ring_list = (
+        [[el, '+', 'QFA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1RC','2R1','2R2','2R3','2R4','2R5','2R6','2RC','3R1','3R2','3R3','3R4','3R5','3R6','3RC']] +
+        [[el, '-', 'QFA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6']] +
+        [[el, '+', 'QFA_M'] for el in ['1R7','2R7','3R7']] +
+        [[el, '-', 'QFA_M'] for el in ['1L7','2L7','3L7']] +
+        [[el, '+', 'QFDoub_'] for el in ['1R','2R','3R']] +
+        [[el, '-', 'QFDoub_'] for el in ['1L','2L','3L']]
+    )
+
+    for elem, sign, prefix in qx_ring_list:
+        h_name = f'hk_ring_{elem}'
+        pdr[h_name] = 0.0  # Unique horizontal kick variable
+        ring.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]]),# edge_entry_active=True, edge_exit_active=True), 
+                    at=sign + str(offset), from_=prefix + elem, from_anchor='end')
+
+    # vertical correctors
+    qy_period_list = (
+        [[el, '+', 'QDA_'] for el in ['PR1','PR2','PR3','PR4','PR5','PR6','PR7']] +
+        [[el, '-', 'QDA_'] for el in ['PL1','PL2','PL3','PL4','PL5','PL6','PL7']] +
+        [[el, '+', 'QDA_M'] for el in ['PR8']] +
+        [[el, '-', 'QDA_M'] for el in ['PL8']]
+    )
+
+    for elem, sign, prefix in qy_period_list:
+        v_name = f'vk_per_{elem}'
+        pdr[v_name] = 0.0
+        period.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]]),# edge_entry_active=True, edge_exit_active=True), 
+                      at=sign + str(offset), from_=prefix + elem, from_anchor='end')
+
+    # horizontal correctors
+    qx_period_list = (
+        [[el, '+', 'QFA_'] for el in ['PR1','PR2','PR3','PR4','PR5','PR6','PRCH']] +
+        [[el, '-', 'QFA_'] for el in ['PL1','PL2','PL3','PL4','PL5','PL6','PLCH']] +
+        [[el, '+', 'QFA_M'] for el in ['PR7']] +
+        [[el, '-', 'QFA_M'] for el in ['PL7']]+
+        [[el, '+', 'QFDoub_'] for el in ['PR']] +
+        [[el, '-', 'QFDoub_'] for el in ['PL']]
+    )
+
+    for elem, sign, prefix in qx_period_list:
+        h_name = f'hk_per_{elem}'
+        pdr[h_name] = 0.0
+        period.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]]),# edge_entry_active=True, edge_exit_active=True), 
+                      at=sign + str(offset), from_=prefix + elem, from_anchor='end')
+        
+    
+    
+    tt = ring.get_table()
+
+    # 2. Identify Monitors (BPMs) 
+    # This finds all elements whose names start with 'BPM'
+    bpm_names = tt.rows['BPM.*'].name
+    
+    # 3. Identify Correctors
+    # In your script, correctors are often named 'Mx' for horizontal and 'My' for vertical
+    corr_x_names = tt.rows['Mx.*'].name
+    corr_y_names = tt.rows['My.*'].name
+
+    # 4. Assign these to the line's steering attributes
+    # This tells Xsuite: "Use these elements for any orbit/trajectory correction"
+    ring.steering_monitors_x = bpm_names
+    ring.steering_monitors_y = bpm_names
+    ring.steering_correctors_x = corr_x_names
+    ring.steering_correctors_y = corr_y_names
+
+    twiss=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
+                   spin=True, polarization=True )
+
+    ring.correct_trajectory(twiss_table=twiss)
+
+    return pdr
