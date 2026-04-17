@@ -129,16 +129,26 @@ def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
 
 
 def misalignments(line):
-   sigma=50e-6
+   sigma=0.3e-3
 
-   
+   tab=line.get_table()
    #Quad and sextupole misalignments
-   quads = line[line.element_type == 'Quadrupole'].index.tolist()
-   sexts = line[line.element_type == 'Sextupole'].index.tolist()
-   bends = line[line.element_type == 'Bend'].index.tolist()
+   quads = list(tab.rows[tab.element_type == 'Quadrupole'].name)
+   sexts = list(tab.rows[tab.element_type == 'Sextupole'].name)
+   bends = list(tab.rows[tab.element_type == 'Bend'].name)
 
    for name in quads + sexts + bends:
-        line.at[name, 'shift_x'] = np.random.normal(0, sigma)
-        line.at[name, 'shift_y'] = np.random.normal(0, sigma)
-        line.at[name, 'rot_y_rad'] = np.random.normal(0, sigma)
-        line.at[name, 'knl'][2]=np.random.normal(0,1e-3)
+        # Access the element via the reference manager
+        ref = line.element_refs[name]
+        
+        # Apply translations
+        ref.shift_x = np.random.normal(0, sigma)
+        ref.shift_y = np.random.normal(0, sigma)
+        ref.shift_s = np.random.normal(0, sigma)
+        
+        # Apply rotations (in radians)
+        ref.rot_s_rad = np.random.normal(0, sigma)
+        ref.rot_x_rad = np.random.normal(0, sigma)
+        ref.rot_y_rad = np.random.normal(0, sigma)
+
+   return line
