@@ -475,6 +475,12 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
         ring.insert( 'BPMy_'+elem[0],bpm,  
                         at=elem[1] + str(offset), from_='QDA_M' + elem[0] , from_anchor='start')
         
+   for elem in ([[el, '+'] for el in ['1R','2R','3R']] +
+        [[el, '-'] for el in ['1L','2L','3L']]):
+
+        ring.insert( 'BPMy_'+elem[0],bpm,
+                        at=elem[1] + str(offset), from_='QDDoub_' + elem[0], from_anchor='start' )
+        
    for elem in ([ [el, '-'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1RC','2R1','2R2','2R3','2R4','2R5','2R6','2RC','3R1','3R2','3R3','3R4','3R5','3R6','3RC'] ] +
                  [ [el, '+'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6'] ]):
 
@@ -504,6 +510,11 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
                  [[el, '-'] for el in ['PL8']]):
         period.insert(  'BPMy_'+elem[0], bpm,
                         at=elem[1] + str(offset), from_='QDA_M' + elem[0] , from_anchor='start')
+   
+   for elem in [['PR','-'],['PL','+']]:
+            period.insert( 'BPMy_'+elem[0],bpm,
+                        at=elem[1] + str(offset), from_='QDDoub_' + elem[0], from_anchor='start' )
+    
 
     # Focusing
    for elem in [['PR1','-'], ['PR2','-'],['PR3','-'], ['PR4','-'],['PR5','-'], ['PR6','-'],['PRCH','-'], ['PL1','+'], ['PL2','+'], ['PL3','+'], ['PL4','+'], ['PL5','+'], ['PL6','+'], ['PLCH','+']]:
@@ -524,7 +535,8 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 
 
 def insert_correctors(pdr):
-    offset = 0.0
+    offset = 0
+    pdr['l_kick']=0.1
     ring = pdr.lines['ring']
     period = pdr.lines['period']
 
@@ -533,13 +545,15 @@ def insert_correctors(pdr):
         [[el, '+', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
         [[el, '-', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
         [[el, '+', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
-        [[el, '-', 'QDA_M'] for el in ['1L8','2L8','3L8']]
+        [[el, '-', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
+        [[el, '+', 'QDDoub_'] for el in ['1R','2R','3R']] +
+        [[el, '-', 'QDDoub_'] for el in ['1L','2L','3L']]
     )
 
     for elem, sign, prefix in qy_ring_list:
         v_name = f'vk_ring_{elem}'
         pdr[v_name] = 0.0  # Unique vertical kick variable
-        ring.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]]), #edge_entry_active=True, edge_exit_active=True), 
+        ring.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
                     at=sign + str(offset), from_=prefix + elem, from_anchor='end')
 
     # horizontal correctors
@@ -555,7 +569,7 @@ def insert_correctors(pdr):
     for elem, sign, prefix in qx_ring_list:
         h_name = f'hk_ring_{elem}'
         pdr[h_name] = 0.0  # Unique horizontal kick variable
-        ring.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]]),# edge_entry_active=True, edge_exit_active=True), 
+        ring.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
                     at=sign + str(offset), from_=prefix + elem, from_anchor='end')
 
     # vertical correctors
@@ -563,13 +577,15 @@ def insert_correctors(pdr):
         [[el, '+', 'QDA_'] for el in ['PR1','PR2','PR3','PR4','PR5','PR6','PR7']] +
         [[el, '-', 'QDA_'] for el in ['PL1','PL2','PL3','PL4','PL5','PL6','PL7']] +
         [[el, '+', 'QDA_M'] for el in ['PR8']] +
-        [[el, '-', 'QDA_M'] for el in ['PL8']]
+        [[el, '-', 'QDA_M'] for el in ['PL8']] +
+        [[el, '+', 'QDDoub_'] for el in ['PR']] +
+        [[el, '-', 'QDDoub_'] for el in ['PL']]
     )
 
     for elem, sign, prefix in qy_period_list:
         v_name = f'vk_per_{elem}'
         pdr[v_name] = 0.0
-        period.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]]),# edge_entry_active=True, edge_exit_active=True), 
+        period.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
                       at=sign + str(offset), from_=prefix + elem, from_anchor='end')
 
     # horizontal correctors
@@ -585,7 +601,7 @@ def insert_correctors(pdr):
     for elem, sign, prefix in qx_period_list:
         h_name = f'hk_per_{elem}'
         pdr[h_name] = 0.0
-        period.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]]),# edge_entry_active=True, edge_exit_active=True), 
+        period.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
                       at=sign + str(offset), from_=prefix + elem, from_anchor='end')
         
     

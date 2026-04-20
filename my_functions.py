@@ -76,7 +76,10 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
                if 'Sext' in tab_pan['element_type'][ind]])
            kstr = scK1*tab_pan['k2l'][ind]/tab_pan['length'][ind]/max_k2l *3
            axl.add_patch( patches.Rectangle( (tab_pan['s'][ind], min(0.0, kstr)) ,
-               tab_pan['s'][ind+1] - tab_pan['s'][ind], abs(kstr), fill=True, color='tab:green' ) )     
+               tab_pan['s'][ind+1] - tab_pan['s'][ind], abs(kstr), fill=True, color='tab:green' ) )   
+        if tab_pan['element_type'][ind].find('Multipole') >= 0:
+           axl.add_patch( patches.Rectangle( (tab_pan['s'][ind], -0.08), 
+               tab_pan['s'][ind+1] - tab_pan['s'][ind], 0.16, fill=True, color='tab:pink' ) )   
     axp.plot( [acc.get_length(), acc.get_length()], limy1, color='black', 
               linestyle=(0, (8, 8)), linewidth=.5 )
 
@@ -97,10 +100,13 @@ def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
     
     pos=0
     for item in pdr.vars.keys()[2:]:
-       print( "'" + item + f"': {pdr[item]:8.4f}," )
-       axt.text( pos%4 , .6 - .1*int( pos/4 ),
-          "'" + item + f"': {pdr[item]:8.4f},", horizontalalignment='left' )
-       pos += 1
+         val = pdr[item]
+         if abs(val) > 1e-12:   # avoids floating point "fake zeros"
+            print("'" + item + f"': {val:8.4f},")
+            axt.text(pos%4 , .6 - .1*int(pos/4),
+                  "'" + item + f"': {val:8.4f},",
+                  horizontalalignment='left')
+            pos += 1
     file=os.getcwd()
     if grname != 'NoGraph': 
        if grname in file:
