@@ -547,13 +547,17 @@ def insert_correctors(pdr):
         [[el, '+', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
         [[el, '-', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
         [[el, '+', 'QDDoub_'] for el in ['1R','2R','3R']] +
-        [[el, '-', 'QDDoub_'] for el in ['1L','2L','3L']]
+        [[el, '-', 'QDDoub_'] for el in ['1L','2L','3L']] +
+        [[el, '+', 'QDDS_'] for el in ['1R','2R','3R']] +
+        [[el, '-', 'QDDS_'] for el in ['1L','2L','3L']] +
+        [[el, '+', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
+        [[el, '-', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
     )
 
     for elem, sign, prefix in qy_ring_list:
         v_name = f'vk_ring_{elem}'
         pdr[v_name] = 0.0  # Unique vertical kick variable
-        ring.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
+        ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
                     at=sign + str(offset), from_=prefix + elem, from_anchor='end')
 
     # horizontal correctors
@@ -563,13 +567,15 @@ def insert_correctors(pdr):
         [[el, '+', 'QFA_M'] for el in ['1R7','2R7','3R7']] +
         [[el, '-', 'QFA_M'] for el in ['1L7','2L7','3L7']] +
         [[el, '+', 'QFDoub_'] for el in ['1R','2R','3R']] +
-        [[el, '-', 'QFDoub_'] for el in ['1L','2L','3L']]
+        [[el, '-', 'QFDoub_'] for el in ['1L','2L','3L']] +
+        [[el, '+', 'QFDS_'] for el in ['1R','2R','3R']] +
+        [[el, '-', 'QFDS_'] for el in ['1L','2L','3L']] 
     )
 
     for elem, sign, prefix in qx_ring_list:
         h_name = f'hk_ring_{elem}'
         pdr[h_name] = 0.0  # Unique horizontal kick variable
-        ring.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
+        ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
                     at=sign + str(offset), from_=prefix + elem, from_anchor='end')
 
     # vertical correctors
@@ -579,13 +585,17 @@ def insert_correctors(pdr):
         [[el, '+', 'QDA_M'] for el in ['PR8']] +
         [[el, '-', 'QDA_M'] for el in ['PL8']] +
         [[el, '+', 'QDDoub_'] for el in ['PR']] +
-        [[el, '-', 'QDDoub_'] for el in ['PL']]
+        [[el, '-', 'QDDoub_'] for el in ['PL']] +
+        [[el, '+', 'QDDS_'] for el in ['PR']] +
+        [[el, '-', 'QDDS_'] for el in ['PL']] +
+        [[el, '+', 'QDTrip_'] for el in ['PR1']] +
+        [[el, '-', 'QDTrip_'] for el in ['PL1']]
     )
 
     for elem, sign, prefix in qy_period_list:
         v_name = f'vk_per_{elem}'
         pdr[v_name] = 0.0
-        period.insert(pdr.new('My_'+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
+        period.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
                       at=sign + str(offset), from_=prefix + elem, from_anchor='end')
 
     # horizontal correctors
@@ -595,38 +605,157 @@ def insert_correctors(pdr):
         [[el, '+', 'QFA_M'] for el in ['PR7']] +
         [[el, '-', 'QFA_M'] for el in ['PL7']]+
         [[el, '+', 'QFDoub_'] for el in ['PR']] +
-        [[el, '-', 'QFDoub_'] for el in ['PL']]
+        [[el, '-', 'QFDoub_'] for el in ['PL']] +
+        [[el, '+', 'QFDS_'] for el in ['PR']] +
+        [[el, '-', 'QFDS_'] for el in ['PL']] 
     )
 
     for elem, sign, prefix in qx_period_list:
         h_name = f'hk_per_{elem}'
         pdr[h_name] = 0.0
-        period.insert(pdr.new('Mx_'+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
+        period.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
                       at=sign + str(offset), from_=prefix + elem, from_anchor='end')
         
-    
+    return pdr
+
+def orbit_correction(pdr,twiss,threading=False):   
+    ring = pdr.lines['ring']
+    period=pdr.lines['period']
     
     tt = ring.get_table()
-
-    # 2. Identify Monitors (BPMs) 
-    # This finds all elements whose names start with 'BPM'
-    bpm_names = tt.rows['BPM.*'].name
-    
-    # 3. Identify Correctors
-    # In your script, correctors are often named 'Mx' for horizontal and 'My' for vertical
+    bpm_names_x = tt.rows['BPMx.*'].name
+    bpm_names_y = tt.rows['BPMy.*'].name
+    #bpm_names = tt.rows['BPM.*'].name
     corr_x_names = tt.rows['Mx.*'].name
     corr_y_names = tt.rows['My.*'].name
 
-    # 4. Assign these to the line's steering attributes
-    # This tells Xsuite: "Use these elements for any orbit/trajectory correction"
-    ring.steering_monitors_x = bpm_names
-    ring.steering_monitors_y = bpm_names
+    ring.steering_monitors_x = bpm_names_x
+    ring.steering_monitors_y = bpm_names_y
     ring.steering_correctors_x = corr_x_names
     ring.steering_correctors_y = corr_y_names
 
-    twiss=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                   spin=True, polarization=True )
+    if threading is False:
+       ring.correct_trajectory(twiss_table=twiss)
+    else:
+        tw0 = twiss
 
+        corr_handler = ring.correct_trajectory(twiss_table=tw0, run=False)
+        corr_handler.thread(ds_thread=10., rcond_long=1e-2)
+
+        tw1 = ring.twiss(method='6d')
+        ring.correct_trajectory(twiss_table=tw1)
+
+    return pdr
+
+def insert_BPMs_all(pdr, start_at_turn, stop_at_turn, fRev):
+   
+   ring=pdr.lines['ring']
+
+   bpm = xt.BeamPositionMonitor(
+    start_at_turn=start_at_turn, 
+    stop_at_turn=stop_at_turn, 
+    frev=fRev
+   )
+
+   tab_r=ring.get_table()
+   
+   quads_ring = tab_r.rows[tab_r.element_type == 'Quadrupole'].name
+
+   for elem_name in quads_ring:
+        element = ring[elem_name]
+        
+        if element.k1 > 0:
+            ring.insert(
+                'BPMx_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+        
+        if element.k1 < 0:
+            ring.insert(
+                'BPMy_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+
+   period=pdr.lines['period']
+   tab_p=period.get_table()
+   quads_period = tab_p.rows[tab_p.element_type == 'Quadrupole'].name
+
+   for elem_name in quads_period:
+        element = period[elem_name]
+        
+        if element.k1 > 0:
+            period.insert(
+                'BPMx_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+        
+        if element.k1 < 0:
+            period.insert(
+                'BPMy_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+
+def insert_correctors_all(pdr):
+    pdr['l_kick'] = 0.2
+    offset = 0.2
+    
+    for line_name in ['ring', 'period']:
+        line = pdr.lines[line_name]
+        
+        # Snapshot the names to avoid iterator mutation errors
+        all_names = list(line.element_names)
+
+        for elem_name in all_names:
+            # Skip internal markers and ensure name exists
+            if elem_name.startswith('_') or elem_name not in line.element_names:
+                continue
+                
+            element = line[elem_name]
+            
+            
+            # We only care about Quadrupoles
+            if hasattr(element, 'k1'):  
+                if element.k1 > 0:
+                    h_var = f'hk_{line_name}_{elem_name}'
+                    pdr[h_var] = 0.0 
+                    line.insert(
+                        pdr.new(f'Mx_{elem_name}', xt.Multipole, knl=[pdr.ref[h_var]], length='l_kick'),
+                        at=offset, 
+                        from_=elem_name, 
+                        from_anchor='end'
+                    )
+
+                elif element.k1 < 0:
+                    v_var = f'vk_{line_name}_{elem_name}'
+                    pdr[v_var] = 0.0 
+                    line.insert(
+                        pdr.new(f'My_{elem_name}', xt.Multipole, ksl=[pdr.ref[v_var]], length='l_kick'),
+                        at=offset, 
+                        from_=elem_name, 
+                        from_anchor='end'
+                    )
+
+    ring = pdr.lines['ring']
+    tt = ring.get_table()
+    
+    ring.steering_monitors_x = tt.rows['BPM.*'].name
+    ring.steering_monitors_y = tt.rows['BPM.*'].name
+    ring.steering_correctors_x = tt.rows['Mx.*'].name
+    ring.steering_correctors_y = tt.rows['My.*'].name
+
+    twiss = ring.twiss(method='6d', radiation_integrals=True)
     ring.correct_trajectory(twiss_table=twiss)
 
     return pdr
