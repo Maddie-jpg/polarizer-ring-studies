@@ -46,3 +46,5 @@ Polarizer-Ring-Studies/
 * [Future Circular Collider Feasibility Study Report: Volume 2, Accelerators, Technical Infrastructure and Safety](https://arxiv.org/pdf/2505.00274)
 
 * [Compilation of papers on RF electronics](https://cds.cern.ch/record/1407402/files/p223.pdf)
+
+![](https://cdn.dribbble.com/userupload/25473001/file/original-a900f3853728a14c547a0d3182815f03.gif)
