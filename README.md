@@ -8,25 +8,25 @@ FCC-ee is a study on an electron-positron collider with a circumference of about
 
 ## Folder Structure
 ```
-polarizer-ring-studies/
-├── assignments/                           # University related work goes in the assignments folder
-│   ├── final dissertation/
-│   ├── interim dissertation/
-│   ├── journal paper review/
-│   └── project plan/
+Polarizer-Ring-Studies/
+├── Assignments/                           # University related work goes in the assignments folder
+│   ├── Final Dissertation/
+│   ├── Interim Dissertation/
+│   ├── Journal Paper Review/
+│   └── Project Plan/
 ├── CC files/                 
-├── essentials/                            # Lattice design, analysis, and associated functions
-│   ├── design_n/                          # Each design/edit gets its own folder (design_0, design_1, etc.)
-│   │   ├── lattice_building_n.ipynb       # Script to build the lattice - including matching routines
-│   │   ├── json_files                     # JSON outputs from lattice_building_n.ipynb
-│   │   ├── plots                          # Plot outputs from lattice_analysis.ipynb
-│   │   └── A Design Description           # Small .txt file describing the lattice being built and any changes from previous iterations
-│   ├── lattice_analysis.ipynb             # Analysis of each design (Twiss, working point, DA, MA etc.)
-│   ├── Tune Diagram/                      # Function to plot resonance lines for WP plots (from Hannes Bartosik)
-│   ├── xutil_DA_CC/                       # Function to plot DA and MA (from Kyriacos Skoufaris)
-│   └── constants.py                       # values such as VRF and WP are put in here so they can be changed across all codes
-├── misc. plots/   
-├── notebooks/   
+├── Design 1/                              # Compact ring 90° phase advance
+│   ├── linear_optics_variation_1.py       # Initial ring design
+│   ├── linear_optics_variation_1.py       # Initial ring design with matching QDs
+│   ├── sextupole_configs.py               # Functions for sextupole insertion (+ BPMs and correctors)
+│   ├── constants.py                       # Values such as VRF and WP are put in here so they can be changed across all codes
+│   ├── build_and_analysis.ipynb           # Loads in lattice and performs analysis
+│   ├── json_files/                        # Saved lattice json files
+│   └── config_Dn/                         # Each sextupole config gets its own folder containing results (config_D0, config_D1, etc.)
+├── Tune Diagram/                          # Function to plot resonance lines for WP plots (from Hannes Bartosik)
+├── xutil_DA_CC/                           # Contains functions to plot DA and MA (from Kyriacos Skoufaris)
+├── my_functions.py                        # Misc. functions that can be used across designs   
+├── Junk Draw/                             # Things I should probably delete but might need 
 ├── .gitignore              
 └── README.md                
 ```

@@ -12,12 +12,12 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
                            height_ratios=(1, 3, 2, 2))
     axl, axp, axw, axt = ax  # Lattice, Optics, W-functions, Text Table
     
-    # Link the x-axes so zooming on one zooms all
+    # Link the x-axes
     axp.sharex(axl)
     axw.sharex(axl)
     fig.subplots_adjust(hspace=0.1, top=0.95, bottom=0.05, left=.1)
 
-    # --- Subplot 2: Beta and Dispersion ---
+    #Subplot 2: Beta and Dispersion
     axp.set_ylabel(r'$\beta_x, \beta_y$ [m]')
     indm = np.argmin(np.abs(acc_tw.s - lims[-1])) + 1
     
@@ -31,7 +31,7 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     axp2.set_ylim(limy2)
     axp.set_xlim(lims)
 
-    # --- Subplot 3: Chromatic W Functions and second order dispersion ---
+    # Chromatic W Functions and second order dispersion
     axw.plot(acc_tw.s[:indm], acc_tw.wx_chrom[:indm], label='$W_x$', color='red')
     axw.plot(acc_tw.s[:indm], acc_tw.wy_chrom[:indm], label='$W_y$', color='blue')
     axw2 = axw.twinx()
@@ -57,7 +57,7 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     axw2.legend(loc='upper right', fontsize=8)
     axw2.set_ylabel(r"$D'_x$ [m]")
     
-    # --- Subplot 1: Lattice Sketch ---
+    #Lattice Sketch
     axl.set_ylim(-0.5, 1.5)
     axl.axis('off')
     tab_pan = acc.get_table(attr=True).to_pandas()
@@ -83,7 +83,7 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     axp.plot( [acc.get_length(), acc.get_length()], limy1, color='black', 
               linestyle=(0, (8, 8)), linewidth=.5 )
 
-    # --- Subplot 4: Text Area ---
+    # Text Area
     axt.axis('off')
     axt.set_xlim(-0.3, 4.0)
     axt.set_ylim(0, 1.5)
@@ -101,7 +101,7 @@ def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
     pos=0
     for item in pdr.vars.keys()[2:]:
          val = pdr[item]
-         if abs(val) > 1e-12:   # avoids floating point "fake zeros"
+         if abs(val) > 1e-12: 
             print("'" + item + f"': {val:8.4f},")
             axt.text(pos%4 , .6 - .1*int(pos/4),
                   "'" + item + f"': {val:8.4f},",
