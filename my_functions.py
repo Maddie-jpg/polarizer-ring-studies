@@ -166,3 +166,52 @@ def misalignments(line, seed=None):
    return line
 
 
+def survey_plot(ring):
+    fig, ax = plt.subplots(figsize=(12, 12))
+    sv = ring.survey()
+    sv.plot(ax=ax) 
+    df = sv.to_pandas()
+
+    bpm_offset = 3.0  # Meters to push BPMs out
+    k_height = 2.0    # Transverse thickness of the kicker box 
+
+    for name in df['name']:
+        # Get the survey row for this element
+        row = df[df['name'] == name].iloc[0]
+        
+        # Logic for Kickers (Mx and My)
+        if name.startswith(('Mx', 'My')):
+        
+            length = ring.element_dict[name].length
+            if length == 0: length = 0.5 # Minimum visible length if it's a marker
+            
+            color = 'hotpink' if name.startswith('Mx') else 'cyan'
+            label = 'H-Kicker' if name.startswith('Mx') else 'V-Kicker'
+            
+        
+            angle_deg = np.degrees(row['theta'])
+            
+        
+            rect = patches.Rectangle(
+                (row['Z'] - length/2, row['X'] - k_height/2), 
+                length, k_height, 
+                angle=angle_deg, rotation_point='center',
+                color=color, zorder=10, label=label
+            )
+            ax.add_patch(rect)
+
+        elif 'BPM' in name.upper():
+
+            direction = row['theta'] + np.pi/2
+            
+            off_z = row['Z'] + bpm_offset * np.cos(direction)
+            off_x = row['X'] + bpm_offset * np.sin(direction)
+            
+            ax.scatter(off_z, off_x, color='black', s=10, zorder=11, label='BPMs (with radial offset)')
+
+    handles, labels = ax.get_legend_handles_labels()
+    unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
+    ax.legend(*zip(*unique), loc='center left', bbox_to_anchor=(1, 0.5))
+
+    ax.set_aspect('equal')
+    plt.show()
