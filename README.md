@@ -47,4 +47,4 @@ Polarizer-Ring-Studies/
 
 * [Compilation of papers on RF electronics](https://cds.cern.ch/record/1407402/files/p223.pdf)
 
-![]([[https://cdn.dribbble.com/userupload/25473001/file/original-a900f3853728a14c547a0d3182815f03.gif](https://media.tenor.com/mMkJeuyHkRYAAAAj/cat-cat-on-computer.gif)]
+![](https://cdn.dribbble.com/userupload/25473001/file/original-a900f3853728a14c547a0d3182815f03.gif)
