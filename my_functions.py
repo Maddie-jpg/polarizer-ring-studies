@@ -134,8 +134,10 @@ def SpuckParsAus( acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
 
 
 
-def misalignments(line):
+def misalignments(line, seed=None):
    sigma=0.3e-3
+
+   rng=np.random.default_rng(seed)
 
    tab=line.get_table()
    #Quad and sextupole misalignments
@@ -148,16 +150,16 @@ def misalignments(line):
         ref = line.element_refs[name]
         
         # Apply translations
-        ref.shift_x = np.random.normal(0, sigma)
-        ref.shift_y = np.random.normal(0, sigma)
-        ref.shift_s = np.random.normal(0, sigma)
+        ref.shift_x = rng.normal(0, sigma)
+        ref.shift_y = rng.normal(0, sigma)
+        ref.shift_s = rng.normal(0, sigma)
         
         # Apply rotations (in radians)
-        ref.rot_s_rad = np.random.normal(0, sigma)
-        ref.rot_x_rad = np.random.normal(0, sigma)
-        ref.rot_y_rad = np.random.normal(0, sigma)
+        ref.rot_s_rad = rng.normal(0, sigma)
+        ref.rot_x_rad = rng.normal(0, sigma)
+        ref.rot_y_rad = rng.normal(0, sigma)
 
-        relative_error = 1 + np.random.normal(0, 1e-3)
+        relative_error = 1 + rng.normal(0, 1e-3)
         ref.knl *= relative_error
         ref.ksl *= relative_error
 
