@@ -659,7 +659,7 @@ def insert_BPMs_all(pdr, start_at_turn, stop_at_turn, fRev):
                 from_anchor='end'
             )
 
-def insert_correctors_no_QDAM(pdr):
+def insert_correctors_var2(pdr):
     offset =(pdr['l_quad']+pdr['l_drift'])/2
     pdr['l_kick']=0.1
     ring = pdr.lines['ring']
@@ -677,8 +677,10 @@ def insert_correctors_no_QDAM(pdr):
 
     #vertical correctors
     qy_ring_list = (
-        [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7','1R8','2R8','3R8']] +
-        [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7','1L8','2L8','3L8']] +
+        [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
+        [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
+        [[el, '-', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
+        [[el, '+', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
         [[el, '-', 'QDDoub_'] for el in ['1R','2R','3R']] +
         [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
         [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
@@ -697,10 +699,10 @@ def insert_correctors_no_QDAM(pdr):
 
     # horizontal correctors
     qx_ring_list = (
-        [[el, '-', 'QFA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','2R1','2R2','2R3','2R4','2R5','2R6','3R1','3R2','3R3','3R4','3R5','3R6']] +
-        [[el, '+', 'QFA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6','1RC','2RC','3RC']] +
-        [[el, '-', 'QFA_M'] for el in ['1R7','2R7','3R7']] +
-        [[el, '+', 'QFA_M'] for el in ['1L7','2L7','3L7']] +
+        [[el, '-', 'QFA_'] for el in ['1R1','1R2','1R3','1R4','1R5','2R1','2R2','2R3','2R4','2R5','3R1','3R2','3R3','3R4','3R5']] +
+        [[el, '+', 'QFA_'] for el in ['1L1','1L2','1L3','1L4','1L5','2L1','2L2','2L3','2L4','2L5','3L1','3L2','3L3','3L4','3L5','1RC','2RC','3RC']] +
+        [[el, '-', 'QFA_M'] for el in ['1R8','2R8','3R8']] +
+        [[el, '+', 'QFA_M'] for el in ['1L8','2L8','3L8']] +
         [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
         [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
         [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +

@@ -139,6 +139,9 @@ def misalignments(line, seed=None):
 
    rng=np.random.default_rng(seed)
 
+   actual_seed = rng.bit_generator.seed_seq.entropy
+   print(f"Applying misalignments with seed: {actual_seed}")
+
    tab=line.get_table()
    #Quad and sextupole misalignments
    quads = list(tab.rows[tab.element_type == 'Quadrupole'].name)
@@ -200,14 +203,25 @@ def survey_plot(ring):
             )
             ax.add_patch(rect)
 
-        elif 'BPM' in name.upper():
+        elif name.startswith(('BPMx', 'BPMy')):
 
             direction = row['theta'] + np.pi/2
             
             off_z = row['Z'] + bpm_offset * np.cos(direction)
             off_x = row['X'] + bpm_offset * np.sin(direction)
             
-            ax.scatter(off_z, off_x, color='black', s=10, zorder=11, label='BPMs (with radial offset)')
+            if name.startswith('BPMx'):
+                bpm_color = 'red'
+                bpm_label = 'BPM (Horizontal)'
+            elif name.startswith('BPMy'):
+                bpm_color = 'purple'
+                bpm_label = 'BPM (Vertical)'
+            else:
+                bpm_color = 'black'
+                bpm_label = 'BPM (Other)'
+
+            ax.scatter(off_z, off_x, color=bpm_color, s=20, 
+                       zorder=11, label=bpm_label)
 
     handles, labels = ax.get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
