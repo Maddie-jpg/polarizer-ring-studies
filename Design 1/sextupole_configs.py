@@ -535,8 +535,8 @@ def insert_correctors(pdr):
         [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
         [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
         [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
-        [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
+        [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] 
+        #[[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
     )
 
     for elem, sign, prefix in qy_ring_list:
@@ -556,7 +556,8 @@ def insert_correctors(pdr):
         [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
         [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
         [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] 
+        [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] +
+        [[el, '+', 'QFTripC_'] for el in ['1L2','2L2','3L2']]
     )
 
     for elem, sign, prefix in qx_ring_list:
