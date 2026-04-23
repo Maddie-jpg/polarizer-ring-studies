@@ -535,8 +535,8 @@ def insert_correctors(pdr):
         [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
         [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
         [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] 
-        #[[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
+        [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
+        [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
     )
 
     for elem, sign, prefix in qy_ring_list:
@@ -659,55 +659,61 @@ def insert_BPMs_all(pdr, start_at_turn, stop_at_turn, fRev):
                 from_anchor='end'
             )
 
-def insert_correctors_all(pdr):
-    pdr['l_kick'] = 0.2
-    offset = 0.2
-    
-    for line_name in ['ring', 'period']:
-        line = pdr.lines[line_name]
-        
-        # Snapshot the names to avoid iterator mutation errors
-        all_names = list(line.element_names)
-
-        for elem_name in all_names:
-            # Skip internal markers and ensure name exists
-            if elem_name.startswith('_') or elem_name not in line.element_names:
-                continue
-                
-            element = line[elem_name]
-            
-            
-            # We only care about Quadrupoles
-            if hasattr(element, 'k1'):  
-                if element.k1 > 0:
-                    h_var = f'hk_{line_name}_{elem_name}'
-                    pdr[h_var] = 0.0 
-                    line.insert(
-                        pdr.new(f'Mx_{elem_name}', xt.Multipole, knl=[pdr.ref[h_var]], length='l_kick'),
-                        at=offset, 
-                        from_=elem_name, 
-                        from_anchor='end'
-                    )
-
-                elif element.k1 < 0:
-                    v_var = f'vk_{line_name}_{elem_name}'
-                    pdr[v_var] = 0.0 
-                    line.insert(
-                        pdr.new(f'My_{elem_name}', xt.Multipole, ksl=[pdr.ref[v_var]], length='l_kick'),
-                        at=offset, 
-                        from_=elem_name, 
-                        from_anchor='end'
-                    )
-
+def insert_correctors_no_QDAM(pdr):
+    offset =(pdr['l_quad']+pdr['l_drift'])/2
+    pdr['l_kick']=0.1
     ring = pdr.lines['ring']
-    tt = ring.get_table()
-    
-    ring.steering_monitors_x = tt.rows['BPM.*'].name
-    ring.steering_monitors_y = tt.rows['BPM.*'].name
-    ring.steering_correctors_x = tt.rows['Mx.*'].name
-    ring.steering_correctors_y = tt.rows['My.*'].name
+    drift_map = {
+        'QDA_':    'l_drift',
+        'QFA_':    'l_drift',
+        'QDA_M':   'l_drift',
+        'QFA_M':   'l_drift',
+        'QDDS_':   'l_drift + dl_drift', # Using the 'DrarcS' logic
+        'QFDS_':   'l_drift + dl_drift',
+        'QDDoub_': 'l_doub',             # Doublet drift
+        'QFDoub_': 'l_doub',
+        'QDTrip_': 'l_tripl',            # Triplet drift
+    }
 
-    twiss = ring.twiss(method='6d', radiation_integrals=True)
-    ring.correct_trajectory(twiss_table=twiss)
+    #vertical correctors
+    qy_ring_list = (
+        [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7','1R8','2R8','3R8']] +
+        [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7','1L8','2L8','3L8']] +
+        [[el, '-', 'QDDoub_'] for el in ['1R','2R','3R']] +
+        [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
+        [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
+        [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
+        [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
+        [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
+    )
 
+    for elem, sign, prefix in qy_ring_list:
+        current_drift = drift_map.get(prefix, 'l_drift')
+        dynamic_offset = f'({current_drift}+l_quad) / 2'
+        v_name = f'vk_ring_{elem}'
+        pdr[v_name] = 0.0  # Unique vertical kick variable
+        ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
+                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+
+    # horizontal correctors
+    qx_ring_list = (
+        [[el, '-', 'QFA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','2R1','2R2','2R3','2R4','2R5','2R6','3R1','3R2','3R3','3R4','3R5','3R6']] +
+        [[el, '+', 'QFA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6','1RC','2RC','3RC']] +
+        [[el, '-', 'QFA_M'] for el in ['1R7','2R7','3R7']] +
+        [[el, '+', 'QFA_M'] for el in ['1L7','2L7','3L7']] +
+        [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
+        [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
+        [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +
+        [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] +
+        [[el, '+', 'QFTripC_'] for el in ['1L2','2L2','3L2']]
+    )
+
+    for elem, sign, prefix in qx_ring_list:
+        current_drift = drift_map.get(prefix, 'l_drift')
+        dynamic_offset = f'({current_drift}+l_quad) / 2'
+        h_name = f'hk_ring_{elem}'
+        pdr[h_name] = 0.0  # Unique horizontal kick variable
+        ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
+                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+        
     return pdr

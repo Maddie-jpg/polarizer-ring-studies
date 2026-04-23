@@ -12,7 +12,7 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 import xtrack as xt
-import Essentials.constants as constants
+import constants
 import numpy as np
 
 # %% create environment, parameters and first simple cells & structures
