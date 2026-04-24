@@ -211,10 +211,10 @@ def survey_plot(ring):
             off_x = row['X'] + bpm_offset * np.sin(direction)
             
             if name.startswith('BPMx'):
-                bpm_color = 'red'
+                bpm_color = 'hotpink'
                 bpm_label = 'BPM (Horizontal)'
             elif name.startswith('BPMy'):
-                bpm_color = 'purple'
+                bpm_color = 'cyan'
                 bpm_label = 'BPM (Vertical)'
             else:
                 bpm_color = 'black'

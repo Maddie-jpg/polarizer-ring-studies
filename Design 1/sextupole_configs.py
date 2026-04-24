@@ -4,28 +4,79 @@ Each function should include a description of the configuration
 
 """
 import xtrack as xt
+import numpy as np
+import numpy as np
+import xtrack as xt
 
-def ChromCorrect_dq(ring, pdr, ksf, ksd, MakePlot=False):
-        
-    opt_chrom = ring.match(
+def ChromCorrect(ring, pdr, variables, MakePlot=False):
+    ring.configure_radiation(model='mean')
+    
+    # --- Phase 0: Linear baseline ---
+    print("Correcting linear chromaticity to zero...")
+    ring.match(
         solve=True,
-        verbose=False,
         method='6d',
-        vary=xt.VaryList([ksf, ksd], step=1e-3),
+        vary=xt.VaryList(variables, step=1e-4),
         targets=[
-            # Global goals
-            xt.Target(dqx=0, tol=1e-4),
-            xt.Target(dqy=0, tol=1e-4),
-            
-            
+            xt.Target('dqx', 0, tol=1e-4),
+            xt.Target('dqy', 0, tol=1e-4),
         ])
-    opt_chrom.target_status()
-    opt_chrom.run_jacobian(n_steps=100)
-    opt_chrom.target_status()
-    # Print the final matched strengths
 
-    print(f"Matched kSF: {pdr.vars[f'{ksf}']._get_value():.6f}")
-    print(f"Matched kSD: {pdr.vars[f'{ksd}']._get_value():.6f}")   
+    tw = ring.twiss(method='6d')
+    # Use actual values as starting points for the loop
+    curr_x, curr_y = tw.ddqx, tw.ddqy
+    last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
+
+    print(f"Starting iterative correction. Initial ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
+
+    for i in range(10):
+        # Calculate next targets based on ACTUAL CURRENT values
+        target_x = curr_x * 0.8
+        target_y = curr_y * 0.8
+        
+        if abs(target_x) < 0.5 and abs(target_y) < 0.5:
+            target_x, target_y = 0, 0
+
+        try:
+            print(f"\nIteration {i+1}: Targeting ddqx={target_x:.4f}, ddqy={target_y:.4f}")   
+
+            opt = ring.match(
+                solve=False,
+                method='6d',
+                vary=xt.VaryList(variables, step=1e-4),
+                targets=[
+                    xt.Target('dqx', 0, tol=1e-4),
+                    xt.Target('dqy', 0, tol=1e-4),
+                    xt.Target('ddqx', target_x, tol=5),
+                    xt.Target('ddqy', target_y, tol=5),
+                ])
+            
+            opt.run_jacobian(n_steps=100)
+            tw_check = ring.twiss(method='6d')
+
+            # Check if we made ANY progress (at least 5% reduction)
+            if abs(tw_check.ddqx) < abs(curr_x) or abs(tw_check.ddqy) < abs(curr_y):
+                # SUCCESS: Update state
+                last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
+                curr_x, curr_y = tw_check.ddqx, tw_check.ddqy
+                print(f"Progress made. New ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
+                
+                if target_x == 0 and target_y == 0:
+                    break
+            else:
+                print("No progress made in this step.")
+                raise ValueError("Stalled")
+
+        except Exception:
+            print(f"Convergence failed. Reverting to last successful values and exiting.")
+            for var, val in last_success_vars.items():
+                pdr.vars[var] = val
+            break
+            
+    for v in variables:
+        print(f"Final {v}: {pdr.vars[v]._get_value():.6f}")
+        
+    return pdr
 
 def ChromCorrect_ddq(ring, pdr, ksf, ksd,ksf2,ksd2,ddqx_val,ddqy_val,tol_val, MakePlot=False):
         
@@ -122,8 +173,8 @@ def config_D1(pdr):
             period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
                     at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
     
-
-    ChromCorrect_dq(ring, pdr, 'k2XF2arc', 'k2XD2arc', MakePlot=False)
+    variables=['k2XF2arc', 'k2XD2arc']
+    ChromCorrect(ring,pdr, variables, MakePlot=False)
 
     return pdr
 
@@ -186,11 +237,14 @@ def config_D2(pdr):
         period.insert( pdr.new('XF2arc2_'+elem[0], 'XF2arc2'), 
                         at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
 
-    ringS1_chroma = ring.match( method='6d', solve=True,
+    '''ringS1_chroma = ring.match( method='6d', solve=True,
     vary = [ xt.VaryList(['k2XF2arc', 'k2XD2arc','k2XF2arc2'], step=1e-4 )],
     targets = [ xt.TargetSet(dqx=0, dqy=0,tol=1e-5 ) ]  )
 
-    ringS1_chroma.run_jacobian(10)
+    ringS1_chroma.run_jacobian(10)'''
+
+    variables=['k2XF2arc', 'k2XD2arc','k2XF2arc2']
+    ChromCorrect(ring,pdr, variables, MakePlot=False)
 
     return pdr
 
@@ -231,8 +285,9 @@ def config_D3(pdr):
     for elem in [ ['PR3', '-'], ['PR5', '-'], ['PL3', '+'], ['PL5', '+'] ]:
         period.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'), 
                         at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
-        
-    ChromCorrect_dq(ring, pdr, 'k2XF1arc', 'k2XD1arc', MakePlot=False)
+
+    variables=['k2XF1arc', 'k2XD1arc']
+    ChromCorrect(ring, pdr,variables, MakePlot=False)
 
     return pdr
     
@@ -270,7 +325,8 @@ def config_D4(pdr):
         period.insert( pdr.new('XF3arc_' + elem, 'XF3arc'), 
                     at ='(l_drift+l_quad)/2', from_='QFA_' + elem )
 
-    ChromCorrect_dq(ring, pdr, 'k2XF3arc', 'k2XD3arc', MakePlot=False)
+    variables=['k2XF3arc', 'k2XD3arc']
+    ChromCorrect(ring, pdr, variables, MakePlot=False)
 
     return pdr
 
@@ -330,7 +386,8 @@ def config_D5(pdr):
         period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
                         at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
 
-    ChromCorrect_dq(ring, pdr, 'k2XF2arc', 'k2XD2arc', MakePlot=False)
+    variables=['k2XF2arc', 'k2XD2arc']
+    ChromCorrect(ring,pdr, variables, MakePlot=False)
 
     return pdr
 
@@ -422,7 +479,8 @@ def config_D6(pdr):
                     at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
     
 
-    ChromCorrect_ddq(ring, pdr, 'k2XF2arc', 'k2XD2arc', MakePlot=False)
+    variables=['k2XF2arc', 'k2XD2arc', 'k2XF2arc2', 'k2XD2arc2']
+    ChromCorrect(ring, pdr,variables, MakePlot=False)
 
     return pdr
 
