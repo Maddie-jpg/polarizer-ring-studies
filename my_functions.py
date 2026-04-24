@@ -229,3 +229,111 @@ def survey_plot(ring):
 
     ax.set_aspect('equal')
     plt.show()
+
+
+import pandas as pd
+def survey_plot_with_strength(ring, scale_height=5.0):
+    # 1. Get the survey data
+    sv = ring.survey()
+    df = sv.to_pandas()
+
+    # 2. Extract strengths from the ring environment
+    def get_element_strength(name):
+        el = ring.element_dict.get(name)
+        if el is None or isinstance(el, xt.Drift): 
+            return None
+        
+        s = 0.0
+        # 1. Check Multipoles (Dipoles, Quads, Sextupoles, Kickers)
+        if hasattr(el, 'knl'):
+            # Sum up all normal components (k0l, k1l, k2l...)
+            # and skew components (ksl)
+            s += np.sum(el.knl) + np.sum(el.ksl)
+        
+        # 2. Check Thick Magnets (if knl is empty)
+        if s == 0:
+            if hasattr(el, 'k1'): s += el.k1 * el.length
+            if hasattr(el, 'k2'): s += el.k2 * el.length
+            # Dipole bending strength for thick elements
+            if hasattr(el, 'k0'): s += el.k0 * el.length 
+            # Kickers often use 'hkick' or 'vkick'
+            if hasattr(el, 'hkick'): s += el.hkick
+            if hasattr(el, 'vkick'): s += el.vkick
+
+        return s
+
+    # Append the strength column to our dataframe
+    df['strength'] = df['name'].apply(get_element_strength)
+    
+    # 3. Setup Plot
+    fig, ax = plt.subplots(figsize=(12, 12))
+    ax.plot(df['Z'], df['X'], color='gray', lw=1, alpha=0.3) # Baseline
+    
+    bpm_offset = 3.0  
+    k_height = 2.0    
+    max_s = df['strength'].abs().max() if df['strength'].abs().max() != 0 else 1.0
+
+    # 4. Iterate through the updated DataFrame
+    for _, row in df.iterrows():
+        name = row['name']
+        z0, x0 = row['Z'], row['X']
+        theta = row['theta']
+        el_len = row['length']
+        strength = row['strength']
+
+        # --- STRENGTH BLOCKS ---
+        if strength != 0:
+            norm_val = strength / max_s
+            draw_len = el_len if el_len > 0 else 0.5
+            
+            perp_angle = theta + np.pi/2
+            h = norm_val * scale_height
+            
+            cos_t, sin_t = np.cos(theta), np.sin(theta)
+            cos_p, sin_p = np.cos(perp_angle), np.sin(perp_angle)
+            
+            # Corner coordinates using your ColView geometry
+            c1 = [z0 - draw_len*cos_t,             x0 - draw_len*sin_t]
+            c2 = [z0,                              x0]
+            c3 = [z0 + h*cos_p,                    x0 + h*sin_p]
+            c4 = [z0 - draw_len*cos_t + h*cos_p,   x0 - draw_len*sin_t + h*sin_p]
+            
+            color = 'red' if strength > 0 else 'blue'
+            ax.add_patch(patches.Polygon([c1, c2, c3, c4], color=color, alpha=0.6, zorder=5))
+
+        # --- KICKERS ---
+        elif name.startswith(('Mx', 'My')):
+            color = 'hotpink' if name.startswith('Mx') else 'cyan'
+            # Centered rectangle for kickers
+            rect = patches.Rectangle(
+                (z0 - el_len, x0 - k_height/2), 
+                el_len if el_len > 0 else 0.5, k_height, 
+                angle=np.degrees(theta), rotation_point='center',
+                color=color, zorder=10
+            )
+            ax.add_patch(rect)
+
+        # --- BPMs ---
+        elif name.startswith(('BPMx', 'BPMy')):
+            direction = theta + np.pi/2
+            ax.scatter(z0 + bpm_offset * np.cos(direction), 
+                       x0 + bpm_offset * np.sin(direction), 
+                       color='hotpink' if 'BPMx' in name else 'cyan', 
+                       s=20, zorder=11)
+
+    # 5. UI Elements (+/- guide and labels)
+    # Use a point near the 5% mark of the ring to show the polarity guide
+    guide = df.iloc[len(df)//20]
+    g_theta = guide['theta'] + np.pi/2
+    for sign, color, side in [("+", "red", 1.5), ("-", "blue", -1.5)]:
+        ax.text(guide['Z'] + (scale_height*side)*np.cos(g_theta), 
+                guide['X'] + (scale_height*side)*np.sin(g_theta), 
+                sign, fontsize=30, color=color, weight='bold', ha='center')
+
+    ax.set_aspect('equal')
+    ax.set_title("Ring Survey: Position + Strength Envelope")
+    plt.xlabel("Z [m]")
+    plt.ylabel("X [m]")
+    plt.show()
+    
+    return df # Returning the dataframe so you can inspect the 'strength' column
