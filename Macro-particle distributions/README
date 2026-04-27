@@ -1,0 +1,62 @@
+# README
+
+This folder contains positron beam distributions at 2.86 GeV for two cases:
+
+1. positron production with a polarized incoming electron beam
+2. positron production with an unpolarized incoming electron beam
+
+---
+
+# 1. PositronBeam_2p86GeV_PolarizedEbeam
+
+## Target and incoming beam information
+
+- Target material: W
+- Target thickness: 15 mm
+- Incoming electron beam energy: 2.86 GeV
+- Incoming electron beam spot size (x/y): 1 mm
+- Incoming electron momentum: (Px, Py, Pz) = (0, 0, 0.9)
+
+## Provided particle distributions
+
+Two particle distributions are provided.
+
+### Column definition
+Sx  Sy  Sz  x[mm]  xp[mrad]  y[mm]  yp[mrad]  p[MeV/c]  t[mm/c]  ID
+
+### Files
+
+- **Feasibility study**  
+  PolarizedBeam_FeasibilityStudy_2.86GeV_20260420.dat
+
+- **Current baseline**  
+  Based on the 3 GHz RF accelerating structures and quadrupole focusing after the positron capture system.  
+  PolarizedBeam_3GHzOption_2.86GeV_20260420.dat
+
+---
+
+# 2. PositronBeam_2p86GeV
+
+## Target and incoming beam information
+
+- Target material: W
+- Target thickness: 15 mm
+- Incoming electron beam energy: 2.86 GeV
+- Incoming electron beam spot size (x/y): 1 mm
+
+## Provided particle distributions
+
+Two particle distributions are provided.
+
+### Column definition
+x[mm]  xp[mrad]  y[mm]  yp[mrad]  t[mm/c]  p[MeV/c]  ID
+
+### Files
+
+- **Feasibility study**  
+  Beam_FeasibilityStudy_20260421.dat
+
+- **Current baseline**  
+  Based on the 3 GHz RF accelerating structures and quadrupole focusing after the positron capture system.  
+  Beam_3GHzOption_2.86GeV_20260421.dat
+

@@ -11,7 +11,7 @@ import xtrack as xt
 def ChromCorrect(ring, pdr, variables, MakePlot=False):
     ring.configure_radiation(model='mean')
     
-    # --- Phase 0: Linear baseline ---
+    
     print("Correcting linear chromaticity to zero...")
     ring.match(
         solve=True,
@@ -23,56 +23,54 @@ def ChromCorrect(ring, pdr, variables, MakePlot=False):
         ])
 
     tw = ring.twiss(method='6d')
-    # Use actual values as starting points for the loop
-    curr_x, curr_y = tw.ddqx, tw.ddqy
-    last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
+    if len(variables)>2:
+        curr_x, curr_y = tw.ddqx, tw.ddqy
+        last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
 
-    print(f"Starting iterative correction. Initial ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
+        print(f"Starting iterative correction. Initial ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
 
-    for i in range(10):
-        # Calculate next targets based on ACTUAL CURRENT values
-        target_x = curr_x * 0.8
-        target_y = curr_y * 0.8
-        
-        if abs(target_x) < 0.5 and abs(target_y) < 0.5:
-            target_x, target_y = 0, 0
-
-        try:
-            print(f"\nIteration {i+1}: Targeting ddqx={target_x:.4f}, ddqy={target_y:.4f}")   
-
-            opt = ring.match(
-                solve=False,
-                method='6d',
-                vary=xt.VaryList(variables, step=1e-4),
-                targets=[
-                    xt.Target('dqx', 0, tol=1e-4),
-                    xt.Target('dqy', 0, tol=1e-4),
-                    xt.Target('ddqx', target_x, tol=5),
-                    xt.Target('ddqy', target_y, tol=5),
-                ])
+        for i in range(10):
+            target_x = curr_x * 0.8
+            target_y = curr_y * 0.8
             
-            opt.run_jacobian(n_steps=100)
-            tw_check = ring.twiss(method='6d')
+            if abs(target_x) < 0.5 and abs(target_y) < 0.5:
+                target_x, target_y = 0, 0
 
-            # Check if we made ANY progress (at least 5% reduction)
-            if abs(tw_check.ddqx) < abs(curr_x) or abs(tw_check.ddqy) < abs(curr_y):
-                # SUCCESS: Update state
-                last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
-                curr_x, curr_y = tw_check.ddqx, tw_check.ddqy
-                print(f"Progress made. New ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
+            try:
+                print(f"\nIteration {i+1}: Targeting ddqx={target_x:.4f}, ddqy={target_y:.4f}")   
+
+                opt = ring.match(
+                    solve=False,
+                    method='6d',
+                    vary=xt.VaryList(variables, step=1e-4),
+                    targets=[
+                        xt.Target('dqx', 0, tol=1e-4),
+                        xt.Target('dqy', 0, tol=1e-4),
+                        xt.Target('ddqx', target_x, tol=5),
+                        xt.Target('ddqy', target_y, tol=5),
+                    ])
                 
-                if target_x == 0 and target_y == 0:
-                    break
-            else:
-                print("No progress made in this step.")
-                raise ValueError("Stalled")
+                opt.run_jacobian(n_steps=100)
+                tw_check = ring.twiss(method='6d')
+                
+                if abs(tw_check.ddqx) < abs(curr_x) or abs(tw_check.ddqy) < abs(curr_y):
+                
+                    last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
+                    curr_x, curr_y = tw_check.ddqx, tw_check.ddqy
+                    print(f"Progress made. New ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
+                    
+                    if target_x == 0 and target_y == 0:
+                        break
+                else:
+                    print("No progress made in this step.")
+                    raise ValueError("Stalled")
 
-        except Exception:
-            print(f"Convergence failed. Reverting to last successful values and exiting.")
-            for var, val in last_success_vars.items():
-                pdr.vars[var] = val
-            break
-            
+            except Exception:
+                print(f"Convergence failed. Reverting to last successful values and exiting.")
+                for var, val in last_success_vars.items():
+                    pdr.vars[var] = val
+                break
+                
     for v in variables:
         print(f"Final {v}: {pdr.vars[v]._get_value():.6f}")
         
