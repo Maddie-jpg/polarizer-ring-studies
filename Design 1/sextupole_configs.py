@@ -716,6 +716,7 @@ def insert_BPMs_all(pdr, start_at_turn, stop_at_turn, fRev):
             )
 
 def insert_correctors_var2(pdr):
+
     offset =(pdr['l_quad']+pdr['l_drift'])/2
     pdr['l_kick']=0.1
     ring = pdr.lines['ring']
@@ -775,3 +776,61 @@ def insert_correctors_var2(pdr):
                     at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
         
     return pdr
+
+def insert_BPMs_all_as_markers(pdr):
+   
+   ring=pdr.lines['ring']
+
+   bpm = xt.Marker()
+
+
+   tab_r=ring.get_table()
+   
+   quads_ring = tab_r.rows[tab_r.element_type == 'Quadrupole'].name
+
+   for elem_name in quads_ring:
+        element = ring[elem_name]
+        
+        if element.k1 > 0:
+            ring.insert(
+                'BPMx_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+        
+        if element.k1 < 0:
+            ring.insert(
+                'BPMy_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+
+   period=pdr.lines['period']
+   tab_p=period.get_table()
+   quads_period = tab_p.rows[tab_p.element_type == 'Quadrupole'].name
+
+   for elem_name in quads_period:
+        element = period[elem_name]
+        
+        if element.k1 > 0:
+            period.insert(
+                'BPMx_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+        
+        if element.k1 < 0:
+            period.insert(
+                'BPMy_'+elem_name,
+                bpm,
+                at=0.0,
+                from_=elem_name,
+                from_anchor='end'
+            )
+   return pdr
