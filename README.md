@@ -14,7 +14,8 @@ Polarizer-Ring-Studies/
 │   ├── Interim Dissertation/
 │   ├── Journal Paper Review/
 │   └── Project Plan/
-├── CC files/                 
+├── CC files/
+├── Macro-particle distributions/          
 ├── Design 1/                              # Compact ring 90° phase advance
 │   ├── linear_optics_variation_1.py       # Initial ring design
 │   ├── linear_optics_variation_1.py       # Initial ring design with matching QDs
