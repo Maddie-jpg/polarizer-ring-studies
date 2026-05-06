@@ -5,4 +5,44 @@ A.~Verdier.
 \newblock Resonance free lattices for a.g. machines.
 \newblock Technical report, CERN, 1999.
 
+\bibitem{courant1958}
+E.~D. Courant and H.~S. Snyder.
+\newblock Theory of the alternating-gradient synchrotron.
+\newblock {\em Annals of Physics}, 1958.
+
+\bibitem{poincare1892}
+H.~Poincaré.
+\newblock {\em Nouvelles méthodes de la mécanique céleste}.
+\newblock Gauthier-Villars, 1892.
+
+\bibitem{moser1956}
+J.~Moser.
+\newblock The resonance lines for the synchrotron.
+\newblock In {\em CERN Symposium}, pages 290--292, 1956.
+
+\bibitem{guignard1978}
+G.~Guignard.
+\newblock A general treatment of resonances in accelerators.
+\newblock Technical Report CERN 78-11, CERN, 1978.
+
+\bibitem{todesco1996}
+E.~Todesco and F.~Schmidt.
+\newblock Evaluating high order resonances using resonant normal forms.
+\newblock In {\em 5th European Particle Accelerator Conference}, 1996.
+
+\bibitem{gao2000}
+J.~Gao.
+\newblock Analytical estimation of the dynamic apertures of circular accelerators.
+\newblock {\em Nuclear Instruments and Methods in Physics Research A}, 451:545--557, 2000.
+
+\bibitem{wan2001}
+W.~Wan and J.~R. Cary.
+\newblock Method for enlarging the dynamic aperture of accelerator lattices.
+\newblock {\em Physical Review Special Topics - Accelerators and Beams}, 4:084001, 2001.
+
+\bibitem{superkekb2013}
+Y.~et~al. Ohnishi.
+\newblock Accelerator design at superkekb.
+\newblock {\em Progress of Theoretical and Experimental Physics}, 2013.
+
 \end{thebibliography}

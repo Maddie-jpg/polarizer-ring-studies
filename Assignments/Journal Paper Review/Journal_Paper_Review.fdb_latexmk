@@ -1,16 +1,15 @@
 # Fdb version 4
-["bibtex Journal_Paper_Review"] 1778001408.69809 "Journal_Paper_Review.aux" "Journal_Paper_Review.bbl" "Journal_Paper_Review" 1778003000.84917 0
-  "./Journal_Paper_ReviewNotes.bib" 1777986216.59882 148 4db66c8a27b9b1891f20f335864bf0cd ""
-  "/usr/local/texlive/2025/texmf-dist/bibtex/bst/base/plain.bst" 1292289607 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
-  "Journal_Paper_Review.aux" 1778003000.52839 844 1aed80044b5ae242464dc6df0339772b "pdflatex"
+["bibtex Journal_Paper_Review"] 1778071847.12432 "Journal_Paper_Review.aux" "Journal_Paper_Review.bbl" "Journal_Paper_Review" 1778071848.00402 0
+  "./Journal_Paper_ReviewNotes.bib" 1778071390.81371 1774 ac1f51906ab61c1b0246436aba0fabc9 ""
+  "/usr/local/texlive/2025/texmf-dist/bibtex/bst/base/unsrt.bst" 1292289607 18030 1376b4b231b50c66211e47e42eda2875 ""
+  "Journal_Paper_Review.aux" 1778071847.7061 1153 129ec8ea46bd7355781df1ec979dcf80 "pdflatex"
   (generated)
   "Journal_Paper_Review.bbl"
   "Journal_Paper_Review.blg"
   (rewritten before read)
-["pdflatex"] 1778002999.9792 "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" "Journal_Paper_Review.pdf" "Journal_Paper_Review" 1778003000.84936 0
-  "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" 1778002999.73203 4362 b929d49e88d94839cce8d420d84b3080 ""
+["pdflatex"] 1778071847.25672 "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" "Journal_Paper_Review.pdf" "Journal_Paper_Review" 1778071848.0042 0
+  "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" 1778071845.1592 8540 50855b15761be551fff3f1b8959606dd ""
   "/usr/local/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
-  "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmbx10.tfm" 1136768653 1328 c834bbb027764024c09d3d2bf908b5f0 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmbx12.tfm" 1136768653 1324 c910af8c371558dc20f2d7822f66fe64 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmmi12.tfm" 1136768653 1524 4414a8315f39513458b80dfc63bff03a ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmmi6.tfm" 1136768653 1512 f21f83efb36853c0b70002322c1ab3ad ""
@@ -22,10 +21,11 @@
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmsy10.tfm" 1136768653 1124 6c73e740cf17375f03eec0ee63599741 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmsy6.tfm" 1136768653 1116 933a60c408fc0a863a92debe84b2d294 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmsy8.tfm" 1136768653 1120 8b7d695260f3cff42e636090a8002094 ""
-  "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb" 1248133631 34811 78b52f49e893bcba91bd7581cdc144c0 ""
+  "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmti10.tfm" 1136768653 1480 aa8e34af0eb6a2941b776984cf1dfdc4 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb" 1248133631 32080 340ef9bf63678554ee606688e7b5339d ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1248133631 35752 024fb6c41858982481f6968b5fc26508 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb" 1248133631 32722 d7379af29a190c3f453aba36302ff5a9 ""
+  "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb" 1248133631 37944 359e864bd06cde3b1cf57bb20757fb06 ""
   "/usr/local/texlive/2025/texmf-dist/tex/generic/iftex/iftex.sty" 1734129479 7984 7dbb9280f03c0a315425f1b4f35d43ee ""
   "/usr/local/texlive/2025/texmf-dist/tex/generic/iftex/ifvtex.sty" 1572645307 1057 525c2192b5febbd8c1f662c9468335bb ""
   "/usr/local/texlive/2025/texmf-dist/tex/latex/base/article.cls" 1738182759 20144 63d8bacaf52e5abf4db3bc322373e1d4 ""
@@ -39,9 +39,9 @@
   "/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1742230541 5467155 19efa205003f9ecad95fbbaa6ff24da1 ""
   "/usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt" 1742230406 3345739 c0dbaaf7d4df3d1296850fcc7500354c ""
   "/usr/local/texlive/2025/texmf.cnf" 1741450484 577 418a7058ec8e006d8704f60ecd22c938 ""
-  "Journal_Paper_Review.aux" 1778003000.52839 844 1aed80044b5ae242464dc6df0339772b "pdflatex"
-  "Journal_Paper_Review.bbl" 1778001408.83501 178 d035ac9ed3cad78c0e377e01899d58f6 "bibtex Journal_Paper_Review"
-  "Journal_Paper_Review.tex" 1778002999.73203 4362 b929d49e88d94839cce8d420d84b3080 ""
+  "Journal_Paper_Review.aux" 1778071847.7061 1153 129ec8ea46bd7355781df1ec979dcf80 "pdflatex"
+  "Journal_Paper_Review.bbl" 1778071847.25417 1516 44f8ef8cc5e589713246de04db66ca36 "bibtex Journal_Paper_Review"
+  "Journal_Paper_Review.tex" 1778071845.1592 8540 50855b15761be551fff3f1b8959606dd ""
   (generated)
   "Journal_Paper_Review.aux"
   "Journal_Paper_Review.log"

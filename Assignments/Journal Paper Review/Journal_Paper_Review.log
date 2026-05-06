@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.17)  5 MAY 2026 19:43
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.17)  6 MAY 2026 14:50
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -123,56 +123,49 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 
 
 
-LaTeX Warning: Citation `courant' on page 1 undefined on input line 42.
-
-
 Underfull \hbox (badness 1721) in paragraph at lines 42--43
 \OT1/cmr/m/n/10 Verdier's work builds upon ear-lier stud-ies on
  []
 
 
-LaTeX Warning: Citation `poincare' on page 1 undefined on input line 44.
-
-
-LaTeX Warning: Citation `' on page 1 undefined on input line 46.
-
-
-LaTeX Warning: Citation `' on page 1 undefined on input line 46.
-
-(./Journal_Paper_Review.bbl
 
 [1{/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
 
 
-])
+]
+
+(./Journal_Paper_Review.bbl
+Underfull \hbox (badness 3954) in paragraph at lines 14--17
+[]\OT1/cmr/m/n/10 H. Poincar^^Se.  \OT1/cmr/m/it/10 Nou-velles m^^Sethodes de la
+ []
 
 
 
-[2
+[2])
+
+
+
+[3
 
 ] (./Journal_Paper_Review.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
-
-
-LaTeX Warning: There were undefined references.
-
  ) 
 Here is how much of TeX's memory you used:
- 1423 strings out of 473190
- 23725 string characters out of 5715800
- 432312 words of memory out of 5000000
- 24719 multiletter control sequences out of 15000+600000
- 563092 words of font info for 50 fonts, out of 8000000 for 9000
+ 1431 strings out of 473190
+ 23823 string characters out of 5715800
+ 435336 words of memory out of 5000000
+ 24727 multiletter control sequences out of 15000+600000
+ 563130 words of font info for 50 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 57i,8n,65p,626b,227s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb>
-Output written on Journal_Paper_Review.pdf (2 pages, 63542 bytes).
+ 57i,8n,65p,750b,222s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb>
+Output written on Journal_Paper_Review.pdf (3 pages, 77305 bytes).
 PDF statistics:
- 31 PDF objects out of 1000 (max. 8388607)
- 18 compressed objects within 1 object stream
+ 34 PDF objects out of 1000 (max. 8388607)
+ 20 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 
