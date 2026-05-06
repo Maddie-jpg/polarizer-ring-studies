@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex Journal_Paper_Review"] 1778071847.12432 "Journal_Paper_Review.aux" "Journal_Paper_Review.bbl" "Journal_Paper_Review" 1778071848.00402 0
+["bibtex Journal_Paper_Review"] 1778073347.66164 "Journal_Paper_Review.aux" "Journal_Paper_Review.bbl" "Journal_Paper_Review" 1778073678.93697 0
   "./Journal_Paper_ReviewNotes.bib" 1778071390.81371 1774 ac1f51906ab61c1b0246436aba0fabc9 ""
   "/usr/local/texlive/2025/texmf-dist/bibtex/bst/base/unsrt.bst" 1292289607 18030 1376b4b231b50c66211e47e42eda2875 ""
-  "Journal_Paper_Review.aux" 1778071847.7061 1153 129ec8ea46bd7355781df1ec979dcf80 "pdflatex"
+  "Journal_Paper_Review.aux" 1778073678.61922 1153 129ec8ea46bd7355781df1ec979dcf80 "pdflatex"
   (generated)
   "Journal_Paper_Review.bbl"
   "Journal_Paper_Review.blg"
   (rewritten before read)
-["pdflatex"] 1778071847.25672 "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" "Journal_Paper_Review.pdf" "Journal_Paper_Review" 1778071848.0042 0
-  "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" 1778071845.1592 8540 50855b15761be551fff3f1b8959606dd ""
+["pdflatex"] 1778073678.13194 "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" "Journal_Paper_Review.pdf" "Journal_Paper_Review" 1778073678.93717 0
+  "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Journal Paper Review/Journal_Paper_Review.tex" 1778073677.88799 8435 70ab0e6735ef7d314c99b489d0ab4997 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmbx12.tfm" 1136768653 1324 c910af8c371558dc20f2d7822f66fe64 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmmi12.tfm" 1136768653 1524 4414a8315f39513458b80dfc63bff03a ""
@@ -23,6 +23,8 @@
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmsy8.tfm" 1136768653 1120 8b7d695260f3cff42e636090a8002094 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmti10.tfm" 1136768653 1480 aa8e34af0eb6a2941b776984cf1dfdc4 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb" 1248133631 32080 340ef9bf63678554ee606688e7b5339d ""
+  "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb" 1248133631 36299 5f9df58c2139e7edcf37c8fca4bd384d ""
+  "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb" 1248133631 36281 c355509802a035cadc5f15869451dcee ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1248133631 35752 024fb6c41858982481f6968b5fc26508 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb" 1248133631 32722 d7379af29a190c3f453aba36302ff5a9 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb" 1248133631 37944 359e864bd06cde3b1cf57bb20757fb06 ""
@@ -39,9 +41,9 @@
   "/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1742230541 5467155 19efa205003f9ecad95fbbaa6ff24da1 ""
   "/usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt" 1742230406 3345739 c0dbaaf7d4df3d1296850fcc7500354c ""
   "/usr/local/texlive/2025/texmf.cnf" 1741450484 577 418a7058ec8e006d8704f60ecd22c938 ""
-  "Journal_Paper_Review.aux" 1778071847.7061 1153 129ec8ea46bd7355781df1ec979dcf80 "pdflatex"
-  "Journal_Paper_Review.bbl" 1778071847.25417 1516 44f8ef8cc5e589713246de04db66ca36 "bibtex Journal_Paper_Review"
-  "Journal_Paper_Review.tex" 1778071845.1592 8540 50855b15761be551fff3f1b8959606dd ""
+  "Journal_Paper_Review.aux" 1778073678.61922 1153 129ec8ea46bd7355781df1ec979dcf80 "pdflatex"
+  "Journal_Paper_Review.bbl" 1778073347.79827 1516 44f8ef8cc5e589713246de04db66ca36 "bibtex Journal_Paper_Review"
+  "Journal_Paper_Review.tex" 1778073677.88799 8435 70ab0e6735ef7d314c99b489d0ab4997 ""
   (generated)
   "Journal_Paper_Review.aux"
   "Journal_Paper_Review.log"
