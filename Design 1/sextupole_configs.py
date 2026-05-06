@@ -3,8 +3,7 @@ Sextupole configs to be paired with linear optics script
 Each function should include a description of the configuration
 
 """
-import xtrack as xt
-import numpy as np
+
 import numpy as np
 import xtrack as xt
 
@@ -23,7 +22,7 @@ def ChromCorrect(ring, pdr, variables, MakePlot=False):
         ])
 
     tw = ring.twiss(method='6d')
-    if len(variables)>2:
+    if len(variables)>3:
         curr_x, curr_y = tw.ddqx, tw.ddqy
         last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
 
@@ -730,21 +729,27 @@ def insert_correctors_var2(pdr):
         'QDDoub_': 'l_doub',             # Doublet drift
         'QFDoub_': 'l_doub',
         'QDTrip_': 'l_tripl',            # Triplet drift
+        'QFA_1RC': 'l_drift-l_sext',
+        'QFA_2RC': 'l_drift-l_sext',
+        'QFA_3RC': 'l_drift-l_sext',
     }
 
     #vertical correctors
     qy_ring_list = (
-        [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
-        [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
-        [[el, '-', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
-        [[el, '+', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
-        [[el, '-', 'QDDoub_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
-        [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
-    )
+    # Standard Arc Defocusing Quads (R1-R7 and L1-L7)
+    [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
+    [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
+    # Matching and DS Quads
+    [[el, '-', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
+    [[el, '+', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
+    [[el, '-', 'QDDoub_'] for el in ['1R','2R','3R']] +
+    [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
+    [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
+    [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
+    # Interaction Region Triplets (Adding missing R side)
+    [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
+    [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
+)
 
     for elem, sign, prefix in qy_ring_list:
         current_drift = drift_map.get(prefix, 'l_drift')
@@ -756,24 +761,38 @@ def insert_correctors_var2(pdr):
 
     # horizontal correctors
     qx_ring_list = (
-        [[el, '-', 'QFA_'] for el in ['1R1','1R2','1R3','1R4','1R5','2R1','2R2','2R3','2R4','2R5','3R1','3R2','3R3','3R4','3R5']] +
-        [[el, '+', 'QFA_'] for el in ['1L1','1L2','1L3','1L4','1L5','2L1','2L2','2L3','2L4','2L5','3L1','3L2','3L3','3L4','3L5','1RC','2RC','3RC']] +
-        [[el, '-', 'QFA_M'] for el in ['1R8','2R8','3R8']] +
-        [[el, '+', 'QFA_M'] for el in ['1L8','2L8','3L8']] +
-        [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] +
-        [[el, '+', 'QFTripC_'] for el in ['1L2','2L2','3L2']]
-    )
-
+    # QFA Arc body (Added R0/L0 and R1-R5)
+    [[el, '-', 'QFA_'] for el in ['1R0','2R0','3R0', '1R1','1R2','1R3','1R4','1R5','2R1','2R2','2R3','2R4','2R5','3R1','3R2','3R3','3R4','3R5']] +
+    [[el, '+', 'QFA_'] for el in ['1L0','2L0','3L0', '1L1','1L2','1L3','1L4','1L5','2L1','2L2','2L3','2L4','2L5','3L1','3L2','3L3','3L4','3L5']] +
+    # QFA Center Quads (Added R side and corrected L side with 'H' suffix to match ring names)
+    [[el, '+', 'QFA_'] for el in ['1RC','2RC','3RC']] +
+    #[[el, '+', 'QFA_'] for el in ['1LCH','2LCH','3LCH']] +
+    # Matching and DS Quads
+    [[el, '-', 'QFA_M'] for el in ['1R8','2R8','3R8']] +
+    [[el, '+', 'QFA_M'] for el in ['1L8','2L8','3L8']] +
+    [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
+    [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
+    [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +
+    [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] +
+    #[[el, '-', 'QFTripC_'] for el in ['1R2','2R2','3R2']] +
+    [[el, '+', 'QFTripC_'] for el in ['1L2','2L2','3L2']]
+)
+    
     for elem, sign, prefix in qx_ring_list:
-        current_drift = drift_map.get(prefix, 'l_drift')
-        dynamic_offset = f'({current_drift}+l_quad) / 2'
-        h_name = f'hk_ring_{elem}'
-        pdr[h_name] = 0.0  # Unique horizontal kick variable
-        ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
-                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+            full_name=prefix+elem
+            if full_name in ['QFA_1RC','QFA_2RC','QFA_3RC']:
+                dynamic_offset='(((l_drift/2)+l_quad)/2)-l_sext'
+                h_name = f'hk_ring_{elem}'
+                pdr[h_name] = 0.0  # Unique horizontal kick variable
+                ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
+                            at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+            else:
+                current_drift = drift_map.get(prefix, 'l_drift')
+                dynamic_offset = f'({current_drift}+l_quad) / 2'
+                h_name = f'hk_ring_{elem}'
+                pdr[h_name] = 0.0  # Unique horizontal kick variable
+                ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
+                            at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
         
     return pdr
 
