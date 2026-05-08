@@ -337,3 +337,89 @@ def survey_plot_with_strength(ring, scale_height=5.0):
     plt.show()
     
     return df # Returning the dataframe so you can inspect the 'strength' column
+
+def geometric_acceptance_plot(
+    x_norm,
+    y_norm,
+    num_r_steps,
+    num_theta_steps,
+    x_aperture,
+    y_aperture
+):
+
+
+    x2d = x_norm.reshape(num_r_steps, num_theta_steps)
+    y2d = y_norm.reshape(num_r_steps, num_theta_steps)
+
+
+    accepted = (
+        (x2d / x_aperture)**2 +
+        (y2d / y_aperture)**2
+    ) <= 1
+
+    accepted = accepted.astype(float)
+
+    x_GA = np.full(num_theta_steps, np.nan)
+    y_GA = np.full(num_theta_steps, np.nan)
+
+    for jj in range(num_theta_steps):
+
+        for ii in range(num_r_steps):
+
+            if not accepted[ii, jj]:
+
+                x_GA[jj] = x2d[ii, jj]
+                y_GA[jj] = y2d[ii, jj]
+                break
+
+
+    GA_radius = np.sqrt(x_GA**2 + y_GA**2)
+
+    min_GA = np.nanmin(np.round(GA_radius, 1))
+
+    where_min_GA = np.where(
+        np.round(GA_radius, 1) == min_GA
+    )[0]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    mesh = ax.pcolormesh(
+        x2d,
+        y2d,
+        accepted,
+        shading='gouraud'
+    )
+
+    ax.plot(
+        x_GA,
+        y_GA,
+        color='red',
+        linewidth=2,
+        label='Geometric Acceptance'
+    )
+
+    ax.plot(
+        x_GA[where_min_GA],
+        y_GA[where_min_GA],
+        'o',
+        color='red',
+        markersize=7,
+        label=f'GA$_{{min}}$ = {min_GA:.1f}$\\sigma$'
+    )
+
+    ax.set_xlabel(
+        r'$\hat{x}\ [\sqrt{\varepsilon_x}]$'
+    )
+
+    ax.set_ylabel(
+        r'$\hat{y}\ [\sqrt{\varepsilon_y}]$'
+    )
+
+    cb = plt.colorbar(mesh)
+    cb.set_label('Accepted')
+
+    ax.legend(fontsize='small')
+
+    plt.tight_layout()
+
+    return x_GA, y_GA
