@@ -3,6 +3,16 @@
 \usepackage{enumitem}
 \usepackage{dsfont}
 
+\usepackage[acronym,nomain,nonumberlist]{glossaries-extra}
+
+\makenoidxglossaries
+
+
+\newglossaryentry{dynamicaperture}{
+    name={dynamic aperture},
+    description={Region of stable transverse phase space}
+}
+
 \title{Placement progress and notes}
 \author{Madeleine Watson}
 
@@ -13,7 +23,7 @@
 \section{Monthly Progress}
 \subsection*{Month 1: 23/02/2026 - 20/03/2026}
 
-\subsection*{Month 1: 23/03/2026 - 24/04/2026}
+\subsection*{Month 2: 23/03/2026 - 24/04/2026}
 \subsubsection*{Overview}
 
 Completed dynamic aperture and momentum acceptance studies for different configurations. Experimented with slicing, integrators, and fringe fields. Now introducing misalignments and corrections.
@@ -29,5 +39,44 @@ Completed dynamic aperture and momentum acceptance studies for different configu
 \item Introduced misalignments, inserted BPMs and correctors, and performed orbit correction
 \end{itemize}
 
+\subsubsection*{Problems encountered}
+
+\textbf{Reducing non-linearities:} Chromatic correction is working for $dqx$ and $dqy$ but often plotting tune against momentum deviation showed that $ddqx$ and $ddqy$ had not been properly corrected. This contributed to smaller DA/MA. Performing chromaticity correction to get these values to 0 often failed as it was too much of a jump.
+\begin{itemize}
+    \item \textbf{Solution:} The chromaticity correction tries to match to 80\% of the value of $ddqx$ and $ddqy$. If this is successful, it iterates through 80\% of the resulting values until the code fails. It takes the strengths from the iteration with the smallest second order chromaticity.
+\end{itemize}
+
+
+\textbf{Code organisation:} Many scripts and results in different places
+\begin{itemize}
+    \item \textbf{Solution:} Everything has been modularised so it is easier to see where errors arise and can edit things more efficiently. This will also help with later lattice designs.
+\end{itemize}
+
+\subsubsection*{Results and progress}
+\begin{itemize}
+    \item Increasing the number of slices for the quadrupoles created smoother curves in the DA/MA plots, but there were no differences when increasing the slices for bends and quadrupoles.
+    \item Fringe fields reduced the less stable configurations' DA/MA considerably, but not as much for stable configurations.
+    \item Added another focusing sextupole pair to the configuration with two sextupole pairs at 180$^\circ$ phase advance, which dramatically improved momentum acceptance.
+    \item Frequency map analysis calculated and shows stable diffusion
+    \item BPMs and correctors are currently placed around every quadrupole (horizontal and vertical) and the MICADO algorithm is used for corrections
+    \item With corrections, the orbits are currently oscillating at less than 1mm
+\end{itemize}
+
+\subsubsection*{Next steps}
+\begin{itemize}
+    \item Studies on spin tracking and polarization build-up time
+    \item Looking at integration with the rest of the injector complex using current macroparticle distribution
+    \item Assess injection efficiency
+\end{itemize}
+
+\subsubsection*{Skills developed}
+\begin{itemize}
+    \item \textbf{Dynamic aperture and momentum acceptance:} how it is calculated and the effects of adjusting integrators and slices
+    \item \textbf{Knowledge of beam optics concepts:} fringe fields, FMA, BPMs, correctors, synchrotron radiation damping
+\end{itemize}
+
+\glsaddall
+
+\printglossary[title=Glossary]
 \end{document}
 
