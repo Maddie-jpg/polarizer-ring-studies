@@ -22,6 +22,60 @@
 
 \section{Monthly Progress}
 \subsection*{Month 1: 23/02/2026 - 20/03/2026}
+\subsubsection*{Overview}
+
+Spent the first week familiarising myself with beam optics concepts and Xsuite functions. Then began understanding and editing a code for a compact ring with 90$^\circ$ phase advance.
+
+\subsubsection*{Work completed}
+
+\begin{itemize}
+\item Initially read papers to understand how the ring functions and what processes go into it.
+\item Made notes on initial ring design code and started compiling work into a GitHub repository.
+\item Added sextupoles to the ring design and performed chromaticity correction.
+\item Corrected beta-functions to create uniform Twiss plot.
+\item Corrected working point and found two potential candidates.
+\end{itemize}
+
+\subsubsection*{Problems encountered}
+
+\textbf{Breaking the ring:} \texttt{Invalid n1}, \texttt{Invalid n2}, and \texttt{Invalid n3}errors arose when trying to add sextupoles. This scenario halted progress the most.
+\begin{itemize}
+    \item \textbf{Solution:} There was no set solution to this error but there were some common causes: changing the geometry of the ring, not matching/rematching the quadrupole strengths. The `breakage' could be identified by computing a Twiss with specified conditions.
+\end{itemize}
+
+\textbf{Sextupole positioning:} This would cause ring breakage. It took a week or so to identify sextupole positions that worked.
+\begin{itemize}
+    \item \textbf{Solution:} I tried creating a function that identified the best positions for sextupoles, but the best solution was trial and error and knowledge of ring properties.
+\end{itemize}
+
+\textbf{Large beta-functions:} Changing parameters resulted in increased beta-functions
+\begin{itemize}
+    \item \textbf{Solution:} Consistently running matching functions and identifying best positions and working points.
+\end{itemize}
+
+\subsubsection*{Results and progress}
+\begin{itemize}
+    \item The initial compact ring now has sextupoles inserted: there are currently 16 in each arc (8 focusing, 8 defocusing).
+    \item Strengths and beta-functions have been corrected
+    \item Two potential working points have been identified and plotted on resonance graphs to show suitability
+    \item Using these working points resulted in reduced beta-functions, more uniform Twiss plots, and slightly reduced sextupole strengths.
+    \item Another configuration with a decreased triplet drift length is being explored and shows signs of reduced beta-functions
+    \item Chromatic functions are plotted and show slightly different, but periodic, results for both working points.
+\end{itemize}
+
+\subsubsection*{Next steps}
+\begin{itemize}
+    \item Further refine suitability of the working point
+    \item Track off-momentum particles
+    \item Track dynamic aperture and momentum acceptance
+    \item Work on different sextupole configurations with different positions, families, and cell lengths in parallel
+\end{itemize}
+
+\subsubsection*{Skills developed}
+\begin{itemize}
+    \item \textbf{Knowledge of beam optics concepts:} Twiss parameters, chromaticity, tune, basics of synchrotron radiation, and dynamic aperture
+    \item \textbf{Xsuite:} Building rings and inserting elements, calculating Twiss plots, creating matching functions
+\end{itemize}
 
 \subsection*{Month 2: 23/03/2026 - 24/04/2026}
 \subsubsection*{Overview}
@@ -79,4 +133,3 @@ Completed dynamic aperture and momentum acceptance studies for different configu
 
 \printglossary[title=Glossary]
 \end{document}
-
