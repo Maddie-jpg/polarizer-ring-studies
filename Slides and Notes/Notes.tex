@@ -2,15 +2,296 @@
 \usepackage[utf8]{inputenc}
 \usepackage{enumitem}
 \usepackage{dsfont}
+\usepackage[margin=1in]{geometry}
+\usepackage[toc, automake,nonumberlist]{glossaries}
 
-\usepackage[acronym,nomain,nonumberlist]{glossaries-extra}
-
-\makenoidxglossaries
+\makeglossaries
 
 
-\newglossaryentry{dynamicaperture}{
-    name={dynamic aperture},
-    description={Region of stable transverse phase space}
+\newglossaryentry{betatronmotion}{
+    name={Betatron Motion},
+    description={Referes to the transverse oscillatory motion of particles around the reference orbit caused by alternating-gradient focusing. This motion is stable when the lattice satisfies periodic focusing conditions.}
+}
+
+\newglossaryentry{AlphaFunction}{
+    name={Alpha Function},
+    description={A Twiss parameter that describes the slope of the beta function and the focusing/defocusing of the beam envelope. It is defined as, $$\alpha(s)=-\frac{1}{2}\frac{d\beta}{ds}$$ and determines the correlation between transverse position and angle.}
+}
+
+\newglossaryentry{betafunction}{
+    name={Beta Function},
+    description={A Twiss parameter that describes how the amplitude of betatron oscillations varies along the lattice. The rms beam size at a given location is described by, $$\sigma_x (s)=\sqrt{\epsilon \beta(s)}$$ showing its direct connection to emittance and beam envelope.}
+}
+
+\newglossaryentry{beamrigidity}{
+    name={Beam Rigidity},
+    description={Quantifies how difficult it is to bend a charged particle beam using magnetic fields. It is defined by $$B_\rho=\frac{p}{q}$$ where $p$ is the particle momentum and $q$ is its charge, and it sets the required dipole field strength for a given curvature.}
+}
+
+\newglossaryentry{betatrontune}{
+    name={Betatron Tune},
+    description={The number of transverse oscillations a particle makes in one full revolution of the ring. It is defined as $$Q=\frac{1}{2\pi}\oint\frac{ds}{\beta(s)}$$ and must be chosen to avoid resonance conditions.}
+}
+
+\newglossaryentry{chromaticity}{
+    name={Chromaticity},
+    description={Describes the depencdence of the betatron tune on particle momentum. It arises because quadrupole focusing strength depends on momentum and is quantified by $$Q'=\frac{dQ}{d(\Delta p/p)}=-\frac{1}{4\pi}\oint k(s)\beta(s)ds$$}
+}
+
+\newglossaryentry{dipole}{
+    name={Dipole Magnet},
+    description={A dipole magnet produces a uniform transverse magnetic field used to bend particle trajectories along the reference orbit. The total integrated dipole field around the ring must produce an angle of $2\pi$.}
+}
+
+\newglossaryentry{dispersionfunction}{
+    name={Dispersion Function},
+    description={Describes how the transverse position of a particle depends on its relative momentum deviation. It appears in the relation $$x(s)=x_{\beta}(s)+D(s)\frac{\Delta p}{p}$$ and serves as a fundamental measure of beam quality.}
+}
+
+\newglossaryentry{emittance}{
+    name={Emittance},
+    description={An invariant of linear transverse motion representing the area occupied by the beam in phase space. It is defined by $$\epsilon=\gamma x^2 + 2\alpha xx'+\beta x'^2$$ and serves as a fundamental measure of beam quality.}
+}
+
+\newglossaryentry{fodo}{
+    name={FODO Lattice},
+    description={A periodic focusing structure consisting of alternating focusing and defocusing quadrupole magnets separated by drift spaces and dipoles. It is widely used in synchrotrons due to its simplicity and stable optical properties.}
+}
+
+\newglossaryentry{focusingfunction}{
+    name={Focusing Function},
+    description={Characterises the net transverse focusing strength along the lattice. It is given by  $$K(s)=k(s)+\frac{1}{\rho^2 (s)}$$ including contributions from quadrupoles and weak focusing from dipole curvature.}
+}
+
+\newglossaryentry{gammafunction}{
+    name={Gamma Function},
+    description={A Twiss parameter associated with beam divergence and angular spread. It is defined as $$\gamma (s)=\frac{1+\alpha^2(s)}{\beta(s)}$$}
+}
+
+\newglossaryentry{harmonicfunction}{
+    name={Harmonic Number},
+    description={The ratio of the RF cavity of the beam. It determines the number of RF buckets around the ring and is defined as $$h=\frac{f_{RF}}{f_{rev}}$$}
+}
+
+\newglossaryentry{hillseq}{
+    name={Hill's Equation},
+    description={The linear differential equation governing transverse particle motion in a synchrotron. Its written as $$x''(s)+K(s)x(s)=0$$ and its periodic solutions describe betatron oscillations.}
+}
+
+\newglossaryentry{linearapprox}{
+    name={Linear Approximation},
+    description={The linear approximation assumes that magnetic fields can be expanded to first order transverse displacement. Under this assumption, only dipole and quadrupole field components are retained, leading to linear equations of motion.}
+}
+
+\newglossaryentry{momentumcompaction}{
+    name={Momentum Compaction Factor},
+    description={Describes how the closed-orbit length changes with particle momentum. It is defined as, $$\gamma_p=\frac{\Delta L/L}{\Delta p/p}$$ and plays a key role in longitudinal beam dynamics.}
+}
+
+\newglossaryentry{oneturnmatrix}{
+    name={One-Turn Matrix},
+    description={The product of all transfer matrices around a full revolution of the ring. Its eigenvalues determine the betatron tune and the stability of transverse motion.}
+}
+
+\newglossaryentry{phaseadvance}{
+    name={Phase Advance},
+    description={The accumulated betatron phase between two points in the lattice. It is given by $$\psi(s)=\int_0^s\frac{ds'}{\beta(s')}$$ and its total over one turn defines the tune.}
+}
+
+\newglossaryentry{phasefocusing}{
+    name={Phase Focusing},
+    description={The RF mechanism that restores particles towards a stable synchronous phase. It provides longitudinal stability by correcting early or late particle arrival times.}
+}
+
+\newglossaryentry{quadrupole}{
+    name={Quadrupole Magnet},
+    description={A quadrupole magnet produces magnetic field gradients that provide linear transverse focusing. The field components satisfy $B_x=gy$ and $B_y=gx$ leading to focusing in one plane and defocusing in the other. The constant $g$ is the gradient of the magnetic field and characterises the focusing strength of the quadrupole lens in both transverse planes.}
+}
+
+\newglossaryentry{referenceorbit}{
+    name={Reference Orbit},
+    description={The ideal closed trajectory followed by a particle with nominal momentum and no transverse displacement. All transverse coordinates and deviations are defined relative to this orbit.}
+}
+
+\newglossaryentry{rfcavity}{
+    name={RF Cavity},
+    description={A resonant structure that provides oscillating electric fields for particle accelerations and longitudinal focusing. It defines the stable phase and energy of the synchronous particle.}
+}
+
+\newglossaryentry{sextupole}{
+    name={Sextupole Magnet},
+    description={A non-linear magnetic element used primarily to correct chromaticity. Sextupoles are placed in regions with high dispersion to compensate momentum-dependent focusing errors.}
+}
+
+\newglossaryentry{slipfactor}{
+    name={Slip Factor},
+    description={Determines how the revolution period of a particle changes with momentum. It is defined as, $$\nu = \frac{1}{\gamma^2} - \alpha_p$$ and governs the longitudinal stability regimes.}
+}
+
+\newglossaryentry{stabilitycondition}{
+    name={Stability Condition},
+    description={The stability condition for transverse motion requires that the trace of the one-turn matrix satisfy $|Tr(M)|<2$. This ensures bounded betatron oscillations.}
+}
+
+\newglossaryentry{synchrotron}{
+    name={Synchrotron},
+    description={A circular accelerator in which magnetic fields and RF frequency are synchronised with particle energy. It enables acceleration and storage of high-energy particle beams.}
+}
+
+\newglossaryentry{synchrotronoscillation}{
+    name={Synchrotron Oscillation},
+    description={Longitudinal oscillations of particles in energy-phase space around the synchronous particle. They occur at much lower frequencies than betatron oscillations.}
+}
+
+
+\newglossaryentry{transfermatrix}{
+    name={Transfer Matrix},
+    description={A linear operator that maps particle coordinates through an accelerator element. Successive multiplication of matrices describes transport through the full lattice.}
+}
+
+\newglossaryentry{transitionenergy}{
+    name={Transition Energy},
+    description={The beam energy at which the slip factor becomes zero. At this point, the character of longitudinal motion changes, making operation challenging.}
+}
+
+\newglossaryentry{transversecoords}{
+    name={Transverse Coordinates},
+    description={Describe particle motion perpendicular to the reference orbit are given by ($x,x',y,y'$). They represent position and angle in the horizontal and vertical planes.}
+}
+
+\newglossaryentry{twiss}{
+    name={Twiss Parameters},
+    description={The Twiss parameters $\beta(s)$, $\alpha(s)$, and $\gamma(s)$ describe the evolution of the beam envelope in a linear lattice. They provide a complete description of transverse linear optics.}
+}
+
+\newglossaryentry{analysingpower}{
+    name={Analysing Power},
+    description={The sensitivity of a polarization measurement to the spin orientation of the beam. It quantifies how strongly an observable depends on the polarization direction and sets the statistical precision of polarization measurements.}
+}
+
+\newglossaryentry{depolarization}{
+    name={Depolarization},
+    description={Any mechanism that reduces the net polarization of a beam over time. Depolarization can arise from spin-orbit coupling, field errors, energy spread, and stochastic effects from synchrotron radiation.}
+}
+
+\newglossaryentry{equilibriumpol}{
+    name={Equilibrium Polarization},
+    description={The steady-state polarization level reached when polarization build-up matches depolarization mechanisms. In electron storage rings, it is determined by the competition between the Sokolov-Ternov effect and spin diffusion.}
+}
+
+\newglossaryentry{invariantspinfield}{
+    name={Invariant Spin Field},
+    description={A vector field defined along the closed orbit that specifies the stable spin direction at each point in phase space. It provides a framework for understanding spin stability and depolarization in storage rings.}
+}
+
+\newglossaryentry{polarization}{
+    name={Polarization},
+    description={The degree to which particle spins are aligned along a preferred direction. It is commonly defined as $$P=\frac{N_\uparrow-N_\downarrow}{N_\uparrow+N_\downarrow}$$}
+}
+
+\newglossaryentry{polarizationbuilduptime}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{polwiggler}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{resonantdepol}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{sokolovternov}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{spindiffusion}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{spinorbitcoupling}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{spinprecession}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{spinresonance}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{spintune}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{thomasbmt}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{verticalpol}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{wiggler}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{workingpoint}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{DA}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{MA}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{synchrotronradiation}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{symplecticintegrators}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{fringefield}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{FMA}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{BPM}{
+    name={},
+    description={}
+}
+
+\newglossaryentry{}{
+    name={},
+    description={}
 }
 
 \title{Placement progress and notes}
@@ -38,7 +319,7 @@ Spent the first week familiarising myself with beam optics concepts and Xsuite f
 
 \subsubsection*{Problems encountered}
 
-\textbf{Breaking the ring:} \texttt{Invalid n1}, \texttt{Invalid n2}, and \texttt{Invalid n3}errors arose when trying to add sextupoles. This scenario halted progress the most.
+\textbf{Breaking the ring:} \texttt{Invalid n1}, \texttt{Invalid n2}, and \texttt{Invalid n3} errors arose when trying to add sextupoles. This scenario halted progress the most.
 \begin{itemize}
     \item \textbf{Solution:} There was no set solution to this error but there were some common causes: changing the geometry of the ring, not matching/rematching the quadrupole strengths. The `breakage' could be identified by computing a Twiss with specified conditions.
 \end{itemize}

@@ -1,0 +1,48 @@
+This is makeindex, version 2.17 [TeX Live 2025] (kpathsea + Thai support).
+Scanning style file ./Notes.ist...........................done (27 attributes redefined, 0 ignored).
+Scanning input file Notes.glo....
+!! Input index error (file = Notes.glo, line = 37):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 38):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 39):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 40):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 41):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 42):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 43):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 44):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 45):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 46):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 47):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 48):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 49):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 50):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 51):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 52):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 53):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 54):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 55):
+   -- Illegal null field.
+!! Input index error (file = Notes.glo, line = 56):
+   -- Illegal null field.
+done (36 entries accepted, 20 rejected).
+Sorting entries....done (190 comparisons).
+Generating output file Notes.gls....done (92 lines written, 0 warnings).
+Output written in Notes.gls.
+Transcript written in Notes.glg.
