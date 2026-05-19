@@ -186,106 +186,102 @@
 
 \newglossaryentry{polarization}{
     name={Polarization},
-    description={The degree to which particle spins are aligned along a preferred direction. It is commonly defined as $$P=\frac{N_\uparrow-N_\downarrow}{N_\uparrow+N_\downarrow}$$}
+    description={The degree to which particle spins are aligned along a preferred direction. It is commonly defined as $$P=\frac{N_\uparrow-N_\downarrow}{N_\uparrow+N_\downarrow}$$} where $N_\uparrow$ and $N_\downarrow$ are the numbers of particles with spin aligned or anti-aligned with the reference axis.
 }
 
 \newglossaryentry{polarizationbuilduptime}{
-    name={},
-    description={}
+    name={Polarization Build-Up Time},
+    description={The characteristic time constant describing how quickly polarization grows toward its equilibrium value. For the Sokolov-Ternov effect, it appears in the exponential growth law, $$P(t)=P_\infty (1-e^{t/\tau_P})$$}
 }
 
 \newglossaryentry{polwiggler}{
-    name={},
-    description={}
+    name={Polarization Wiggler},
+    description={A magnetic insertion device designed to enhance synchrotron radiation damping, therefore reducing polarization build-up time. Wigglers increase spin-flip rates while minimally perturbing the overall lattice optics when properly designed.}
 }
 
 \newglossaryentry{resonantdepol}{
-    name={},
-    description={}
+    name={Resonant Depolarization},
+    description={A method used to determine beam energy with extreme precision by using an external oscillating magnetic field to flip the spins of particles when the field frequency matches their natural precession frequency.​}
 }
 
 \newglossaryentry{sokolovternov}{
-    name={},
+    name={Sokolov-Ternov Effect},
     description={}
 }
 
 \newglossaryentry{spindiffusion}{
-    name={},
+    name={Spin Diffusion},
     description={}
 }
 
 \newglossaryentry{spinorbitcoupling}{
-    name={},
+    name={Spin-Orbit Coupling},
     description={}
 }
 
 \newglossaryentry{spinprecession}{
-    name={},
+    name={Spin Precession},
     description={}
 }
 
 \newglossaryentry{spinresonance}{
-    name={},
+    name={Spin Resonance},
     description={}
 }
 
 \newglossaryentry{spintune}{
-    name={},
+    name={Spin Tune},
     description={}
 }
 
 \newglossaryentry{thomasbmt}{
-    name={},
+    name={Thomas-BMT Equation},
     description={}
 }
 
 \newglossaryentry{verticalpol}{
-    name={},
+    name={Vertical Polarization},
     description={}
 }
 
-\newglossaryentry{wiggler}{
-    name={},
-    description={}
-}
 
 \newglossaryentry{workingpoint}{
-    name={},
+    name={Working Point},
     description={}
 }
 
 \newglossaryentry{DA}{
-    name={},
-    description={}
+    name={Dynamic Aperture},
+    description={The maximum stable area within an accelerator where particles can circulate without being lost due to nonlinear magnetic effects.}
 }
 
 \newglossaryentry{MA}{
-    name={},
-    description={}
+    name={Momentum Acceptance},
+    description={​The range of energy deviations a particle can have relative to the design energy while remaining stable.}
 }
 
 \newglossaryentry{synchrotronradiation}{
-    name={},
+    name={Synchrotron Radiation},
     description={}
 }
 
 \newglossaryentry{symplecticintegrators}{
-    name={},
+    name={Symplectic Integrators},
     description={}
 }
 
 \newglossaryentry{fringefield}{
-    name={},
+    name={Fringe Fields},
     description={}
 }
 
 \newglossaryentry{FMA}{
-    name={},
+    name={Frequency Map Analysis},
     description={}
 }
 
 \newglossaryentry{BPM}{
-    name={},
+    name={Beam Position Monitors},
     description={}
 }
 
@@ -408,6 +404,74 @@ Completed dynamic aperture and momentum acceptance studies for different configu
 \begin{itemize}
     \item \textbf{Dynamic aperture and momentum acceptance:} how it is calculated and the effects of adjusting integrators and slices
     \item \textbf{Knowledge of beam optics concepts:} fringe fields, FMA, BPMs, correctors, synchrotron radiation damping
+\end{itemize}
+
+
+\section*{Notes and Concepts}
+\subsection*{Overview of processes within the ring}
+\subsubsection{Injection - electron enters the ring}
+\begin{itemize}
+\item An electron bunch is injected at a defined energy
+\item At this point:
+    \begin{itemize}
+    \item Position is near the closed orbit
+    \item Momentum is close to design value
+    \item Spins are unpolarized
+    \end{itemize}
+\item The electron now starts circulating
+\end{itemize}
+
+\subsubsection{First turn - Bending in Dipoles}
+\begin{itemize}
+\item The electron enters a dipole magnet
+\item The magnetic field applies the Lorentz force: $\vec{F}=q\vec{v}\times \vec{B}$
+\item Electron trajectory curves and now travels along an arc
+\item This defines the bending radius: $\rho=\frac{P}{eB}$
+\end{itemize}
+
+\subsubsection{Synchrotron radiation happens immediately}
+\begin{itemize}
+\item Because the electron is accelerating (curved motion), it emits photons and loses energy.
+\item Energy loss per turn: $U_0\propto \frac{E^4}{\rho}$
+\end{itemize}
+
+\subsubsection{RF Cavities}
+
+\begin{itemize}
+\item After losing energy, due to synchrotron radiation, in the dipoles:
+    \begin{itemize}
+    \item The electron enters the RF cavity
+    \item The RF electric field accelerates it longitudinally 
+    \item Energy is restored
+    \end{itemize}
+\item However, radiation reduces total momentum, whereas RF only restores longitudinal momentum
+\item This imbalance creates damping
+\end{itemize}
+
+\subsubsection{Radiation Damping}
+
+\begin{itemize}
+\item Over many turns, horizontal, vertical, and longitudinal oscillations shrink
+\item This occurs because electron radiation losses exceed the energy restored by the RF cavity (it doesn't restore the transverse momentum)
+\item Therefore, after a full turn, the total momentum is restored but the transverse components are reduced
+\item Transverse momentum follows $x_n=x_0e^{-n/\tau_x}$ where $\tau_x=\frac{2E}{J_x U_0}$
+\item Vertical oscillations also increase path length and radiation slightly
+\item If a particle has a higher energy, it will radiate stronger, therefore losing more energy per turn
+\item The beam shrinks towards equilibrium
+\end{itemize}
+
+\subsubsection{Quantum Excitation}
+\begin{itemize}
+\item Radiation is not continuous
+\item Electrons emit discrete photons randomly
+\item Each photon changes energy slightly and introduces noise
+\item Damping shrinks motion and quantum fluctuations increase motion
+\item Eventually, damping = excitation and the beam reaches equilibrium emittance and energy spread
+\end{itemize}
+
+\subsubsection{Spin Begins Evolving}
+\begin{itemize}
+\item Electron spins precess as it moves in the magnetic field according to the Thomas-BMT equation
 \end{itemize}
 
 \glsaddall

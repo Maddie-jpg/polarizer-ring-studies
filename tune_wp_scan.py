@@ -1,199 +1,250 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 
+def analyse_verdier_resonances_from_line(line, max_order=5, tune_tolerance=0.02):
+    
 
-class TuneFootprintAnalysis:
-
-    # =====================================================
-    # Init
-    # =====================================================
-
-    def __init__(
-        self,
-        line,
-        twiss=None,
-        resonance_orders=(1,2,3,4),
-        Qx_range=None,
-        Qy_range=None
-    ):
-
-        self.line = line
-        self.twiss = twiss
-
-        self.resonance_orders = resonance_orders
-
-        self.Qx_range = Qx_range
-        self.Qy_range = Qy_range
-
-    # =====================================================
-    # Generic plotting backend
-    # =====================================================
-
-    def _base_plot(
-        self,
-        Qx,
-        Qy,
-        values=None,
-        label='',
-        title='',
-        cmap='viridis',
-        nominal_point=None
-    ):
-
-        fig, ax = plt.subplots(figsize=(8,8))
-
-        # Resonance diagram
-        resonances = resonance_lines(
-            self.Qx_range,
-            self.Qy_range,
-            self.resonance_orders,
-            3
+    # twiss from line
+    try:
+        twiss = line.twiss()
+        qx = twiss.qx
+        qy = twiss.qy
+        print(f"Current Operating Tunes -> Qx: {qx:.4f}, Qy: {qy:.4f}")
+    except Exception as e:
+        print(
+            f"Could not compute line.twiss(). Please make sure the line is built and closed. Error: {e}"
         )
+        return None
 
-        resonances.plot_resonance(fig)
+    # superperiodicity (N_c) from element names
 
-        # Scatter
-        sc = ax.scatter(
-            Qx,
-            Qy,
-            c=values,
-            cmap=cmap,
-            s=10
-        )
+    element_names = line.element_names
+    sectors = set()
+    for name in element_names:
+        # Looking for structural segment identifiers e.g. '_1R', '_2R', '_3L'
+        if "_" in name:
+            parts = name.split("_")[-1]
+            if len(parts) >= 2 and parts[0].isdigit() and parts[1] in ["R", "L"]:
+                sectors.add(parts[0])
 
-        cb = plt.colorbar(sc)
-        cb.set_label(label)
+    N_c = len(sectors) if len(sectors) > 0 else 1
+    # Fallback default if your specific layout operates on a hardcoded sector configuration:
+    if N_c == 1:
+        N_c = 3  
 
-        # Nominal WP
-        if nominal_point is not None:
+    print(f"Identified Structural Superperiodicity (N_c): {N_c}")
 
-            ax.plot(
-                nominal_point[0],
-                nominal_point[1],
-                'ro',
-                label='Nominal WP'
-            )
+    # Phase advances per structural superperiod
+    mu_x_fraction = (qx / N_c) % 1.0
+    mu_y_fraction = (qy / N_c) % 1.0
 
-        ax.set_xlabel(r'$Q_x$')
-        ax.set_ylabel(r'$Q_y$')
+    #Check resonance driving terms up to max_order
+    dangerous_resonances = []
 
-        ax.set_title(title)
-
-        ax.grid(True, alpha=0.3)
-
-        if nominal_point is not None:
-            ax.legend()
-
-        plt.tight_layout()
-
-        return fig, ax
-
-    # =====================================================
-    # Chromatic footprint
-    # =====================================================
-
-    def chromatic_footprint(
-        self,
-        Qx,
-        Qy,
-        delta
-    ):
-
-        return self._base_plot(
-            Qx,
-            Qy,
-            values=delta,
-            label=r'$\delta$',
-            title='Chromatic Footprint'
-        )
-
-    # =====================================================
-    # Amplitude footprint
-    # =====================================================
-
-    def amplitude_footprint(
-        self,
-        Qx,
-        Qy,
-        amplitude
-    ):
-
-        return self._base_plot(
-            Qx,
-            Qy,
-            values=amplitude,
-            label='Amplitude',
-            title='Amplitude Footprint'
-        )
-
-    # =====================================================
-    # Frequency map analysis
-    # =====================================================
-
-    def diffusion_map(
-        self,
-        Qx_start,
-        Qx_end,
-        Qy_start,
-        Qy_end
-    ):
-
-        diffusion = np.sqrt(
-            (Qx_start - Qx_end)**2 +
-            (Qy_start - Qy_end)**2
-        )
-
-        diffusion = np.log10(diffusion + 1e-20)
-
-        return self._base_plot(
-            Qx_start,
-            Qy_start,
-            values=diffusion,
-            label=r'$\log_{10}(D)$',
-            title='Frequency Map Analysis'
-        )
-
-    # =====================================================
-    # Resonance finder
-    # =====================================================
-
-    def find_resonances(
-        self,
-        Qx,
-        Qy,
-        max_order=6,
-        tolerance=1e-3
-    ):
-
-        resonances = []
-
-        for m in range(-max_order, max_order+1):
-
-            for n in range(-max_order, max_order+1):
-
+    for order in range(1, max_order + 1):
+        for m in range(-order, order + 1):
+            remaining = order - abs(m)
+            for n in [remaining, -remaining] if remaining != 0 else [0]:
                 if m == 0 and n == 0:
                     continue
 
-                order = abs(m) + abs(n)
+                # m * (mu_x / 2pi) + n * (mu_y / 2pi) is close to an integer
+                phase_sum = m * mu_x_fraction + n * mu_y_fraction
+                distance_to_structural = abs(phase_sum - round(phase_sum))
 
-                if order > max_order:
-                    continue
+                #calculate distance to total physical global resonance line:
+                global_phase_sum = m * qx + n * qy
+                distance_to_global = abs(
+                    global_phase_sum - round(global_phase_sum)
+                )
 
-                value = m*Qx + n*Qy
+                # Flag if the working tune point is dangerously close to a driven structural harmonic
+                if distance_to_global < tune_tolerance:
+                    # Check if this global resonance is structurally driven or systematically suppressed
+                    # If it's a multiple of N_c, it is structurally driven
+                    is_structural = (round(global_phase_sum) % N_c) == 0
 
-                p = int(round(value))
+                    status = (
+                        "Dangerous (Structural)"
+                        if is_structural
+                        else "Suppressed (Non-Structural)"
+                    )
 
-                distance = abs(value - p)
+                    dangerous_resonances.append(
+                        {
+                            "Order": order,
+                            "m": m,
+                            "n": n,
+                            "Global Harmonic (k)": int(
+                                round(global_phase_sum)
+                            ),
+                            "Distance to Resonance": f"{distance_to_global:.4f}",
+                            "Verdier Status": status,
+                            "Resonance Condition": f"{m}*Qx + {n}*Qy = {int(round(global_phase_sum))}",
+                        }
+                    )
 
-                if distance < tolerance:
+    # Convert to Dataframe for visualization
+    df = pd.DataFrame(dangerous_resonances)
+    if not df.empty:
+        df = df.drop_duplicates(subset=["m", "n"]).reset_index(drop=True)
+        # Sort so that the closest dangerous resonances bubble up to the top
+        df = df.sort_values(by="Distance to Resonance").reset_index(drop=True)
 
-                    resonances.append({
-                        'm': m,
-                        'n': n,
-                        'p': p,
-                        'order': order,
-                        'distance': distance
-                    })
+    return df
 
-        return resonances
+def plot_tune_diagram(df, qx, qy, tune_window=0.05, save_path="tune_diagram.png"):
+    """Plots a localized 2D Tune Diagram centered around the working point
+
+    showing nearby resonance lines color-coded by order and styled by Verdier
+    status.
+    """
+    if df.empty:
+        print("The resonance DataFrame is empty. Nothing to plot.")
+        return
+
+    # Create the figure and axis
+    fig, ax = plt.subplots(figsize=(8, 7))
+
+    # Define the viewing window around the working point
+    qx_min, qx_max = qx - tune_window, qx + tune_window
+    qy_min, qy_max = qy - tune_window, qy + tune_window
+
+    ax.set_xlim(qx_min, qx_max)
+    ax.set_ylim(qy_min, qy_max)
+
+    # Plot the current Operating Working Point
+    ax.plot(
+        qx,
+        qy,
+        "ro",
+        markersize=10,
+        label=f"Working Point ({qx:.4f}, {qy:.4f})",
+        zorder=5,
+    )
+
+    # Styling properties for resonance orders
+    # Distinct colors for orders 1 through 5+
+    order_colors = {
+        1: "blue",
+        2: "green",
+        3: "darkorange",
+        4: "purple",
+        5: "brown",
+    }
+
+    # Plot each resonance line found in the dataframe
+    for _, row in df.iterrows():
+        m = int(row["m"])
+        n = int(row["n"])
+        k = int(row["Global Harmonic (k)"])
+        order = int(row["Order"])
+        status = row["Verdier Status"]
+
+        # Solid lines for Dangerous/Structural, dashed for Suppressed/Non-Structural
+        linestyle = "-" if "Structural" in status else "--"
+        # Thicker lines for lower-order resonances (which are usually stronger)
+        linewidth = max(0.8, 3.5 - 0.5 * order)
+        color = order_colors.get(order, "black")
+        alpha = 0.8 if "Structural" in status else 0.35
+
+        # Handle different line orientations safely
+        if n == 0:  # Vertical line: m*Qx = k -> Qx = k/m
+            if m != 0:
+                qx_val = k / m
+                if qx_min <= qx_val <= qx_max:
+                    ax.axvline(
+                        x=qx_val,
+                        color=color,
+                        linestyle=linestyle,
+                        linewidth=linewidth,
+                        alpha=alpha,
+                    )
+        elif m == 0:  # Horizontal line: n*Qy = k -> Qy = k/n
+            if n != 0:
+                qy_val = k / n
+                if qy_min <= qy_val <= qy_max:
+                    ax.axhline(
+                        y=qy_val,
+                        color=color,
+                        linestyle=linestyle,
+                        linewidth=linewidth,
+                        alpha=alpha,
+                    )
+        else:  # Sloped resonance line: Qy = (k - m*Qx) / n
+            qx_vals = np.array([qx_min, qx_max])
+            qy_vals = (k - m * qx_vals) / n
+            # Only plot if it intersects or passes near our window bounds
+            ax.plot(
+                qx_vals,
+                qy_vals,
+                color=color,
+                linestyle=linestyle,
+                linewidth=linewidth,
+                alpha=alpha,
+            )
+
+    # Build a clean, clear custom legend
+    from matplotlib.lines import Line2D
+
+    legend_elements = [
+        Line2D(
+            [0],
+            [0],
+            color="red",
+            marker="o",
+            linestyle="",
+            markersize=10,
+            label=f"Working Point ({qx:.3f}, {qy:.3f})",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="black",
+            linestyle="-",
+            linewidth=2,
+            label="Dangerous (Structural)",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="black",
+            linestyle="--",
+            linewidth=1.5,
+            alpha=0.5,
+            label="Suppressed (Non-Structural)",
+        ),
+    ]
+
+    # Add indicators for each active resonance order present in data
+    for o in sorted(df["Order"].unique()):
+        legend_elements.append(
+            Line2D(
+                [0],
+                [0],
+                color=order_colors.get(o, "black"),
+                linestyle="-",
+                linewidth=2,
+                label=f"Order {o} Resonance",
+            )
+        )
+
+    # Position the legend outside the plot area to prevent overlapping data
+    ax.legend(
+        handles=legend_elements, loc="upper left", bbox_to_anchor=(1.02, 1)
+    )
+
+    # Labels and Titles
+    ax.set_xlabel(r"Horizontal Tune $Q_x$", fontsize=12)
+    ax.set_ylabel(r"Vertical Tune $Q_y$", fontsize=12)
+    ax.set_title(
+        "Local Tune Diagram & Verdier Resonance Analysis",
+        fontsize=13,
+        fontweight="bold",
+    )
+    ax.grid(True, which="both", linestyle=":", alpha=0.5)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.close()
