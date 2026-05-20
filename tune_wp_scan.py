@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
+from xutil_DA_CC.xsuite_plot_functions import DA_vs_turns
 
 def analyse_verdier_resonances_from_line(line, max_order=5, tune_tolerance=0.02):
     
@@ -94,157 +97,155 @@ def analyse_verdier_resonances_from_line(line, max_order=5, tune_tolerance=0.02)
 
     return df
 
-def plot_tune_diagram(df, qx, qy, tune_window=0.05, save_path="tune_diagram.png"):
-    """Plots a localized 2D Tune Diagram centered around the working point
 
-    showing nearby resonance lines color-coded by order and styled by Verdier
-    status.
+
+
+def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5), tune_range=0.1):
     """
-    if df.empty:
-        print("The resonance DataFrame is empty. Nothing to plot.")
-        return
+    Danger levels (Tier 1 to 4):
+    1. Structural / Systematic resonances very close to the Working Point.
+    2. Non-Structural / Error-driven resonances close to the Working Point.
+    3. Resonances that are within the tune box but have lower immediate threat.
+    4. Safe background lattice grid (drawn faintly in gray).
+    """
+    if isinstance(max_order, (int, float)):
+        orders_to_check = tuple(range(1, int(max_order) + 1))
+    else:
+        orders_to_check = tuple(sorted(max_order))
 
-    # Create the figure and axis
-    fig, ax = plt.subplots(figsize=(8, 7))
+    element_names = line.element_names
+    sectors = set()
+    for name in element_names:
+        if "_" in name:
+            parts = name.split("_")[-1]
+            if len(parts) >= 2 and parts[0].isdigit() and parts[1] in ["R", "L"]:
+                sectors.add(parts[0])
 
-    # Define the viewing window around the working point
-    qx_min, qx_max = qx - tune_window, qx + tune_window
-    qy_min, qy_max = qy - tune_window, qy + tune_window
+    N_c = len(sectors) if len(sectors) > 0 else 3  
+    print(f"Detected Superperiodicity N_c = {N_c}")
+    print(f"Analyzing explicit resonance orders: {orders_to_check}")
 
-    ax.set_xlim(qx_min, qx_max)
-    ax.set_ylim(qy_min, qy_max)
+    qmin_x, qmax_x = qx - tune_range, qx + tune_range
+    qmin_y, qmax_y = qy - tune_range, qy + tune_range
 
-    # Plot the current Operating Working Point
-    ax.plot(
-        qx,
-        qy,
-        "ro",
-        markersize=10,
-        label=f"Working Point ({qx:.4f}, {qy:.4f})",
-        zorder=5,
-    )
+    fig, ax = plt.subplots(figsize=(8.5, 7.5))
 
-    # Styling properties for resonance orders
-    # Distinct colors for orders 1 through 5+
-    order_colors = {
-        1: "blue",
-        2: "green",
-        3: "darkorange",
-        4: "purple",
-        5: "brown",
-    }
+    qx_range = (qmin_x, qmax_x)
+    qy_range = (qmin_y, qmax_y)
+    
+    diagram_object = resonance_lines(qx_range, qy_range, orders_to_check, N_c)
+    
+    ax.set_xlim(qmin_x, qmax_x)
+    ax.set_ylim(qmin_y, qmax_y)
 
-    # Plot each resonance line found in the dataframe
-    for _, row in df.iterrows():
-        m = int(row["m"])
-        n = int(row["n"])
-        k = int(row["Global Harmonic (k)"])
-        order = int(row["Order"])
-        status = row["Verdier Status"]
+    for resonance in diagram_object.resonance_list:
+        nx_val = resonance[0]
+        ny_val = resonance[1]
+        for res_sum in resonance[2]:
+            # Plot the standard full faint template background layout first
+            if ny_val != 0:
+                x_pts = np.array([qmin_x, qmax_x])
+                y_pts = (res_sum - nx_val * x_pts) / ny_val
+            else:
+                x_pts = np.array([float(res_sum) / nx_val, float(res_sum) / nx_val])
+                y_pts = np.array([qmin_y, qmax_y])
+                
+            ax.plot(x_pts, y_pts, color="lightgray", linestyle=":", linewidth=1.0, zorder=1, alpha=0.6)
 
-        # Solid lines for Dangerous/Structural, dashed for Suppressed/Non-Structural
-        linestyle = "-" if "Structural" in status else "--"
-        # Thicker lines for lower-order resonances (which are usually stronger)
-        linewidth = max(0.8, 3.5 - 0.5 * order)
-        color = order_colors.get(order, "black")
-        alpha = 0.8 if "Structural" in status else 0.35
+            # Calculate perpendicular distance from working point (qx, qy) to line: nx*x + ny*y = res_sum
+            distance = abs(nx_val * qx + ny_val * qy - res_sum) / np.sqrt(nx_val**2 + ny_val**2)
+            
+            is_structural = (res_sum % N_c == 0)
 
-        # Handle different line orientations safely
-        if n == 0:  # Vertical line: m*Qx = k -> Qx = k/m
-            if m != 0:
-                qx_val = k / m
-                if qx_min <= qx_val <= qx_max:
-                    ax.axvline(
-                        x=qx_val,
-                        color=color,
-                        linestyle=linestyle,
-                        linewidth=linewidth,
-                        alpha=alpha,
-                    )
-        elif m == 0:  # Horizontal line: n*Qy = k -> Qy = k/n
-            if n != 0:
-                qy_val = k / n
-                if qy_min <= qy_val <= qy_max:
-                    ax.axhline(
-                        y=qy_val,
-                        color=color,
-                        linestyle=linestyle,
-                        linewidth=linewidth,
-                        alpha=alpha,
-                    )
-        else:  # Sloped resonance line: Qy = (k - m*Qx) / n
-            qx_vals = np.array([qx_min, qx_max])
-            qy_vals = (k - m * qx_vals) / n
-            # Only plot if it intersects or passes near our window bounds
-            ax.plot(
-                qx_vals,
-                qy_vals,
-                color=color,
-                linestyle=linestyle,
-                linewidth=linewidth,
-                alpha=alpha,
-            )
+            if distance <= 0.015:
+                if is_structural:
+                    
+                    color = "red"
+                    linewidth = 2.5
+                    zorder = 4
+                else:
+                  
+                    color = "darkorange"
+                    linewidth = 2.0
+                    zorder = 3
+            elif distance <= 0.035:
+                color = "gold"
+                linewidth = 1.5
+                zorder = 2
+            else:
+                continue  
 
-    # Build a clean, clear custom legend
-    from matplotlib.lines import Line2D
+            # Plot the colored highlighted overlay on top
+            ax.plot(x_pts, y_pts, color=color, linewidth=linewidth, linestyle="-", zorder=zorder)
+
+    # 7. Mark the nominal Active Working Point
+    ax.plot(qx, qy, marker="o", color="black", markersize=10, linestyle="", zorder=5)
+
+    # 8. Axis labeling and Threat Assessment Legend
+    ax.set_xlabel(r"$Q_x$", fontsize=12)
+    ax.set_ylabel(r"$Q_y$", fontsize=12)
+    ax.set_title(f"Dangerous resonances", fontsize=13)
 
     legend_elements = [
-        Line2D(
-            [0],
-            [0],
-            color="red",
-            marker="o",
-            linestyle="",
-            markersize=10,
-            label=f"Working Point ({qx:.3f}, {qy:.3f})",
-        ),
-        Line2D(
-            [0],
-            [0],
-            color="black",
-            linestyle="-",
-            linewidth=2,
-            label="Dangerous (Structural)",
-        ),
-        Line2D(
-            [0],
-            [0],
-            color="black",
-            linestyle="--",
-            linewidth=1.5,
-            alpha=0.5,
-            label="Suppressed (Non-Structural)",
-        ),
+        Line2D([0], [0], color="red", linewidth=2.5, label="Tier 1: Most Dangerous (Structural near WP)"),
+        Line2D([0], [0], color="darkorange", linewidth=2.0, label="Tier 2: Medium Danger (Non-Structural near WP)"),
+        Line2D([0], [0], color="gold", linewidth=1.5, label="Tier 3: Low Danger (Wider tune tolerance)"),
+        Line2D([0], [0], color="lightgray", linestyle=":", linewidth=1, label="Tier 4: Safe / Faint Background Grid"),
+        Line2D([0], [0], marker="o", color="black", linestyle="", markersize=10, label=f"Current Operating WP: {qx:.2f},{qy:.2f}")
     ]
+    ax.legend(handles=legend_elements)
+    
+    
+    return fig, ax
 
-    # Add indicators for each active resonance order present in data
-    for o in sorted(df["Order"].unique()):
-        legend_elements.append(
-            Line2D(
-                [0],
-                [0],
-                color=order_colors.get(o, "black"),
-                linestyle="-",
-                linewidth=2,
-                label=f"Order {o} Resonance",
+
+def plot_DA_tune_scan(qx_range, qy_range, particles, num_r_steps, num_theta_steps, x_norm, y_norm, delta_initial):
+    """
+    qx_range: 1D array of qx values to scan
+    qy_range: 1D array of qy values to scan
+    """
+    # Create grids for tunes
+    QX, QY = np.meshgrid(qx_range, qy_range)
+    
+    # Initialize a 2D array to store the minimum DA for each working point
+    min_DA_grid = np.zeros_like(QX)
+
+    # Loop through the grid
+    for i in range(len(qy_range)):
+        for j in range(len(qx_range)):
+            current_qx = qx_range[j]
+            current_qy = qy_range[i]
+            
+            # --- 1. SIMULATION STEP ---
+            # You need to update your accelerator lattice tunes to (current_qx, current_qy)
+            # and rerun your tracking simulation here to get the new 'particles' object.
+            # Example: particles = run_tracking(current_qx, current_qy)
+            
+            # For demonstration, let's assume 'particles' is generated here:
+            
+            # --- 2. CALCULATE DA ---
+            # Call your function (disable plotting inside the loop to avoid 1000s of windows)
+            _, _, _, min_DA = DA_vs_turns(
+                particles, num_r_steps, num_theta_steps, 
+                x_norm, y_norm, delta_initial, delta_plots=False
             )
-        )
+            
+            # Store the result
+            min_DA_grid[i, j] = min_DA
 
-    # Position the legend outside the plot area to prevent overlapping data
-    ax.legend(
-        handles=legend_elements, loc="upper left", bbox_to_anchor=(1.02, 1)
-    )
-
-    # Labels and Titles
-    ax.set_xlabel(r"Horizontal Tune $Q_x$", fontsize=12)
-    ax.set_ylabel(r"Vertical Tune $Q_y$", fontsize=12)
-    ax.set_title(
-        "Local Tune Diagram & Verdier Resonance Analysis",
-        fontsize=13,
-        fontweight="bold",
-    )
-    ax.grid(True, which="both", linestyle=":", alpha=0.5)
-
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    plt.close()
+    # --- 3. PLOT THE HEATMAP ---
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    # Using pcolormesh for a clean heatmap grid
+    c = ax.pcolormesh(QX, QY, min_DA_grid, cmap='viridis', shading='auto')
+    
+    # Add labels and styling
+    ax.set_xlabel(r'Horizontal Tune $q_x$')
+    ax.set_ylabel(r'Vertical Tune $q_y$')
+    ax.set_title(r'Minimum Dynamic Aperture [$\sigma$]')
+    
+    # Colorbar
+    cb = fig.colorbar(c, ax=ax)
+    cb.set_label(r'Minimum DA ($\sigma$)')
+    
+    plt.show()

@@ -613,7 +613,7 @@ def DA_vs_turns(particles, num_r_steps, num_theta_steps, x_norm, y_norm, delta_i
         ax.set_label('Lost at turn')
         plt.legend(fontsize='small', loc='best')
 
-    return (x_DA, y_DA, where_min_DA)
+    return (x_DA, y_DA, where_min_DA, min_DA)
 
 
 def MA_vs_turns(particles, num_r_steps, num_delta_steps, x_norm, y_norm, delta_initial):
