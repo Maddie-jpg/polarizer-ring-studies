@@ -191,14 +191,17 @@ cell_tr_opt = cell_tr.match( method='4d', solve=True,
 def matchingWP( qx, qy, MakePlot=False ):
     cell_arc_opt.run_jacobian(10)
     cell_arc_tw = cell_arc.twiss( method='4d' )
+    
+    knobs_to_vary = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS', 'kQFDoub', 'kQDDoub', 'kQFtr', 'kQDtr']
+    
     arc1R_opttune = arc1R.match( method='4d', solve=True, verbose=False,
                  betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
                  bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
                  dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0],
-            vary=[ xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
-                   xt.VaryList(['kQFDS', 'kQDDS'], step=1e-4),
-                   xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
-                   xt.VaryList(['kQFtr', 'kQDtr'], step=1e-4), ],
+            vary=[ xt.VaryList(knobs_to_vary[:2], step=1e-4),
+                   xt.VaryList(knobs_to_vary[2:4], step=1e-4),
+                   xt.VaryList(knobs_to_vary[4:6], step=1e-4),
+                   xt.VaryList(knobs_to_vary[6:], step=1e-4), ],
             targets=[ xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1.0e-9),
                       xt.TargetSet(mux=qx/6, muy=qy/6, at=xt.END, 
                                    tol=1.0e-9, weight=.1, tag='phase'),
@@ -206,13 +209,16 @@ def matchingWP( qx, qy, MakePlot=False ):
                       xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', 
                                    tol=1.0e-9, weight=10.) ])
     arc1R_opttune.run_jacobian(50)
+    
     if MakePlot:
        arc1R.twiss( method='4d',
                     betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
                     bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
                     dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0],).plot()
-
-        
+       
+    optimized_knobs = {knob: arc1R.vars[knob]._value for knob in knobs_to_vary}
+    return optimized_knobs
+ 
 # Matching sequence for sextant with beta at center of straights fixed
 def matchingBeta( betxS, betyS, MakePlot=False ): #, **kwargs ):
     cell_arc_opt.run_jacobian(10)
