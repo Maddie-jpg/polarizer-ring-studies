@@ -297,13 +297,15 @@
 
 \maketitle
 
+\tableofcontents
+
 \section{Monthly Progress}
-\subsection*{Month 1: 23/02/2026 - 20/03/2026}
-\subsubsection*{Overview}
+\subsection{Month 1: 23/02/2026 - 20/03/2026}
+\subsubsection{Overview}
 
 Spent the first week familiarising myself with beam optics concepts and Xsuite functions. Then began understanding and editing a code for a compact ring with 90$^\circ$ phase advance.
 
-\subsubsection*{Work completed}
+\subsubsection{Work completed}
 
 \begin{itemize}
 \item Initially read papers to understand how the ring functions and what processes go into it.
@@ -313,7 +315,7 @@ Spent the first week familiarising myself with beam optics concepts and Xsuite f
 \item Corrected working point and found two potential candidates.
 \end{itemize}
 
-\subsubsection*{Problems encountered}
+\subsubsection{Problems encountered}
 
 \textbf{Breaking the ring:} \texttt{Invalid n1}, \texttt{Invalid n2}, and \texttt{Invalid n3} errors arose when trying to add sextupoles. This scenario halted progress the most.
 \begin{itemize}
@@ -330,7 +332,7 @@ Spent the first week familiarising myself with beam optics concepts and Xsuite f
     \item \textbf{Solution:} Consistently running matching functions and identifying best positions and working points.
 \end{itemize}
 
-\subsubsection*{Results and progress}
+\subsubsection{Results and progress}
 \begin{itemize}
     \item The initial compact ring now has sextupoles inserted: there are currently 16 in each arc (8 focusing, 8 defocusing).
     \item Strengths and beta-functions have been corrected
@@ -340,7 +342,7 @@ Spent the first week familiarising myself with beam optics concepts and Xsuite f
     \item Chromatic functions are plotted and show slightly different, but periodic, results for both working points.
 \end{itemize}
 
-\subsubsection*{Next steps}
+\subsubsection{Next steps}
 \begin{itemize}
     \item Further refine suitability of the working point
     \item Track off-momentum particles
@@ -348,18 +350,18 @@ Spent the first week familiarising myself with beam optics concepts and Xsuite f
     \item Work on different sextupole configurations with different positions, families, and cell lengths in parallel
 \end{itemize}
 
-\subsubsection*{Skills developed}
+\subsubsection{Skills developed}
 \begin{itemize}
     \item \textbf{Knowledge of beam optics concepts:} Twiss parameters, chromaticity, tune, basics of synchrotron radiation, and dynamic aperture
     \item \textbf{Xsuite:} Building rings and inserting elements, calculating Twiss plots, creating matching functions
 \end{itemize}
 
-\subsection*{Month 2: 23/03/2026 - 24/04/2026}
-\subsubsection*{Overview}
+\subsection{Month 2: 23/03/2026 - 24/04/2026}
+\subsubsection{Overview}
 
 Completed dynamic aperture and momentum acceptance studies for different configurations. Experimented with slicing, integrators, and fringe fields. Now introducing misalignments and corrections.
 
-\subsubsection*{Work completed}
+\subsubsection{Work completed}
 
 \begin{itemize}
 \item Plotted DA/MA for 7 different sextupole configurations 
@@ -370,7 +372,7 @@ Completed dynamic aperture and momentum acceptance studies for different configu
 \item Introduced misalignments, inserted BPMs and correctors, and performed orbit correction
 \end{itemize}
 
-\subsubsection*{Problems encountered}
+\subsubsection{Problems encountered}
 
 \textbf{Reducing non-linearities:} Chromatic correction is working for $dqx$ and $dqy$ but often plotting tune against momentum deviation showed that $ddqx$ and $ddqy$ had not been properly corrected. This contributed to smaller DA/MA. Performing chromaticity correction to get these values to 0 often failed as it was too much of a jump.
 \begin{itemize}
@@ -383,7 +385,7 @@ Completed dynamic aperture and momentum acceptance studies for different configu
     \item \textbf{Solution:} Everything has been modularised so it is easier to see where errors arise and can edit things more efficiently. This will also help with later lattice designs.
 \end{itemize}
 
-\subsubsection*{Results and progress}
+\subsubsection{Results and progress}
 \begin{itemize}
     \item Increasing the number of slices for the quadrupoles created smoother curves in the DA/MA plots, but there were no differences when increasing the slices for bends and quadrupoles.
     \item Fringe fields reduced the less stable configurations' DA/MA considerably, but not as much for stable configurations.
@@ -393,14 +395,14 @@ Completed dynamic aperture and momentum acceptance studies for different configu
     \item With corrections, the orbits are currently oscillating at less than 1mm
 \end{itemize}
 
-\subsubsection*{Next steps}
+\subsubsection{Next steps}
 \begin{itemize}
     \item Studies on spin tracking and polarization build-up time
     \item Looking at integration with the rest of the injector complex using current macroparticle distribution
     \item Assess injection efficiency
 \end{itemize}
 
-\subsubsection*{Skills developed}
+\subsubsection{Skills developed}
 \begin{itemize}
     \item \textbf{Dynamic aperture and momentum acceptance:} how it is calculated and the effects of adjusting integrators and slices
     \item \textbf{Knowledge of beam optics concepts:} fringe fields, FMA, BPMs, correctors, synchrotron radiation damping
@@ -408,7 +410,7 @@ Completed dynamic aperture and momentum acceptance studies for different configu
 
 
 \section{Notes and Concepts}
-\subsection*{Overview of processes within the ring}
+\subsection{Overview of processes within the ring}
 \subsubsection{Injection - electron enters the ring}
 \begin{itemize}
 \item An electron bunch is injected at a defined energy
@@ -488,7 +490,95 @@ Completed dynamic aperture and momentum acceptance studies for different configu
 \item Stable polarization
 \end{itemize}
 
+\subsection{Synchrotron Radiation Damping and Quantum Excitation}
+
+In an electron storage ring, the steady-state properties of the beam (beam size,emittance, energy spread) are governed by the fight between radiation damping and quantum excitation.
+
+The equilbrium value of any beam distribution parameter $\chi$ can be described by the balance equation:
+$$\frac{d \langle \chi^2 \rangle}{dt}=-\frac{2}{\tau_\chi}\langle \chi^2 \rangle + \mathcal{Q}_{\chi}=0 => \langle \chi^2 \rangle_{eq} = \frac{\tau_\chi}{2} \mathcal{Q}_{\chi}$$
+
+Where $\tau_{\chi}$ is the characteristic damping time and $\mathcal{Q}_\chi$ is the quantum excitation diffusion coefficient \cite{Sands1970}.
+
+\subsubsection{Synchrotron Radiation Damping}
+\textbf{Transverse Damping}
+
+When an ultra-relativistic electron undergoes centripetal acceleration in a bending magnet, it emits synchrotron in a very tight forward cone with an opening half-angle $\theta \approx 1/\gamma$ relative to its instantaneous velocity vector. \cite{Jackson1999}
+
+\begin{itemize}
+\item \textbf{Photon Emission:} The photon carries away momentum along the particle's instantaneous direction of motion ($p_{total}=p_s+p_x+p_y$). This reduces the absolute values of all directional components, but leaves the angles ($x'=p_x/p_s$) unchanged.
+\item \textbf{RF Cavity Replenishment:}As the particle passes through the RF cavity, the longitudinal electric fields accelerate the particle only along the design longitudinal axis ($s$).
+\item \textbf{Net Geometric Effect:}This replaces the lost longitudinal momentum $p_s$ while leaving the reduced transverse momenta unchanged. Consequently, the transverse divergence angle shrinks linearly over time: $$x'_f=x'_i(1-\frac{\Delta E}{E_0})$$ This collapse of transverse angles creates exponential damping. \cite{Wolski2014}
+\end{itemize}
+
+\textbf{Longitudinal Damping}
+
+
+Longitudinal damping operates through the relationship between a particle's off-momentum energy deviation ($\Delta E$) and its rate of energy loss per turn ($U_0$).
+\begin{itemize}
+\item A higher-energy particle ($\Delta E > 0$) travels on a wider horizontal orbit through the dipoles (through dispersion). It experiences a stronger integrated magnetic field pathway causing it to emit more radiation than a nominal particle.
+\item When it returns to the RF cavity, it recieves the same voltage kick, resulting in a net loss of its energy \cite{Sands1970, Jackson1999}.
+\end{itemize}
+
+
+\textbf{Damping Partition Numbers (Robinson Criterion)}
+
+The total damping available in the system is divided among the three degrees of freedom ($x, y, s$) via the damping partition numbers ($J_x, J_y, J_s$):
+$$\tau_i=\frac{2E_0T_0}{U_0 J_i}$$
+Where $E_0$ is the nominal energy, $T_0$ is the revolution period, and $U_0$ is the energy loss per turn.
+
+The Robinson criterion states that the sum of the partition numbers is an invariant determined entirely by the geometry of the system \cite{Robinson1958}.
+
+\subsubsection{Quantum Excitation}
+
+If there was only radiation damping, the beam would collapse infinitely. However, the quantum nature of light prevents this.
+
+\textbf{The Random Walk mechanism}
+
+When a particle emits a photon of energy $u$ inside a region with non-zero horizontal dispersion ($D_x$), its nominal reference energy changes instantaneously. This shifts its reference closed orbit position relative to its actual physical location:
+$$\Delta x_\beta=-D_x \frac{u}{E_0},\space \Delta x'_\beta =-D'_x\frac{u}{E_0}$$
+
+Betatron Heating: The particle suddenly finds itself offset from its new reference trajectory, forcing it to execute a larger betatron oscillation. Because photon emission times and energy sizes are completely stochastic, this process drives a random walk (diffusion) that increases beam emittance \cite{Wolski2014,Wiedemann2015}.
+
+\textbf{Fundamental Equilibrium Equations}
+
+Equilibrium Energy Spread ($\sigma_\delta^2$):
+$$\sigma_\delta^2=(\frac{\sigma_E}{E_0})^2 =\frac{C_q\gamma^2}{J_s}\frac{I_3}{I_2}$$
+
+Natural Horizontal Emittance ($\epsilon_0$):
+$$\epsilon_0=\frac{C_q\gamma^2}{J_x}\frac{I_5}{I_2}=\frac{C_q\gamma^2}{J_x}\frac{\int |\frac{1}{\rho^3}| \mathcal{H}(s) ds}{\int \frac{1}{\rho^2} ds}$$
+
+\begin{itemize}
+\item The quantum constant: $C_q=\frac{55\hbar}{32\sqrt{3}m_e c}\approx 3.83\times 10^{-13} m$ \cite{Sands1970}
+\item Dispersion invariant: $\mathcal{H}(s)=\gamma_x D_x^2 +2\alpha_x D_x D'_x +\beta_x D'^2_x$ \cite{Wolski2014}
+\end{itemize}
+
+\subsubsection{Boundaries and Limits}
+\textbf{Vertical Emittance Limit ($\epsilon_y \rightarrow 0$)}
+
+\begin{itemize}
+\item In a perfectly flat storage ring with no vertical bending magnets, vertical dispersion is zero, meaning quantum excitation does not drive vertical emittance \cite{Wolski2014}.
+\item The absolute floor for vertical emittance is set by the microscopic opening angle of the emitted photons ($\theta \approx 1/\gamma$). The residual limit is incredibly small:$$\epsilon_{y,\text{min}}\approx \frac{C_q}{2J_y}$$
+\item In real machines, vertical emittance is limited to higher values by lattice imperfections \cite{Wiedemann2015}
+\end{itemize}
+
+\textbf{Scaling Limits of Lattice Types}
+To lower the natural emittance, lattice optics must minimise the dispersion invariant inside the bending magnets where $1/\rho^3$ is non-zero. This constraint sets limits on the performance of different cell designs for a given deflection angle \cite{Wolski2014, Papaphilippou2014}:
+\begin{itemize}
+\item \textbf{Double Bend Achromat (DBA):} Forces dispersion to zero at the cell exits to accommodate insertion devices: $$\epsilon_{\text{DBA,min}}=\frac{1}{4\sqrt{15}}C_q\gamma^2\theta^3$$
+\item \textbf{Theoretical Minimum Emittance (TME):} Relaxes the zero-dispersion constraint to minimise $\mathcal{H}(s)$ exactly at the centre of the dipole magnet: $$\epsilon_{\text{TME, min}}=\frac{1}{12\sqrt{15}}C_q\gamma^2\theta^3$$
+\end{itemize}
+
+The absolute geometric limit of a TME cell is exactly 3 times smaller than a DBA layout for the same bending configuration \cite{Wolski2014}.
+
+\textbf{Dynamic Aperture Limit}
+Strong quadrupoles generate large natural chromaticity which need to be corrected with sextupoles.
+Non-linear sextupole fields introduce amplitude-dependent tune shifts which shrink the dynamic aperture. If the DA drops below the physical injection boundary, or the core beam envelope size, injection efficiency collapses and the beam lifetime drops dramatically \cite{Papaphilippou2014}.
+
+
 \glsaddall
 
 \printglossary[title=Glossary]
+
+\bibliographystyle{unsrt}
+\bibliography{Notes.bib}
 \end{document}

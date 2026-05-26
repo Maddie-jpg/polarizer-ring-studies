@@ -1,0 +1,32 @@
+\contentsline {section}{\numberline {1}Monthly Progress}{2}{}%
+\contentsline {subsection}{\numberline {1.1}Month 1: 23/02/2026 - 20/03/2026}{2}{}%
+\contentsline {subsubsection}{\numberline {1.1.1}Overview}{2}{}%
+\contentsline {subsubsection}{\numberline {1.1.2}Work completed}{2}{}%
+\contentsline {subsubsection}{\numberline {1.1.3}Problems encountered}{2}{}%
+\contentsline {subsubsection}{\numberline {1.1.4}Results and progress}{2}{}%
+\contentsline {subsubsection}{\numberline {1.1.5}Next steps}{3}{}%
+\contentsline {subsubsection}{\numberline {1.1.6}Skills developed}{3}{}%
+\contentsline {subsection}{\numberline {1.2}Month 2: 23/03/2026 - 24/04/2026}{3}{}%
+\contentsline {subsubsection}{\numberline {1.2.1}Overview}{3}{}%
+\contentsline {subsubsection}{\numberline {1.2.2}Work completed}{3}{}%
+\contentsline {subsubsection}{\numberline {1.2.3}Problems encountered}{3}{}%
+\contentsline {subsubsection}{\numberline {1.2.4}Results and progress}{4}{}%
+\contentsline {subsubsection}{\numberline {1.2.5}Next steps}{4}{}%
+\contentsline {subsubsection}{\numberline {1.2.6}Skills developed}{4}{}%
+\contentsline {section}{\numberline {2}Notes and Concepts}{4}{}%
+\contentsline {subsection}{\numberline {2.1}Overview of processes within the ring}{4}{}%
+\contentsline {subsubsection}{\numberline {2.1.1}Injection - electron enters the ring}{4}{}%
+\contentsline {subsubsection}{\numberline {2.1.2}First turn - Bending in Dipoles}{4}{}%
+\contentsline {subsubsection}{\numberline {2.1.3}Synchrotron radiation happens immediately}{5}{}%
+\contentsline {subsubsection}{\numberline {2.1.4}RF Cavities}{5}{}%
+\contentsline {subsubsection}{\numberline {2.1.5}Radiation Damping}{5}{}%
+\contentsline {subsubsection}{\numberline {2.1.6}Quantum Excitation}{5}{}%
+\contentsline {subsubsection}{\numberline {2.1.7}Spin Begins Evolving}{5}{}%
+\contentsline {subsubsection}{\numberline {2.1.8}Sokolov-Ternov Effect Starts}{6}{}%
+\contentsline {subsubsection}{\numberline {2.1.9}Polarization Build-Up}{6}{}%
+\contentsline {subsubsection}{\numberline {2.1.10}Equilibrium State}{6}{}%
+\contentsline {subsection}{\numberline {2.2}Synchrotron Radiation Damping and Quantum Excitation}{6}{}%
+\contentsline {subsubsection}{\numberline {2.2.1}Synchrotron Radiation Damping}{6}{}%
+\contentsline {subsubsection}{\numberline {2.2.2}Quantum Excitation}{7}{}%
+\contentsline {subsubsection}{\numberline {2.2.3}Boundaries and Limits}{7}{}%
+\contentsline {section}{Glossary}{8}{}%
