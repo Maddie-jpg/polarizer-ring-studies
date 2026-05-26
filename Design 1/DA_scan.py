@@ -16,7 +16,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 line=xt.Line.from_json('/home/mwatson/Documents/laughing-octo-bassoon/Junk Draw/polarizer_ring_current_config.json')
-
+line_tw=line.twiss()
 
 line.config.XTRACK_USE_EXACT_DRIFTS = True
 xutil.set_integrator (line)
@@ -49,7 +49,7 @@ paths = [
     ("Stream UP", qx_up, qy_up),
     ("Stream DOWN", qx_down, qy_down)
 ]
-line_tw=line.twiss()
+
 qx=line_tw.qx
 qy=line_tw.qy
 radii=np.linspace(0,0.5,25)
@@ -164,45 +164,53 @@ for r in radii:
 
 df = pd.DataFrame(min_DAs)
 
-# 2. Pivot the data to create a 2D matrix (Qy rows, Qx columns)
-# If a specific tune pair crashed or has multiples, 'min' handles it gracefully
-heatmap_data = df.pivot_table(index='qy', columns='qx', values='min_da', aggfunc='min')
+df['qx_round'] = df['qx'].round(2)
+df['qy_round'] = df['qy'].round(2)
+
+# 2. Pivot using the rounded, structured coordinate system
+heatmap_data = df.pivot_table(index='qy_round', columns='qx_round', values='min_da', aggfunc='min')
 
 # Sort index descendingly so higher vertical tunes are at the top of the plot
 heatmap_data = heatmap_data.sort_index(ascending=False)
 
-# 3. Define the spatial extent for boundary alignment
-qx_centers = heatmap_data.columns.values
-qy_centers = heatmap_data.index.values
+# Check if we have a valid, dense 2D grid matrix
+if heatmap_data.notna().sum().sum() < (len(df) * 0.1):
+    # FALLBACK: If your points do not lie on a perfect grid, a Scatter Plot 
+    # will display the data accurately without needing a dense matrix grid.
+    print("Data is irregularly spaced. Generating a continuous scatter map instead...")
+    fig, ax = plt.subplots(figsize=(9, 8))
+    cax = ax.scatter(df['qx'], df['qy'], c=df['min_da'], cmap='viridis', s=40, marker='s')
+    
+else:
+    # GRID RENDER: Proceed with standard grid image array mapping
+    qx_centers = heatmap_data.columns.values
+    qy_centers = heatmap_data.index.values
 
-dx = (qx_centers[1] - qx_centers[0]) / 2.0 if len(qx_centers) > 1 else 0.05
-dy = (qy_centers[1] - qy_centers[0]) / 2.0 if len(qy_centers) > 1 else 0.05
+    dx = (qx_centers[1] - qx_centers[0]) / 2.0 if len(qx_centers) > 1 else 0.05
+    dy = (qy_centers[1] - qy_centers[0]) / 2.0 if len(qy_centers) > 1 else 0.05
 
-extent = [
-    qx_centers.min() - dx, qx_centers.max() + dx,
-    qy_centers.min() - dy, qy_centers.max() + dy
-]
+    extent = [
+        qx_centers.min() - dx, qx_centers.max() + dx,
+        qy_centers.min() - dy, qy_centers.max() + dy
+    ]
 
-# 4. Generate the plot
-fig, ax = plt.subplots(figsize=(9, 8))
+    fig, ax = plt.subplots(figsize=(9, 8))
+    cax = ax.tripcolor(df['qx'], df['qy'], df['min_da'], cmap='viridis', shading='flat')
 
-# Using 'viridis' or 'jet'. 'inferno' works great for structural DA scans.
-cax = ax.imshow(heatmap_data.values, extent=extent, cmap='viridis', aspect='auto')
+    # Update axis markers directly on your clean binned values
+    ax.set_xticks(np.arange(15.0, 16.0, 0.1))
+    ax.set_yticks(np.arange(15.0, 16.0, 0.1))
 
 # Labels and aesthetics
 ax.set_xlabel(r'Horizontal Tune ($q_x$)', fontsize=12)
 ax.set_ylabel(r'Vertical Tune ($q_y$)', fontsize=12)
 ax.set_title('Working Point Scan: Minimum Dynamic Aperture', fontsize=14, pad=15, fontweight='bold')
-
-# Set tick markers directly on your scanned tune steps
-ax.set_xticks(qx_vals)
-ax.set_yticks(qy_vals)
 plt.xticks(rotation=45)
 
 # Colorbar setup
 cbar = fig.colorbar(cax, ax=ax)
 cbar.set_label(r'Minimum DA [$\sigma$]', fontsize=12)
 
-
 plt.tight_layout()
+plt.savefig('DA_scan.png')
 plt.show()
