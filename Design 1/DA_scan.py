@@ -148,7 +148,9 @@ for r in radii:
                 min_DAs.append({
                     'qx': qx_val,
                     'qy': qy_val,
-                    'min_da': min_DA
+                    'min_da': min_DA,
+                    'r':r,
+                    'theta': theta
                 })
                 print(f"WP ({qx_val:.3f}, {qy_val:.3f}) computed successfully. DA: {min_DA}")
                 
@@ -156,7 +158,9 @@ for r in radii:
                 min_DAs.append({
                     'qx': qx_val,
                     'qy': qy_val,
-                    'min_da': 0
+                    'min_da': 0,
+                    'r':r,
+                    'theta': theta
                 })
 
         
@@ -164,8 +168,8 @@ for r in radii:
 
 df = pd.DataFrame(min_DAs)
 
-df['qx_round'] = df['qx'].round(2)
-df['qy_round'] = df['qy'].round(2)
+df['qx_round'] = (df['qx']-df['r']*np.cos(df['theta'])).round(2)
+df['qy_round'] = (df['qy']-df['r']*np.sin(df['theta'])).round(2)
 
 # 2. Pivot using the rounded, structured coordinate system
 heatmap_data = df.pivot_table(index='qy_round', columns='qx_round', values='min_da', aggfunc='min')
