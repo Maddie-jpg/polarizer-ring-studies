@@ -26,7 +26,7 @@ Eref = 2860.
 
 #f = open('/Users/ccarli/Documents/FCC/PolarizerRing/FromPosLinac/Beam_3GHzOption_2.86GeV_20260421.dat', 'r')
 
-f = open('Documents/FCC/PolarizerRing/FromPosLinac/Beam_3GHzOption_2.86GeV_20260421.dat', 'r')
+f = open('/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Macro-particle distributions/PositronBeam_2p86GeV/Beam_3GHzOption_2.86GeV_20260421.dat', 'r')
 
 #f = open('./Beam_3GHzOption_2.86GeV_20260421.dat', 'r')
 
