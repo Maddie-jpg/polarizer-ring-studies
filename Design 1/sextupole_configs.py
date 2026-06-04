@@ -625,14 +625,13 @@ def insert_correctors(pdr):
         
     return pdr
 
-def orbit_correction(pdr,twiss,threading=False):   
+def orbit_correction(pdr, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2):   
     ring = pdr.lines['ring']
-    period=pdr.lines['period']
+    period = pdr.lines['period']
     
     tt = ring.get_table()
     bpm_names_x = tt.rows['BPMx.*'].name
     bpm_names_y = tt.rows['BPMy.*'].name
-    #bpm_names = tt.rows['BPM.*'].name
     corr_x_names = tt.rows['Mx.*'].name
     corr_y_names = tt.rows['My.*'].name
 
@@ -642,15 +641,20 @@ def orbit_correction(pdr,twiss,threading=False):
     ring.steering_correctors_y = corr_y_names
 
     if threading is False:
-       ring.correct_trajectory(twiss_table=twiss)
+        corr_handler = ring.correct_trajectory(twiss_table=twiss, run=False)
+        corr_handler.x_correction.rcond = rcond_x
+        corr_handler.y_correction.rcond = rcond_y
+        corr_handler.correct()
     else:
         tw0 = twiss
-
         corr_handler = ring.correct_trajectory(twiss_table=tw0, run=False)
         corr_handler.thread(ds_thread=10., rcond_long=1e-2)
 
         tw1 = ring.twiss(method='6d')
-        ring.correct_trajectory(twiss_table=tw1)
+        corr_handler_final = ring.correct_trajectory(twiss_table=tw1, run=False)
+        corr_handler_final.x_correction.rcond = rcond_x
+        corr_handler_final.y_correction.rcond = rcond_y
+        corr_handler_final.correct()
 
     return pdr
 
