@@ -1,11 +1,5 @@
 import sys
 import os
-
-parent_dir = os.path.abspath('..')
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-import sys
-import os
 import xtrack as xt
 import numpy as np
 
@@ -15,7 +9,7 @@ pdr.particle_ref = xt.Particles(kinetic_energy0=2.86e9, mass0 = xt.ELECTRON_MASS
 E0 = 2.86e9  
 VRF = 4.0e6  
 
-pdr.vars({'l_cell': 3.4,'l_bend': 0.40,'l_bendDS': 0.55,'dl_noben': 0.25, 'l_quad': 0.30,
+pdr.vars({'l_cell': 3,'l_bend': 0.40,'l_bendDS': 0.55,'dl_noben': 0.25, 'l_quad': 0.30,
   'l_drift': '(l_cell - 2*l_bend - 2*l_quad)/4.','dl_drift': -0.1, 'dl_trans': 0.00,
   'l_doub':  0.25, 'l_tripl': 2.7, 'l_trips': 0.40, 'l_sext': 0.20, })
 
@@ -28,6 +22,9 @@ U0 = (0.88463e-31)*E0**4*(2.*np.pi)/(4*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['
 
 pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend', k0_from_h=True, 
          edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model='full', edge_exit_model='full')
+pdr.new('Bend_R', xt.Bend, length='l_bend', angle='hBarc*l_bend', k0_from_h=True, 
+         edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model='full', edge_exit_model='full')
+
 pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc', edge_entry_active=True, edge_exit_active=True)
 pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc', edge_entry_active=True, edge_exit_active=True)
 pdr.new('Drarc',  xt.Drift,      length='l_drift')
@@ -35,8 +32,12 @@ pdr.new('DrarcS', xt.Drift,      length='l_drift + dl_drift')
 pdr.new('QDarc',  xt.Quadrupole, length='l_quad',    k1='kQDarc', edge_entry_active=True, edge_exit_active=True)
 pdr.new('QFarcM', xt.Quadrupole, length='l_quad',    k1='kQFarcM', edge_entry_active=True, edge_exit_active=True)
 pdr.new('QDarcM', xt.Quadrupole, length='l_quad',    k1='kQDarcM', edge_entry_active=True, edge_exit_active=True)
+
 pdr.new('BendDS', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS', k0_from_h=True, 
          edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model='full', edge_exit_model='full')
+pdr.new('BendDS_R', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS', k0_from_h=True, 
+         edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model='full', edge_exit_model='full')
+
 pdr.new('QFDS',   xt.Quadrupole, length='l_quad',    k1='kQFDS', edge_entry_active=True, edge_exit_active=True)
 pdr.new('QDDS',   xt.Quadrupole, length='l_quad',    k1='kQDDS', edge_entry_active=True, edge_exit_active=True)
 pdr.new('DrDSL',  xt.Drift,      length='2*l_drift + l_bend + dl_noben')
@@ -61,10 +62,10 @@ cell_arcS = pdr.new_line( length='l_cell',
     ])
 
 cell_arc = pdr.new_line( components = [ 
-   pdr.new('QF_cell_arcH1',  'QFarcH' ), pdr.place( 'Drarc' ),
-   pdr.new('Bend1_cell_arcH','Bend' ),   pdr.place( 'Drarc' ),
-   pdr.new('QD_cell_arcH',   'QDarc' ),  pdr.place( 'Drarc' ),
-   pdr.new('Bend2_cell_arcH','Bend' ),   pdr.place( 'Drarc' ),
+   pdr.new('QF_cell_arcH1',  'QFarcH' ), pdr.new('Drarc_cell1', 'Drarc'),
+   pdr.new('Bend1_cell_arcH','Bend' ),   pdr.new('Drarc_cell2', 'Drarc'),
+   pdr.new('QD_cell_arcH',   'QDarc' ),  pdr.new('Drarc_cell3', 'Drarc'),
+   pdr.new('Bend2_cell_arcH','Bend' ),   pdr.new('Drarc_cell4', 'Drarc'),
    pdr.new('QF_cell_arcH2',  'QFarcH' ), 
    ])
 
@@ -79,39 +80,43 @@ cell_tr = pdr.new_line(
 
 def makesextant ( name, fall ):
     comps = [ ]
+    is_left = (fall == 'left')
+    b_type = 'Bend_R' if is_left else 'Bend'
+    bds_type = 'BendDS_R' if is_left else 'BendDS'
+
     for ind in range( pdr['N_cells_S'] - 1 ):
-       comps = comps + [ pdr.place('Drarc'), pdr.new('Bend1_' + name + str(ind+1), 'Bend')]
-       comps = comps + [ pdr.place('Drarc'), pdr.new('QDA_' + name + str(ind+1), 'QDarc')]
-       comps = comps + [ pdr.place('Drarc'), pdr.new('Bend2_' + name + str(ind+1), 'Bend')]
-       comps = comps + [ pdr.place('Drarc'), pdr.new('QFA_' + name + str(ind+1), 'QFarc')]
+       comps = comps + [ pdr.new(f'Drarc_{name}_{ind}_1', 'Drarc'), pdr.new('Bend1_' + name + str(ind+1), b_type)]
+       comps = comps + [ pdr.new(f'Drarc_{name}_{ind}_2', 'Drarc'), pdr.new('QDA_' + name + str(ind+1), 'QDarc')]
+       comps = comps + [ pdr.new(f'Drarc_{name}_{ind}_3', 'Drarc'), pdr.new('Bend2_' + name + str(ind+1), b_type)]
+       comps = comps + [ pdr.new(f'Drarc_{name}_{ind}_4', 'Drarc'), pdr.new('QFA_' + name + str(ind+1), 'QFarc')]
 
     comps[-1] = pdr.new('QFA_M' + name + str(pdr['N_cells_S']-1), xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFarcM'])
-    comps = comps + [pdr.place('Drarc'),pdr.new('Bend1_' + name + str(pdr['N_cells_S']), 'Bend')]
-    comps = comps + [pdr.place('Drarc'), pdr.new('QDA_M' + name + str(pdr['N_cells_S']), xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDarcM'])]
-    comps = comps + [pdr.place('Drarc'), pdr.new('Bend2_' + name + str(pdr['N_cells_S']), 'Bend')]
+    comps = comps + [pdr.new(f'Drarc_{name}_m1', 'Drarc'), pdr.new('Bend1_' + name + str(pdr['N_cells_S']), b_type)]
+    comps = comps + [pdr.new(f'Drarc_{name}_m2', 'Drarc'), pdr.new('QDA_M' + name + str(pdr['N_cells_S']), xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDarcM'])]
+    comps = comps + [pdr.new(f'Drarc_{name}_m3', 'Drarc'), pdr.new('Bend2_' + name + str(pdr['N_cells_S']), b_type)]
 
-    comps = comps + [pdr.place('DrarcS'), pdr.new('QFDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDS']) ]
-    comps = comps + [pdr.place('DrDSL'), pdr.new('QDDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDS']) ]
-    comps = comps + [pdr.place('Drarc'), pdr.new('BendDS_' + name, 'BendDS')]
+    comps = comps + [pdr.new(f'DrarcS_{name}', 'DrarcS'), pdr.new('QFDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDS']) ]
+    comps = comps + [pdr.new(f'DrDSL_{name}', 'DrDSL'), pdr.new('QDDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDS']) ]
+    comps = comps + [pdr.new(f'Drarc_{name}_ds', 'Drarc'), pdr.new('BendDS_' + name, bds_type)]
 
-    comps = comps + [pdr.place('DrTrans'), pdr.new('QFDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDoub'])]
-    comps = comps + [pdr.place('DrDoub'), pdr.new('QDDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDoub'])]   
-    comps = comps + [pdr.place('DrTripl'), pdr.new('QDTrip_' + name + '1', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDtr'])]  
+    comps = comps + [pdr.new(f'DrTrans_{name}', 'DrTrans'), pdr.new('QFDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDoub'])]
+    comps = comps + [pdr.new(f'DrDoub_{name}', 'DrDoub'), pdr.new('QDDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDoub'])]   
+    comps = comps + [pdr.new(f'DrTripl_{name}', 'DrTripl'), pdr.new('QDTrip_' + name + '1', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDtr'])]  
 
     if fall == 'symm':
        comps = [ pdr.new('QFA_' + name + 'CH', 'QFarcH' ) ] + comps
-       comps = comps + [ pdr.place('DrTrips'), pdr.new('QFTripC_' + name + '2H', 'QFtrH')]
+       comps = comps + [ pdr.new(f'DrTrips_{name}', 'DrTrips'), pdr.new('QFTripC_' + name + '2H', 'QFtrH')]
     elif fall == 'right':
-       comps = [ pdr.new('QFA_' + name + 'C', 'QFarc'  ) ] + comps + [ pdr.place('DrTrips') ]
+       comps = [ pdr.new('QFA_' + name + 'C', 'QFarc'  ) ] + comps + [ pdr.new(f'DrTrips_{name}', 'DrTrips') ]
     elif fall == 'left':
-       comps = comps + [pdr.place('DrTrips'), pdr.new('QFTripC_' + name + '2', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFtr']) ]
+       comps = comps + [pdr.new(f'DrTrips_{name}', 'DrTrips'), pdr.new('QFTripC_' + name + '2', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFtr']) ]
        comps = list( reversed(comps) )
     return pdr.new_line( components = comps )
 
 arc1R = makesextant( 'xR', 'symm' )
+arc1R.insert( pdr.new('CtrS1_xR1', xt.Marker ), at='(l_tripl+l_quad)/2', from_='QDDoub_xR' )
 arc1R_sliced = arc1R.select()
 arc1R_sliced.cut_at_s( np.linspace(.05, arc1R.get_length()-.05, int(arc1R.get_length()/.05-.5)) )
-arc1R.insert( pdr.new('CtrS1_xR1', xt.Marker ), at='(l_tripl+l_quad)/2', from_='QDDoub_xR' )
 
 period = makesextant( 'PR', 'symm') + ( -makesextant( 'PL', 'symm') )
 period_sliced = period.select()
@@ -167,7 +172,7 @@ def matchingBeta( betxS, betyS ):
                       xt.TargetSet(betx=cell_tr_tw.betx[0], bety=cell_tr_tw.bety[0], at=xt.END, tol=1.0e-9) ])
     arc1R_opt.run_jacobian(10)
 
-matchingWP(6.25, 6.25)
+matchingWP(11.72, 11.375)
 
 cell_tr_tw = cell_tr.twiss(method='4d')
 mid_idx = len(cell_tr_tw.betx) // 2
@@ -185,7 +190,6 @@ pdr.lines['cell_arc'] = cell_arc
 pdr.lines['cell_tr'] = cell_tr
 pdr.lines['period'] = period
 pdr.lines['ring'] = ring
-
 
 pdr.to_json("json_files/pdr_var1.json")
 print("Successfully verified closed orbit stability and saved json configuration.")

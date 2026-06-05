@@ -98,164 +98,143 @@ def ChromCorrect_ddq(ring, pdr, ksf, ksd,ksf2,ksd2,ddqx_val,ddqy_val,tol_val, Ma
     print(f"Matched kSD: {pdr.vars[f'{ksd2}']._get_value():.6f}")  
 
 def config_D1(pdr):
-
     """
-    8 SF's and 8 SD's in each half-arc
-
+    Dynamically maps SF's and SD's to match the exact structural layout
+    of the 10-cell ring configuration by tracking boundary quads correctly.
     """
+    ring = pdr.lines['ring']
+    period = pdr.lines['period']
+    n_cells = pdr.vars['N_cells_S']._value 
 
-    ring=pdr.lines['ring']
-    print(ring.element_names)
-    period=pdr.lines['period']
+    pdr.vars({'l_sext': 0.1, 'k2XF2arc': 0.00, 'k2XD2arc': 0.00})  
+    pdr.new('XF2arc', xt.Sextupole, length='l_sext', k2='k2XF2arc', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc', xt.Sextupole, length='l_sext', k2='k2XD2arc', edge_entry_active=True, edge_exit_active=True)
 
-    pdr.vars( {'l_sext':0.1, 'k2XF2arc': 0.00, 'k2XD2arc': 0.00} )  # Sextupoles - 3 families defined here
-    pdr.new('XF2arc',  xt.Sextupole, length='l_sext',    k2='k2XF2arc' , edge_entry_active=True, edge_exit_active=True)
-    pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XD2arc' , edge_entry_active=True, edge_exit_active=True)
+    # Correct dynamic indexing for N_cells_S = 10:
+    # Standard FODO cells: 1 -> 8
+    sda_mid_cells = [str(i) for i in range(1, n_cells - 1)]       # 1 to 8
+    # The last cell is the matching block element: 10
+    sda_last_cell = str(n_cells)                                 # 10
 
-
-    # Defocusing (QDA)
-    for elem in ([ [el, '+'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7'] ] +
-                 [ [el, '-'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7'] ]):
-
-        ring.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
-        
-    for elem in ([[el, '+'] for el in ['1R8','2R8','3R8']]+
-                 [[el, '-'] for el in ['1L8','2L8','3L8']]):
-        ring.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] )
-        
-
-    # Focusing (QFA)
-    for elem in ([ [el, '+'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','2R1','2R2','2R3','2R4','2R5','2R6','3R1','3R2','3R3','3R4','3R5','3R6'] ] +
-                 [ [el, '-'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6'] ]):
-
-        ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+    # Standard Focusing cells: 1 -> 8
+    sfa_mid_cells = [str(i) for i in range(1, n_cells - 1)]       # 1 to 8
+    # The penultimate focusing element gets the matching suffix '_M': 9
+    sfa_match_cells = [str(n_cells - 1)]                         # 9
 
 
-    # Matching quads
-    for elem in [['1R7','+'], ['2R7','+'], ['3R7','+'],['1L7','-'], ['2L7','-'], ['3L7','-']]:
-        ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_M' + elem[0] )
+    # Right-handed sectors (Standard processing orientation)
+    for prefix in ['1R', '2R']:
+        for cell in sda_mid_cells:
+            ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', 'XD2arc'), at='+(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
+        ring.insert(pdr.new(f'XD2arc_{prefix}{sda_last_cell}', 'XD2arc'), at='+(l_drift+l_quad)/2', from_=f'QDA_M{prefix}{sda_last_cell}')
 
+        for cell in sfa_mid_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
+        for cell in sfa_match_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_M{prefix}{cell}')
 
-    # Second focusing family
-    for elem in [['1RC','+'], ['2RC','+'], ['3RC','+']]:
-        ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+    # Left-handed sectors (Reversed structural orientation)
+    for prefix in ['2L', '3L']:
+        for cell in sda_mid_cells:
+            ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
+        ring.insert(pdr.new(f'XD2arc_{prefix}{sda_last_cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_M{prefix}{sda_last_cell}')
 
-    print(period.element_names)
-    # Defocusing
-    for elem in [['PR1','+'], ['PR2','+'],['PR3','+'], ['PR4','+'],['PR5','+'], ['PR6','+'],['PR7','+'], ['PL1','-'], ['PL2','-'], ['PL3','-'], ['PL4','-'], ['PL5','-'], ['PL6','-'], ['PL7','-']]:
-            period.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
-    for elem in ([[el, '+'] for el in ['PR8']]+
-                 [[el, '-'] for el in ['PL8']]):
-        period.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] )
+        for cell in sfa_mid_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', 'XF2arc'), at='-(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
+        for cell in sfa_match_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', 'XF2arc'), at='-(l_drift+l_quad)/2', from_=f'QFA_M{prefix}{cell}')
 
-    # Focusing
-    for elem in [['PR1','+'], ['PR2','+'],['PR3','+'], ['PR4','+'],['PR5','+'], ['PR6','+'], ['PL1','-'], ['PL2','-'], ['PL3','-'], ['PL4','-'], ['PL5','-'], ['PL6','-']]:
-            period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+    # Second focusing family (Center entries)
+    for prefix in ['1RC', '2RC']:
+        ring.insert(pdr.new(f'XF2arc_{prefix}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}')
+
     
+    # Symmetric Right Segment
+    for cell in sda_mid_cells:
+        period.insert(pdr.new(f'XD2arc_PR{cell}', 'XD2arc'), at='+(l_drift+l_quad)/2', from_=f'QDA_PR{cell}')
+    period.insert(pdr.new(f'XD2arc_PR{sda_last_cell}', 'XD2arc'), at='+(l_drift+l_quad)/2', from_=f'QDA_MPR{sda_last_cell}')
 
-    # Matching
-    for elem in [['PR7','+'],['PL7','-']]:
-            period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_M' + elem[0] )
-    
-    for elem in [['PRCH','+'], ['PLCH','-']]:
-            period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
-    
-    variables=['k2XF2arc', 'k2XD2arc']
-    ChromCorrect(ring,pdr, variables, MakePlot=False)
+    for cell in sfa_mid_cells:
+        period.insert(pdr.new(f'XF2arc_PR{cell}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_PR{cell}')
+    for cell in sfa_match_cells:
+        period.insert(pdr.new(f'XF2arc_PR{cell}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_MPR{cell}')
+
+    # Symmetric Inverted Left Segment
+    for cell in sda_mid_cells:
+        period.insert(pdr.new(f'XD2arc_PL{cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_PL{cell}')
+    period.insert(pdr.new(f'XD2arc_PL{sda_last_cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_MPL{sda_last_cell}')
+
+    for cell in sfa_mid_cells:
+        period.insert(pdr.new(f'XF2arc_PL{cell}', 'XF2arc'), at='-(l_drift+l_quad)/2', from_=f'QFA_PL{cell}')
+    for cell in sfa_match_cells:
+        period.insert(pdr.new(f'XF2arc_PL{cell}', 'XF2arc'), at='-(l_drift+l_quad)/2', from_=f'QFA_MPL{cell}')
+
+    # Half quad central markers
+    period.insert(pdr.new('XF2arc_PRCH', 'XF2arc'), at='+(l_drift+l_quad)/2', from_='QFA_PRCH')
+    period.insert(pdr.new('XF2arc_PLCH', 'XF2arc'), at='-(l_drift+l_quad)/2', from_='QFA_PLCH')
+
+    variables = ['k2XF2arc', 'k2XD2arc']
+    ChromCorrect(ring, pdr, variables, MakePlot=False) # Uncomment when function is available
 
     return pdr
 
 def config_D2(pdr):
     """
-    Configures 3 families of sextupoles (2 focusing, 1 defocusing)
-    adapted dynamically for a 10-cell lattice layout.
+    Configures 3 families of sextupoles by dynamically matching the true, 
+    reversed element names of your 10-cell FODO line layout.
     """
     ring = pdr.lines['ring']
     period = pdr.lines['period']
-    n_cells = pdr.vars['N_cells_S']._value  # 10 cells
+    n_cells = pdr.vars['N_cells_S']._value # 10
 
     pdr.vars({ 'l_sext': 0.2, 'k2XF2arc': 0.00, 'k2XD2arc': 0.00, 'k2XF2arc2': 0.00 })  
     pdr.new('XF2arc',   xt.Sextupole, length='l_sext', k2='k2XF2arc' ,  edge_entry_active=True, edge_exit_active=True)
     pdr.new('XD2arc',   xt.Sextupole, length='l_sext', k2='k2XD2arc' ,  edge_entry_active=True, edge_exit_active=True)
     pdr.new('XF2arc2',  xt.Sextupole, length='l_sext', k2='k2XF2arc2' , edge_entry_active=True, edge_exit_active=True)
 
-    # Calculate the penultimate cell value for the dynamic matching element boundary
-    match_cell_idx = str(n_cells - 1)  # Resolves to '9' for 10 cells
+    match_cell_idx = str(n_cells - 1)  # '9'
 
-    # ----------------------------------------------------
-    # 1. RING LINE SECTOR INSERTIONS
-    # ----------------------------------------------------
 
-    # Right-handed sectors (Standard orientation)
     for prefix in ['1R', '2R']:
-        # Defocusing family placements
+        # Defocusing cells 2 and 4
         for cell in ['2', '4']:
             ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', 'XD2arc'), at='+(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
-        
-        # First focusing family placements
-        for cell in ['5']:
-            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
-        
-        # Shifted boundary matching cell (Cell 9 for a 10-cell arc)
+        # Focusing cell 5
+        ring.insert(pdr.new(f'XF2arc_{prefix}5', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}5')
+        # Matching Focusing cell 9 (QFA_M1R9 / QFA_M2R9)
         ring.insert(pdr.new(f'XF2arc_{prefix}{match_cell_idx}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_M{prefix}{match_cell_idx}')
+        # Focusing family 2 cell 1
+        ring.insert(pdr.new(f'XF2arc2_{prefix}1', 'XF2arc2'), at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}1')
         
-        # Second focusing family placements
-        for cell in ['1']:
-            ring.insert(pdr.new(f'XF2arc2_{prefix}{cell}', 'XF2arc2'), at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
 
-    # Left-handed sectors (Inverted structural orientation)
     for prefix in ['2L', '3L']:
-        # Defocusing family placements
+        # Defocusing cells 2 and 4 (Note the negative direction sign since the line sequence is reversed!)
         for cell in ['2', '4']:
             ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
-            
-        # First focusing family placements
+        # Focusing cells 4 and 6
         for cell in ['4', '6']:
             ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', 'XF2arc'), at='-(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
-            
-        # Second focusing family placements
-        for cell in ['1']:
-            ring.insert(pdr.new(f'XF2arc2_{prefix}{cell}', 'XF2arc2'), at='-(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
+        # Focusing family 2 cell 1
+        ring.insert(pdr.new(f'XF2arc2_{prefix}1', 'XF2arc2'), at='-(l_drift+l_quad)/2', from_=f'QFA_{prefix}1')
 
-    # ----------------------------------------------------
-    # 2. PERIOD LINE SECTOR INSERTIONS
-    # ----------------------------------------------------
 
-    # Right Symmetric Period Section
     for cell in ['2', '4']:
         period.insert(pdr.new(f'XD2arc_PR{cell}', 'XD2arc'), at='+(l_drift+l_quad)/2', from_=f'QDA_PR{cell}')
-    for cell in ['5']:
-        period.insert(pdr.new(f'XF2arc_PR{cell}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_PR{cell}')
-        
-    # Boundary tracking match element for the dynamic period layout
+    period.insert(pdr.new(f'XF2arc_PR5', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_PR5')
     period.insert(pdr.new(f'XF2arc_PR{match_cell_idx}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_MPR{match_cell_idx}')
-    
-    for cell in ['1']:
-        period.insert(pdr.new(f'XF2arc2_PR{cell}', 'XF2arc2'), at='+(l_drift+l_quad)/2', from_=f'QFA_PR{cell}')
+    period.insert(pdr.new(f'XF2arc2_PR1', 'XF2arc2'), at='+(l_drift+l_quad)/2', from_=f'QFA_PR1')
 
-    # Left Symmetric Inverted Period Section
+    # --- PL (Symmetric Left Section) ---
     for cell in ['2', '4']:
         period.insert(pdr.new(f'XD2arc_PL{cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_PL{cell}')
     for cell in ['4', '6']:
         period.insert(pdr.new(f'XF2arc_PL{cell}', 'XF2arc'), at='-(l_drift+l_quad)/2', from_=f'QFA_PL{cell}')
-    for cell in ['1']:
-        period.insert(pdr.new(f'XF2arc2_PL{cell}', 'XF2arc2'), at='-(l_drift+l_quad)/2', from_=f'QFA_PL{cell}')
+    period.insert(pdr.new(f'XF2arc2_PL1', 'XF2arc2'), at='-(l_drift+l_quad)/2', from_=f'QFA_PL1')
 
-    # ----------------------------------------------------
-    # 3. CHROMATICITY CORRECTION CALL
-    # ----------------------------------------------------
-    variables = ['k2XF2arc', 'k2XD2arc', 'k2XF2arc2']
-    # ChromCorrect(ring, pdr, variables, MakePlot=False) # Uncomment when ready to execute context helper
+    
+
+    variables = ['k2XF2arc', 'k2XD2arc','k2XF2arc2']
+    ChromCorrect(ring, pdr, variables, MakePlot=False) # Uncomment when function is available
 
     return pdr
 
