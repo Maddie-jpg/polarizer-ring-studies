@@ -81,10 +81,13 @@ if not os.path.exists(new_results_folder):
     os.makedirs(new_results_folder)
 # %%
 #%matplotlib widget
-#ring.survey().plot(labels=ring.element_names)
-mf.survey_plot(ring)
-#plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_survey_{mode}.png')
+if mode in ['perfect','misaligned']:
+    ring.survey().plot()
+    plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_survey_{mode}.png')
+else:
+    mf.survey_plot(ring)
+    #plt.tight_layout()
+    plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_survey_{mode}.png')
 
 # %%
 print(ring.element_names)
