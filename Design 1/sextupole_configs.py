@@ -2,6 +2,10 @@
 Sextupole configs to be paired with linear optics script
 Each function should include a description of the configuration
 
+D1 - Ring design with 3 fold symmetry
+
+D2 - Ring design with racetrack configuration and 2-fold symmetry
+
 """
 
 import numpy as np
