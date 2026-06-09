@@ -1,0 +1,23 @@
+{
+    "x": {
+        "alpha": -2.1537296220112148,
+        "beta": 6.872780838006745,
+        "gamma": 0.8204177344848772,
+        "dispersion": 0.7517433832245832,
+        "dispersion_prime": 0.3371304330018361,
+        "emittance_geo": 1.2572309773552315
+    },
+    "y": {
+        "alpha": 0.6753639326698309,
+        "beta": 1.8191575083253522,
+        "gamma": 0.8004345060212547,
+        "dispersion": -0.16647006706397005,
+        "dispersion_prime": 0.14256744210224082,
+        "emittance_geo": 1.2636791733437
+    },
+    "metadata": {
+        "particle_type": "positron",
+        "design_energy_mev": 2860.0,
+        "n_particles": 23274
+    }
+}
