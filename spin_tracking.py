@@ -12,10 +12,10 @@ import os
 # %%
 design=int(os.environ.get('DESIGN',1))
 config=int(os.environ.get('CONFIG',1))
-mode=os.environ.get('MODE','perfect')
+mode=os.environ.get('MODE','misaligned')
 
 # %%
-pdr = xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_{mode}.json')
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_{mode}.json')
 pdr.particle_ref.anomalous_magnetic_moment=0.001159652181
 
 line=pdr.lines['ring']

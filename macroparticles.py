@@ -719,7 +719,7 @@ with open(f'{new_folder}/CompressorParams.json', 'w') as f:
 # %%
 #Particle mapping
 
-#Reference particle
+'''#Reference particle
 p0c_reference = df['p[MeV/c]'].mean() * 1e6 
 p0c_reference = 2910*1e6
 
@@ -799,7 +799,7 @@ ax[0].legend(fontsize='small')
 
 # Save the diagnostic plot for the complete distribution
 plt.savefig(f'{new_folder}/injection_tracking_final_state_full_{p0c_reference/1e6}MeV.png')
-
+'''
 # %%
 
 

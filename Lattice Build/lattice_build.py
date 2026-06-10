@@ -18,7 +18,7 @@ from pathlib import Path
 
 design=1
 config=6
-mode='misaligned' # 'perfect', 'misaligned', or 'corrected'
+mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
 #%%
 

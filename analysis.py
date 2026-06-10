@@ -256,6 +256,25 @@ plt.grid(True)
 plt.xlim(-max_dp*1.05,max_dp*1.05)
 plt.savefig(f'Results/D{design}/C{config}/{mode}/momentum_deviation{current_wp}_{mode}.png')
 
+
+
+nominal_tw = ring.twiss4d(delta0=0)
+'''Qx_range = (nominal_tw.qx-0.005,tw.qx+0.005)
+Qy_range = (nominal_tw.qy-0.1,tw.qy+0.1)'''
+resonances = resonance_lines(Qx_range,Qy_range,resonance_orders,3)
+fig, ax = plt.subplots(1, figsize=(8,8), alpha=0.3)
+
+ax.plot(qx, qy, label='Chromatic Footprint', color='tab:blue')
+
+# Plot the actual center (delta=0)
+ax.plot(nominal_tw.qx,nominal_tw.qy, 'ro', label='Nominal ($\delta=0$)')
+ax.legend()
+resonances.plot_resonance(fig)
+plt.tight_layout()
+plt.savefig(f'Results/D{design}/C{config}/{mode}/momentum_dev_working_point{current_wp}_{mode}.png')
+
+
+
 # %%
 r_max = 16.0
 fp0 = None

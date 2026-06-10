@@ -28,17 +28,6 @@ def run_configuration(design, config, mode):
 
 if __name__ == '__main__':
 
-    target_design = 1
-    
-
-    mode_configs = {
-        'perfect': range(1, 7),     # configs 1 to 6
-        'misaligned': range(1, 7),  # configs 1 to 6
-        'corrected': range(1, 7)    # configs 1 to 6
-    }
-
-    for mode, configs in mode_configs.items():
-        for config in configs:
-            print(f'Now running config {config}, {mode} lattice.')
-            run_configuration(target_design, config, mode)
-            print(f'Completed config {config}, {mode} lattice.')
+    run_configuration(1, 6, 'perfect')
+    run_configuration(1, 6, 'misaligned')
+    run_configuration(1, 6, 'corrected')
