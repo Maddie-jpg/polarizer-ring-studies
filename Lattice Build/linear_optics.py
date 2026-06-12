@@ -695,7 +695,7 @@ def two_fold_periodicity_90_deg():
                         xt.TargetSet(betx=cell_tr_tw.betx[0], bety=cell_tr_tw.bety[0], at=xt.END, tol=1.0e-9) ])
         arc1R_opt.run_jacobian(10)
 
-    matchingWP(constants.WP_D2)
+    matchingWP(*constants.WP_D2)
 
     cell_tr_tw = cell_tr.twiss(method='4d')
     mid_idx = len(cell_tr_tw.betx) // 2
