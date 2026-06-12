@@ -377,8 +377,8 @@ def insert_BPMs_all_as_markers(pdr):
             )
    return pdr
 
-def misalignments(line, seed=None):
-   sigma=0.3e-3
+def misalignments(line,sigma, seed=None):
+   
 
    rng=np.random.default_rng(seed)
 

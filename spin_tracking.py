@@ -1,4 +1,12 @@
 # %%
+import sys
+import os
+
+# Adds the parent directory to the search path
+parent_dir = os.path.abspath('..')
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
 import xtrack as xt
 import xpart as xp
 import xfields as xf 
@@ -10,8 +18,10 @@ import json
 import os
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
+from LatticeBuild.misalignments_corrections import misalignments, orbit_correction
 
-# %%
+
+#%%
 design=int(os.environ.get('DESIGN',1))
 config=int(os.environ.get('CONFIG',1))
 mode=os.environ.get('MODE','misaligned')
@@ -22,93 +32,112 @@ pdr.particle_ref.anomalous_magnetic_moment=0.001159652181
 
 line=pdr.lines['ring']
 
-
 # Simulate bunch evolution with stochastic photon emission
 line.configure_spin('auto')
 
-# Enable parallelization
-line.discard_tracker()
-line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-
+max_seed_value = np.iinfo(np.uint32).max  
 num_seeds=300
-seeds=np.arange(1,num_seeds+1)
+seeds = np.random.randint(0, max_seed_value, size=num_seeds)
 scan_turns=1000
 long_scan_turns=100000
 
-P_BKS=[]
-tau_BKS=[]
-P_DKM=[]
-tau_DKM=[]
-P_eq=[]
-tau_pol=[]
-tau_depol=[]
-tune_x=[]
-tune_y=[]
-tune_s=[]
+P_BKS, tau_BKS, P_DKM, tau_DKM, tau_depol, tau_pol, P_eq = [], [], [], [], [], [], []
+tune_x, tune_y, tune_s = [], [], []
+
+prepped_particles, prepped_twiss = [], []
+failed_misalignments=[]
 
 for seed in seeds:
-    np.random.seed(seed)
-    line.discard_tracker()
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
-    line.configure_radiation('mean')
-    tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                    spin=True, polarization=True)
-    
-    print(tw.cols)
-    particles = xp.generate_matched_gaussian_bunch(
-        line=line,
-        nemitt_x=tw.eq_nemitt_x,
-        nemitt_y=tw.eq_nemitt_y,
-        sigma_z=np.sqrt(tw.eq_gemitt_zeta * tw.bets0),
-        num_particles=300)
-    # Add stable phase
-    particles.zeta += tw.zeta[0]
-    particles.delta += tw.delta[0]
+    try:
+        line=line.copy()
+        line=misalignments(line,0.2e-3,seed=seed)
 
-    # Initialize spin of all particles along n0
-    particles.spin_x = tw.spin_x[0]
-    particles.spin_y = tw.spin_y[0]
-    particles.spin_z = tw.spin_z[0]
-    line.configure_radiation(model='quantum')
-    # Track
-    
-    line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
-            with_progress=10)
-    mon = line.record_last_track
+        line.configure_radiation('mean')
+        tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
+                        spin=True, polarization=True)
 
-    # Fit depolarization time
-    mask_alive = mon.state > 0
-    pol_x = mon.spin_x.sum(axis=0)/mask_alive.sum(axis=0)
-    pol_y = mon.spin_y.sum(axis=0)/mask_alive.sum(axis=0)
-    pol_z = mon.spin_z.sum(axis=0)/mask_alive.sum(axis=0)
-    pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
+        if mode=='corrected':
+            try:
+                line.discard_tracker()
+                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                
+            except:
+                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                
 
-    pol_to_fit = pol[3:] / pol[3]
-    turns = np.arange(len(pol_to_fit))
-    slope, intercept, r_value, p_value, std_err = linregress(turns, pol_to_fit)
-    # Calculate depolarization time
-    t_dep_turns = -1 / slope
+        line.discard_tracker()
+        line.build_tracker()
+        
+        print(tw.cols)
+        particles = xp.generate_matched_gaussian_bunch(
+            line=line,
+            nemitt_x=tw.eq_nemitt_x,
+            nemitt_y=tw.eq_nemitt_y,
+            sigma_z=np.sqrt(tw.eq_gemitt_zeta * tw.bets0),
+            num_particles=300)
+        # Add stable phase
+        particles.zeta += tw.zeta[0]
+        particles.delta += tw.delta[0]
 
-    p_bks=tw.spin_polarization_inf_no_depol
-    t_bks=tw.spin_t_pol_component_s
-    p_dkm=tw.spin_polarization_eq
-    t_dkm=tw.spin_t_pol_buildup_s
-    t_depol=tw.spin_t_depol_component_s
-    t_pol=t_bks/(1+t_bks/tw.T_rev0)
+        # Initialize spin of all particles along n0
+        particles.spin_x = tw.spin_x[0]
+        particles.spin_y = tw.spin_y[0]
+        particles.spin_z = tw.spin_z[0]
+        line.configure_radiation(model='quantum')
 
-    t_pol_turns = t_bks/tw.T_rev0
-    p_eq = p_bks * 1 / (1 + t_pol_turns/t_dep_turns)
+        prepped_particles.append(particles)
+        prepped_twiss.append(tw)
+    except (RuntimeError, np.linalg.LinAlgError) as e:
+        print(e)
+        failed_misalignments.append(seed)
 
-    P_BKS.append(p_bks*100)
-    tau_BKS.append(t_bks)
-    P_DKM.append(p_dkm*100)
-    tau_DKM.append(t_dkm)
-    tau_depol.append(t_depol)
-    tau_pol.append(t_pol)
-    P_eq.append(p_eq*100)
-    tune_x.append(tw.qx)
-    tune_y.append(tw.qy)
-    tune_s.append(tw.qs)
+print(len(failed_misalignments))
+
+line.discard_tracker()
+line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
+
+for particles, tw in zip(prepped_particles, prepped_twiss):
+    for i, seed in enumerate(seeds):
+        particles = prepped_particles[i]
+        tw = prepped_twiss[i]
+
+        line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
+                with_progress=10)
+        mon = line.record_last_track
+
+        # Fit depolarization time
+        mask_alive = mon.state > 0
+        pol_x = mon.spin_x.sum(axis=0)/mask_alive.sum(axis=0)
+        pol_y = mon.spin_y.sum(axis=0)/mask_alive.sum(axis=0)
+        pol_z = mon.spin_z.sum(axis=0)/mask_alive.sum(axis=0)
+        pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
+
+        pol_to_fit = pol[3:] / pol[3]
+        turns = np.arange(len(pol_to_fit))
+        slope, intercept, r_value, p_value, std_err = linregress(turns, pol_to_fit)
+        # Calculate depolarization time
+        t_dep_turns = -1 / slope
+
+        p_bks=tw.spin_polarization_inf_no_depol
+        t_bks=tw.spin_t_pol_component_s
+        p_dkm=tw.spin_polarization_eq
+        t_dkm=tw.spin_t_pol_buildup_s
+        t_depol=tw.spin_t_depol_component_s
+        t_pol=t_bks/(1+t_bks/tw.T_rev0)
+
+        t_pol_turns = t_bks/tw.T_rev0
+        p_eq = p_bks * 1 / (1 + t_pol_turns/t_dep_turns)
+
+        P_BKS.append(p_bks*100)
+        tau_BKS.append(t_bks)
+        P_DKM.append(p_dkm*100)
+        tau_DKM.append(t_dkm)
+        tau_depol.append(t_depol)
+        tau_pol.append(t_pol)
+        P_eq.append(p_eq*100)
+        tune_x.append(tw.qx)
+        tune_y.append(tw.qy)
+        tune_s.append(tw.qs)
 
 scan_results={
     'Seed': seeds,
@@ -152,9 +181,24 @@ for group_name, df_group in [('top_3', top_3), ('bottom_3', bottom_3)]:
         seed_val = int(row['Seed'])
         p_eq_scan = row['P_eq']
         print(f"Running deep 100k track for {group_name} - Seed {seed_val}...")
+
+        line.discard_tracker()
+        line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
         
-        np.random.seed(seed_val) # Fixed np.seed to np.random.seed
+        line=misalignments(line,0.2e-3,seed=seed_val)
+
         line.configure_radiation('mean')
+        tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
+                        spin=True, polarization=True)
+
+        if mode=='corrected':
+            try:
+                line.discard_tracker()
+                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                
+            except:
+                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+        
         particles = xp.generate_matched_gaussian_bunch(
             line=line,
             nemitt_x=tw.eq_nemitt_x,
@@ -169,6 +213,8 @@ for group_name, df_group in [('top_3', top_3), ('bottom_3', bottom_3)]:
         particles.spin_z = tw.spin_z[0]
 
         line.configure_radiation('quantum')
+        line.discard_tracker()
+        line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
         # Track for full long duration
         line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
@@ -218,7 +264,7 @@ fig, axes = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
 fig.suptitle('Bottom 3 Seeds - Polarization Evolution', fontsize=14, fontweight='bold')
 
 for i, data in enumerate(plot_data['bottom_3']):
-    axes[i].plot(data['turns'], data['pol'], label='Tracking Data', color='darkorange', alpha=0.7)
+    axes[i].plot(data['turns'], data['pol'], label='Tracking Data', color='blue', alpha=0.7)
     axes[i].plot(data['turns'], data['fit'], label='Linear Fit', color='red', linestyle='--')
     axes[i].set_title(f"Seed {data['seed']} (Long $P_{{eq}}$: {data['p_eq_long']:.2f}%)")
     axes[i].set_ylabel('$P(t)/P(0)$')
@@ -235,7 +281,7 @@ plt.savefig(f'Results/D{design}/C{config}/{mode}/Bottom3_Polarization_Subplots.p
 
 # Polarization vs depol time
 
-plt.scatter(df['P_eq'],df['t_depol'])
+plt.scatter(df['P_eq'],df['t_depol']/60**2)
 plt.xlabel('Equilibrium Polarization (%)')
 plt.ylabel('Depolarization Time (hours)')
 plt.savefig(f'Results/D{design}/C{config}/{mode}/EquilibriumPol_v_DepolTime.png')

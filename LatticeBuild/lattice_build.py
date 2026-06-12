@@ -46,7 +46,7 @@ elif mode=='corrected':
     twiss=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                    spin=True, polarization=True )
 
-    mc.misalignments(ring)
+    mc.misalignments(ring,0.3e-3)
 
     try:
         ring.discard_tracker()
