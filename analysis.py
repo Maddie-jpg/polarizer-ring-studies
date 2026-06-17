@@ -24,13 +24,13 @@ from matplotlib.backends.backend_pdf import PdfPages
 import tune_wp_scan as twps
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
+design=int(os.environ.get('DESIGN',2))
+config=int(os.environ.get('CONFIG',3))
 mode=os.environ.get('MODE','perfect')
 
 
 # %%
-pdf_run=True
+pdf_run=False
 
 if pdf_run is True:
     pdf = PdfPages(f"Results/D{design}/C{config}/{mode}/AnalysisResults.pdf")
@@ -209,7 +209,7 @@ print('2nd order chrom y', ring_tw.ddqy)
 
 # %%
 
-mf.SpuckParsAus( period_sliced.twiss(method='4d'), period,(0., 38.), (0., 12.), (0., 1.), .08,pdr, f"Results/D{design}/C{config}/{mode}/Standard.png" )
+mf.SpuckParsAus( ring, period_sliced.twiss(method='4d'), period,(0., 38.), (0., 12.), (0., 1.), .08,pdr, f"Results/D{design}/C{config}/{mode}/Standard.png" )
 
 # %%
 max_dp = 4e-2
@@ -370,7 +370,7 @@ energy = modes[operation_mode]
 parameters = xutil.log_parameters (None, operation_mode, particle_type=particle, modes=modes)
 # ## Choose a context
 context = xo.ContextCpu()         # For CPU
-context_tracking = xo.ContextCpu(omp_num_threads='auto') # For CPU with activate multi-core CPU parallelization
+context_tracking = xo.ContextCpu(omp_num_threads=0) # For CPU with activate multi-core CPU parallelization
 
 
 # ## Transfer lattice on context and compile tracking code
@@ -456,7 +456,7 @@ plt.savefig(f"Results/D{design}/C{config}/{mode}/DA_plot_{mode}_WP{current_wp}.p
 
 # %%
 #%matplotlib widget
-
+'''
 line=ring
 line.config.XTRACK_USE_EXACT_DRIFTS = True
 xutil.set_integrator (line)
@@ -472,7 +472,7 @@ energy = modes[operation_mode]
 
 
 context = xo.ContextCpu()         # For CPU
-context_tracking = xo.ContextCpu(omp_num_threads='auto') # For CPU with activate multi-core CPU 
+context_tracking = xo.ContextCpu(omp_num_threads=0) # For CPU with activate multi-core CPU 
 # parameters = xutil.log_parameters (None, operation_mode, particle_type=particle, modes=modes)
 parameters = {}
 line.configure_radiation(model=None)
@@ -521,7 +521,7 @@ Qy_end = xutil.nafflib_tune_calculation(line.record_last_track.y[:, 1500:2500], 
 
 my_xpf.tune_diffusion (Qx_start['Q1']+15, Qx_end['Q1']+15, Qy_start['Q1']+15, Qy_end['Q1']+15, initial_conditions_x_axis=grid_details['x_normalized'], initial_conditions_y_axis=grid_details['y_normalized'], xlabel='x [$\sigma$]', ylabel='y [$\sigma$]', resonance_orders=(1,2,3,4), annotate=True, delta_value= None)
 
-
+'''
 
 # %%
 '''fp = line.get_footprint(
@@ -592,7 +592,7 @@ particles.sort(interleave_lost_particles=True)
 
 # %%
 my_xpf.MA_vs_turns(particles, grid_details['num_r_y_points'], 51, grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'])
-
+plt.xlim(-5,5)
 plt.savefig(f"Results/D{design}/C{config}/{mode}/MA_plot_{mode}_WP{current_wp}.png")
 
 # %%

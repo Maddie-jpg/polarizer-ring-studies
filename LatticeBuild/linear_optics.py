@@ -645,8 +645,8 @@ def two_fold_periodicity_90_deg():
     period_sliced = period.select()
     period_sliced.cut_at_s( np.linspace(.05, period.get_length()-.05, int(period.get_length()/.05-.5)) )
 
-    half_ring = makesextant('1R', 'right') + makesextant('2L', 'left')
-    ring = half_ring + makesextant('2R', 'right') + makesextant('3L', 'left')
+    half_ring = makesextant('1R', 'right') + (makesextant('2L', 'left'))
+    ring = half_ring + makesextant('2R', 'right') + makesextant('1L', 'left')
 
     cell_arc_opt = cell_arc.match( method='4d', solve=True, verbose=False,
         vary=[xt.VaryList(['kQFarc', 'kQDarc', 'kQFarcM'], step=1e-4)],

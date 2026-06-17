@@ -26,7 +26,7 @@ def ChromCorrect(ring, pdr, variables, MakePlot=False):
         ])
 
     tw = ring.twiss(method='6d')
-    if len(variables)>3:
+    if len(variables)>2:
         curr_x, curr_y = tw.ddqx, tw.ddqy
         last_success_vars = {v: pdr.vars[v]._get_value() for v in variables}
 
@@ -47,8 +47,8 @@ def ChromCorrect(ring, pdr, variables, MakePlot=False):
                     method='6d',
                     vary=xt.VaryList(variables, step=1e-4),
                     targets=[
-                        xt.Target('dqx', 0, tol=1e-4),
-                        xt.Target('dqy', 0, tol=1e-4),
+                        xt.Target('dqx', 0, tol=1e-3),
+                        xt.Target('dqy', 0, tol=1e-3),
                         xt.Target('ddqx', target_x, tol=5),
                         xt.Target('ddqy', target_y, tol=5),
                     ])
@@ -500,12 +500,12 @@ def config_D2_C1(pdr):
 
     # Correct dynamic indexing for N_cells_S = 10:
     # Standard FODO cells: 1 -> 8
-    sda_mid_cells = [str(i) for i in range(1, n_cells - 1)]       # 1 to 8
+    sda_mid_cells = [str(i) for i in range(1, n_cells )]       # 1 to 8
     # The last cell is the matching block element: 10
     sda_last_cell = str(n_cells)                                 # 10
 
     # Standard Focusing cells: 1 -> 8
-    sfa_mid_cells = [str(i) for i in range(1, n_cells - 1)]       # 1 to 8
+    sfa_mid_cells = [str(i) for i in range(1, n_cells -1)]       # 1 to 8
     # The penultimate focusing element gets the matching suffix '_M': 9
     sfa_match_cells = [str(n_cells - 1)]                         # 9
 
@@ -522,7 +522,7 @@ def config_D2_C1(pdr):
             ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', 'XF2arc'), at='+(l_drift+l_quad)/2', from_=f'QFA_M{prefix}{cell}')
 
     # Left-handed sectors (Reversed structural orientation)
-    for prefix in ['2L', '3L']:
+    for prefix in ['2L', '1L']:
         for cell in sda_mid_cells:
             ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
         ring.insert(pdr.new(f'XD2arc_{prefix}{sda_last_cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_M{prefix}{sda_last_cell}')
@@ -595,7 +595,7 @@ def config_D2_C2(pdr):
         ring.insert(pdr.new(f'XF2arc2_{prefix}1', 'XF2arc2'), at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}1')
         
 
-    for prefix in ['2L', '3L']:
+    for prefix in ['2L', '1L']:
         # Defocusing cells 2 and 4 (Note the negative direction sign since the line sequence is reversed!)
         for cell in ['2', '4']:
             ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', 'XD2arc'), at='-(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
@@ -625,3 +625,80 @@ def config_D2_C2(pdr):
     ChromCorrect(ring, pdr, variables, MakePlot=False) # Uncomment when function is available
 
     return pdr
+
+
+def config_D2_C3(pdr):
+
+    """
+    180 degree phase advance sextupoles for D2
+
+    """
+
+    ring=pdr.lines['ring']
+    print(ring.element_names)
+    period=pdr.lines['period']
+
+  
+
+    pdr.vars( {'l_sext':0.1, 'k2XF2arc': 0.00, 'k2XD2arc': 0.00,  'k2XF2arc2': 0.00,  'k2XD2arc2': 0.00} ) 
+    pdr.new('XF2arc',  xt.Sextupole, length='l_sext',    k2='k2XF2arc' , edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XD2arc' , edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XF2arc2',  xt.Sextupole, length='l_sext',    k2='k2XF2arc2' , edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc2',  xt.Sextupole, length='l_sext',    k2='k2XD2arc2' , edge_entry_active=True, edge_exit_active=True)
+
+
+
+    # Defocusing (QDA)
+    for elem in ([ [el, '+'] for el in ['1R4','1R6','2R4','2R6',] ] +
+                 [ [el, '-'] for el in ['1L4','1L6','2L4','2L6',] ]):
+
+        ring.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
+
+    '''for elem in [ ['1R8', '+'], ['1L8', '-'],['2R8', '+'], ['2L8', '-']]:
+        ring.insert( pdr.new('XD2arc2_'+elem[0], 'XD2arc2'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )   
+        
+    for elem in [ ['1R10', '+'], ['1L10', '-'],['2R10', '+'], ['2L10', '-']]:
+        ring.insert( pdr.new('XD2arc2_'+elem[0], 'XD2arc2'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] )'''
+        
+    # Focusing (QFA)
+    for elem in ([ [el, '+'] for el in ['1R1','1R3','2R1','2R3',] ] +
+                 [ [el, '-'] for el in ['1L1','1L3','2L1','2L3',] ]):
+
+        ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+        
+    for elem in ([ [el, '+'] for el in ['1R6','1R8','2R6','2R8',] ] +
+                 [ [el, '-'] for el in ['1L6','1L8','2L6','2L8',] ]):
+
+        ring.insert( pdr.new('XF2arc2_'+elem[0], 'XF2arc2'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+        
+    for elem in [ ['PR4', '+'], ['PR6', '+'], ['PL4', '-'], ['PL6', '-'] ]:
+        period.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
+        
+    '''for elem in [ ['PR8', '+'],['PL8', '-'] ]:
+        period.insert( pdr.new('XD2arc2_'+elem[0], 'XD2arc2'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] ) 
+
+    for elem in [ ['PR10', '+'],['PL10', '-'] ]:
+        period.insert( pdr.new('XD2arc2_'+elem[0], 'XD2arc2'), 
+                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] ) '''
+    
+    for elem in [ ['PR1', '+'], ['PR3', '+'],['PL1', '-'], ['PL3', '-']]:
+        period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
+                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+        
+    for elem in [['PR6', '+'], ['PR8', '+'], ['PL6', '-'], ['PL8', '-'] ]:
+        period.insert( pdr.new('XF2arc2_'+elem[0], 'XF2arc2'), 
+                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+        
+    variables = ['k2XF2arc', 'k2XD2arc','k2XF2arc2']
+    ChromCorrect(ring, pdr, variables, MakePlot=False)
+
+    return pdr
+        
+    
