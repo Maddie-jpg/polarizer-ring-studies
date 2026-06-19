@@ -36,9 +36,9 @@ line=pdr.lines['ring']
 line.configure_spin('auto')
 
 max_seed_value = np.iinfo(np.uint32).max  
-num_seeds=300
+num_seeds=50
 seeds = np.random.randint(0, max_seed_value, size=num_seeds)
-scan_turns=100000
+scan_turns=10000
 long_scan_turns=100000
 
 P_BKS, tau_BKS, P_DKM, tau_DKM, tau_depol, tau_pol, P_eq = [], [], [], [], [], [], []
@@ -96,7 +96,7 @@ print(len(failed_misalignments))
 #%%
 
 line.discard_tracker()
-line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
 for particles, tw in zip(prepped_particles, prepped_twiss):
     for i, seed in enumerate(seeds):
@@ -185,7 +185,7 @@ for group_name, df_group in [('top_3', top_3), ('bottom_3', bottom_3)]:
         print(f"Running deep 100k track for {group_name} - Seed {seed_val}...")
 
         line.discard_tracker()
-        line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+        line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
         
         line=misalignments(line,0.2e-3,seed=seed_val)
 
@@ -216,7 +216,7 @@ for group_name, df_group in [('top_3', top_3), ('bottom_3', bottom_3)]:
 
         line.configure_radiation('quantum')
         line.discard_tracker()
-        line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+        line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
         # Track for full long duration
         line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)

@@ -1,7 +1,9 @@
 #%%
 import xtrack as xt
 import xpart as xp
+import xobjects as xo
 import matplotlib.pyplot as plt
+import numpy as np
 
 #%%
 
@@ -40,8 +42,8 @@ line.insert_element(
     at_s=0.0
 )
 
-nemitt_x = 7600 * 1e-6
-nemitt_y = 7200 * 1e-6
+nemitt_x = 7600 * 1e-9
+nemitt_y = 7200 * 1e-9
 
 
 
@@ -54,11 +56,11 @@ twiss_initial = xt.TwissInit(
 )
 
 #%%
-line.build_tracker()
+line.build_tracker(_context=xo.ContextCpu(omp_num_threads=200))
 # Generate particle bunch
 bunch = xp.build_particles(
     line=line,
-    num_particles=10000,
+    num_particles=500,
     nemitt_x=nemitt_x,
     nemitt_y=nemitt_y,
     sigma_z=1e-4,
@@ -76,15 +78,11 @@ initial_z  = bunch.zeta.copy() * 1e3       # m to mm
 initial_pz = bunch.delta.copy() * p0c_eV/1e6
 #%%
 
-num_turns = 100
-
-monitor=xt.ParticlesMonitor(start_at_turn=0,
-                            stop_at_turn=num_turns,
-                            num_particles=100)
-
+num_turns = 10000
 
 # When tracking with a monitor:
-line.track(bunch, num_turns=num_turns, turn_by_turn_monitor=monitor, with_progress=5)
+line.track(bunch, num_turns=num_turns, turn_by_turn_monitor=True, with_progress=5)
+data=line.record_last_track
 
 #%%
 # Initial phase space plot
@@ -96,6 +94,23 @@ final_z  = bunch.zeta.copy() * 1e3       # m to mm
 final_pz = bunch.delta.copy() * p0c_eV/1e6
 
 #%%
+survival_counts = np.sum(data.state > 0, axis=0)
+turns = np.arange(len(survival_counts))
+
+# 2. Plotting
+plt.figure(figsize=(10, 6))
+plt.plot(turns, survival_counts, color='firebrick', linewidth=2)
+
+plt.title(f'Particle Survival over {len(turns)} Turns', fontsize=14)
+plt.xlabel('Turn Number', fontsize=12)
+plt.ylabel('Number of Surviving Particles', fontsize=12)
+plt.grid(True, which='both', linestyle=':', alpha=0.6)
+plt.ylim(min(survival_counts)-5, survival_counts[0]+5)  # Set y-axis to start at 0
+plt.legend()
+
+
+# 3. Save the plot
+plt.show()
 
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5.5))
 
