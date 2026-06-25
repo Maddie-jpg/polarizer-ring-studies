@@ -1,0 +1,109 @@
+%merlin.mbs aipnum4-1.bst 2010-07-25 4.21a (PWD, AO, DPC) hacked
+%Control: key (0)
+%Control: author (8) initials jnrlst
+%Control: editor formatted (1) identically to author
+%Control: production of article title (0) allowed
+%Control: page (1) range
+%Control: year (1) truncated
+%Control: production of eprint (0) enabled
+\begin{thebibliography}{19}%
+\makeatletter
+\providecommand \@ifxundefined [1]{%
+ \@ifx{#1\undefined}
+}%
+\providecommand \@ifnum [1]{%
+ \ifnum #1\expandafter \@firstoftwo
+ \else \expandafter \@secondoftwo
+ \fi
+}%
+\providecommand \@ifx [1]{%
+ \ifx #1\expandafter \@firstoftwo
+ \else \expandafter \@secondoftwo
+ \fi
+}%
+\providecommand \natexlab [1]{#1}%
+\providecommand \enquote  [1]{``#1''}%
+\providecommand \bibnamefont  [1]{#1}%
+\providecommand \bibfnamefont [1]{#1}%
+\providecommand \citenamefont [1]{#1}%
+\providecommand \href@noop [0]{\@secondoftwo}%
+\providecommand \href [0]{\begingroup \@sanitize@url \@href}%
+\providecommand \@href[1]{\@@startlink{#1}\@@href}%
+\providecommand \@@href[1]{\endgroup#1\@@endlink}%
+\providecommand \@sanitize@url [0]{\catcode `\\12\catcode `\$12\catcode `\&12\catcode `\#12\catcode `\^12\catcode `\_12\catcode `\%12\relax}%
+\providecommand \@@startlink[1]{}%
+\providecommand \@@endlink[0]{}%
+\providecommand \url  [0]{\begingroup\@sanitize@url \@url }%
+\providecommand \@url [1]{\endgroup\@href {#1}{\urlprefix }}%
+\providecommand \urlprefix  [0]{URL }%
+\providecommand \Eprint [0]{\href }%
+\providecommand \doibase [0]{http://dx.doi.org/}%
+\providecommand \selectlanguage [0]{\@gobble}%
+\providecommand \bibinfo  [0]{\@secondoftwo}%
+\providecommand \bibfield  [0]{\@secondoftwo}%
+\providecommand \translation [1]{[#1]}%
+\providecommand \BibitemOpen [0]{}%
+\providecommand \bibitemStop [0]{}%
+\providecommand \bibitemNoStop [0]{.\EOS\space}%
+\providecommand \EOS [0]{\spacefactor3000\relax}%
+\providecommand \BibitemShut  [1]{\csname bibitem#1\endcsname}%
+\let\auto@bib@innerbib\@empty
+%</preamble>
+\bibitem [{\citenamefont {Dam}(2016)}]{dam_precision_2016}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Dam}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Precision electroweak measurements at the fcc-ee},}\ }\href {\doibase https://doi.org/10.48550/arXiv.1601.03849} {\  (\bibinfo {year} {2016}),\ https://doi.org/10.48550/arXiv.1601.03849}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {the FCC~Collaboration}\ \emph {et~al.}(2019)\citenamefont {the FCC~Collaboration}, \citenamefont {Abada}, \citenamefont {Abbrescia}, \citenamefont {S}, \citenamefont {Abdyukhanov}, \citenamefont {Fernandez}, \citenamefont {Abramov}, \citenamefont {Aburaia}, \citenamefont {O}, \citenamefont {R}, \citenamefont {Agrawal}, \citenamefont {A}, \citenamefont {J}, \citenamefont {Aiba}, \citenamefont {Aichinger}, \citenamefont {Aielli}, \citenamefont {Akay}, \citenamefont {Akhundov}, \citenamefont {Aksakal},\ and\ \citenamefont {L}}]{the_fcc_collaboration_fcc-ee_2019}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibnamefont {the FCC~Collaboration}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Abada}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Abbrescia}}, \bibinfo {author} {\bibfnamefont {A.~S.}\ \bibnamefont {S}}, \bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Abdyukhanov}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Fernandez}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Abramov}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Aburaia}}, \bibinfo {author} {\bibfnamefont {A.~A.}\ \bibnamefont {O}}, \bibinfo {author} {\bibfnamefont {A.~P.}\ \bibnamefont {R}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Agrawal}}, \bibinfo {author} {\bibfnamefont {A.-S.~J.}\ \bibnamefont {A}}, \bibinfo {author} {\bibfnamefont {A.-V.~J.}\ \bibnamefont {J}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Aiba}}, \bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Aichinger}}, \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Aielli}}, \bibinfo {author} {\bibfnamefont {A.~g.}\ \bibnamefont {Akay}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Akhundov}}, \bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Aksakal}}, \ and\ \bibinfo {author} {\bibfnamefont {A.~J.}\ \bibnamefont {L}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Fcc-ee: The lepton collider: Future circular collider conceptual design report volume 2},}\ }\href {\doibase https://doi.org/10.1140/epjst/e2019-900045-4} {\bibfield  {journal} {\bibinfo  {journal} {The European Physical Journal Special Topics}\ }\textbf {\bibinfo {volume} {228}},\ \bibinfo {pages} {261–623} (\bibinfo {year} {2019})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {{ALEPH Collaboration}}\ \emph {et~al.}(2006)\citenamefont {{ALEPH Collaboration}}, \citenamefont {{DELPHI Collaboration}}, \citenamefont {{L3 Collaboration}}, \citenamefont {{OPAL Collaboration}}, \citenamefont {{SLD Collaboration}}, \citenamefont {{SLD Electroweak Heavy Flavour Group}}, \citenamefont {{ALEPH Electroweak Working Group}}, \citenamefont {{DELPHI Electroweak Working Group}}, \citenamefont {{L3 Electroweak Working Group}}, \citenamefont {{OPAL Electroweak Working Group}},\ and\ \citenamefont {{LEP Electroweak Working Group}}}]{LEP_precision_2006}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibnamefont {{ALEPH Collaboration}}}, \bibinfo {author} {\bibnamefont {{DELPHI Collaboration}}}, \bibinfo {author} {\bibnamefont {{L3 Collaboration}}}, \bibinfo {author} {\bibnamefont {{OPAL Collaboration}}}, \bibinfo {author} {\bibnamefont {{SLD Collaboration}}}, \bibinfo {author} {\bibnamefont {{SLD Electroweak Heavy Flavour Group}}}, \bibinfo {author} {\bibnamefont {{ALEPH Electroweak Working Group}}}, \bibinfo {author} {\bibnamefont {{DELPHI Electroweak Working Group}}}, \bibinfo {author} {\bibnamefont {{L3 Electroweak Working Group}}}, \bibinfo {author} {\bibnamefont {{OPAL Electroweak Working Group}}}, \ and\ \bibinfo {author} {\bibnamefont {{LEP Electroweak Working Group}}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Precision electroweak measurements on the {$Z$} resonance},}\ }\href {\doibase 10.1016/j.physrep.2005.12.006} {\bibfield  {journal} {\bibinfo  {journal} {Physics Reports}\ }\textbf {\bibinfo {volume} {427}},\ \bibinfo {pages} {257--454} (\bibinfo {year} {2006})},\ \Eprint {http://arxiv.org/abs/hep-ex/0509008} {arXiv:hep-ex/0509008} \BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Benedikt}\ \emph {et~al.}(2025)\citenamefont {Benedikt}, \citenamefont {Bartmann}, \citenamefont {Burnet}, \citenamefont {Carli}, \citenamefont {Chance}, \citenamefont {Craievich}, \citenamefont {Giovannozzi}, \citenamefont {Grojean}, \citenamefont {Gutleber}, \citenamefont {Hanke}, \citenamefont {Henriques}, \citenamefont {Janot}, \citenamefont {Lourenco}, \citenamefont {Mangano}, \citenamefont {Otto}, \citenamefont {Poole}, \citenamefont {Rajagopalan}, \citenamefont {Raubenheimer}, \citenamefont {Todesco},\ and\ \citenamefont {Ulrici}}]{benedikt_future_2025}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Benedikt}}, \bibinfo {author} {\bibfnamefont {W.}~\bibnamefont {Bartmann}}, \bibinfo {author} {\bibfnamefont {J.-P.}\ \bibnamefont {Burnet}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Carli}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Chance}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Craievich}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Giovannozzi}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Grojean}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Gutleber}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Hanke}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Henriques}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Janot}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Lourenco}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Mangano}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Otto}}, \bibinfo {author} {\bibfnamefont {J.~H.}\ \bibnamefont {Poole}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Rajagopalan}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Raubenheimer}}, \bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Todesco}}, \ and\ \bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Ulrici}},\ }\href {\doibase https://doi.org/10.17181/CERN.EBAY.7W4X} {\emph {\bibinfo {title} {Future circular collider feasibility study report volume 2: Accelerators, technical infrastructure and safety}}}\ (\bibinfo {year} {2025})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Blondel}\ \emph {et~al.}(2019{\natexlab{a}})\citenamefont {Blondel}, \citenamefont {Janot}, \citenamefont {Wenninger}, \citenamefont {Aßmann}, \citenamefont {Aumon}, \citenamefont {Azzurri}, \citenamefont {Barber}, \citenamefont {Benedikt}, \citenamefont {Bogomyagkov}, \citenamefont {Gianfelice-Wendt}, \citenamefont {El}, \citenamefont {Koop}, \citenamefont {Koratzinos}, \citenamefont {Levitchev}, \citenamefont {Lefevre}, \citenamefont {Milanese}, \citenamefont {Muchnoi}, \citenamefont {Nikitin}, \citenamefont {Oide},\ and\ \citenamefont {Perez}}]{blondel_polarization_2019}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Blondel}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Janot}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Wenninger}}, \bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Aßmann}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Aumon}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Azzurri}}, \bibinfo {author} {\bibfnamefont {D.~P.}\ \bibnamefont {Barber}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Benedikt}}, \bibinfo {author} {\bibfnamefont {A.~V.}\ \bibnamefont {Bogomyagkov}}, \bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Gianfelice-Wendt}}, \bibinfo {author} {\bibfnamefont {K.~D.}\ \bibnamefont {El}}, \bibinfo {author} {\bibfnamefont {I.~A.}\ \bibnamefont {Koop}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Koratzinos}}, \bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Levitchev}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Lefevre}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Milanese}}, \bibinfo {author} {\bibfnamefont {N.}~\bibnamefont {Muchnoi}}, \bibinfo {author} {\bibfnamefont {S.~A.}\ \bibnamefont {Nikitin}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Oide}}, \ and\ \bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Perez}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Polarization and centre-of-mass energy calibration at fcc-ee},}\ }\href {\doibase https://doi.org/10.48550/arXiv.1909.12245} {\  (\bibinfo {year} {2019}{\natexlab{a}}),\ https://doi.org/10.48550/arXiv.1909.12245}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Koratzinos}(2016)}]{koratzinos_fcc-ee_2016}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Koratzinos}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {The fcc-ee design study: luminosity and beam polarization},}\ \ }(\bibinfo  {publisher} {Sissa Medialab},\ \bibinfo {address} {Vienna, Austria},\ \bibinfo {year} {2016})\ p.\ \bibinfo {pages} {518}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Assmann}\ \emph {et~al.}(2001)\citenamefont {Assmann}, \citenamefont {Blondel}, \citenamefont {Dehning}, \citenamefont {Grosse-Wiesmann}, \citenamefont {Jacobsen}, \citenamefont {Koutchouk}, \citenamefont {Miles}, \citenamefont {Placidi}, \citenamefont {Schmidt},\ and\ \citenamefont {Wenninger}}]{assmann_spin_2001}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Assmann}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Blondel}}, \bibinfo {author} {\bibfnamefont {B.}~\bibnamefont {Dehning}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Grosse-Wiesmann}}, \bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Jacobsen}}, \bibinfo {author} {\bibfnamefont {J.~P.}\ \bibnamefont {Koutchouk}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Miles}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Placidi}}, \bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Schmidt}}, \ and\ \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Wenninger}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Spin dynamics in {LEP} with 40--100~{GeV} beams},}\ }\href {\doibase 10.1007/s100520100720} {\bibfield  {journal} {\bibinfo  {journal} {The European Physical Journal C}\ }\textbf {\bibinfo {volume} {21}},\ \bibinfo {pages} {1--23} (\bibinfo {year} {2001})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Dam}(2025)}]{Dam2025DetectorRequirements}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Dam}},\ }\href@noop {} {\emph {\bibinfo {title} {Detector requirements, design, and technologies for the FCC-ee higgs, electroweak, and top factory}}}\ (\bibinfo {year} {2025})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {d’Enterria}(2016)}]{denterria_physics_2016}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {d’Enterria}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Physics case of fcc-ee},}\ }\href {\doibase https://doi.org/10.48550/arXiv.1601.06640} {\  (\bibinfo {year} {2016}),\ https://doi.org/10.48550/arXiv.1601.06640}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Maestre}\ \emph {et~al.}(2021)\citenamefont {Maestre}, \citenamefont {Blondel}, \citenamefont {Dam},\ and\ \citenamefont {Janot}}]{maestre_z_2021}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~A.}\ \bibnamefont {Maestre}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Blondel}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Dam}}, \ and\ \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Janot}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {The z lineshape challenge: ppm and kev measurements},}\ }\href {\doibase https://doi.org/10.1140/epjp/s13360-021-01760-x} {\bibfield  {journal} {\bibinfo  {journal} {The European Physical Journal Plus}\ }\textbf {\bibinfo {volume} {136}},\ \bibinfo {pages} {848} (\bibinfo {year} {2021})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Blondel}\ \emph {et~al.}(2019{\natexlab{b}})\citenamefont {Blondel}, \citenamefont {Freitas}, \citenamefont {Jadach}, \citenamefont {Janot},\ and\ \citenamefont {Riemann}}]{blondel_theory_2019}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Blondel}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Freitas}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Jadach}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Janot}}, \ and\ \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Riemann}},\ }\href {https://arxiv.org/abs/1901.02648} {\enquote {\bibinfo {title} {Theory requirements and challenges for the {FCC-ee}},}\ } (\bibinfo {year} {2019}{\natexlab{b}}),\ \Eprint {http://arxiv.org/abs/1901.02648} {arXiv:1901.02648 [hep-ph]} \BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Collaboration}\ \emph {et~al.}(2019)\citenamefont {Collaboration}, \citenamefont {Abada}, \citenamefont {Abbrescia}, \citenamefont {S}, \citenamefont {Abdyukhanov}, \citenamefont {Abelleira}, \citenamefont {Abramov}, \citenamefont {Aburaia}, \citenamefont {O}, \citenamefont {R}, \citenamefont {Agrawal}, \citenamefont {A}, \citenamefont {J}, \citenamefont {Aiba}, \citenamefont {Aichinger}, \citenamefont {Aielli}, \citenamefont {Akay}, \citenamefont {Akhundov}, \citenamefont {Aksakal},\ and\ \citenamefont {L}}]{the_fcccollaboration_fcc_2019}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.~F.}\ \bibnamefont {Collaboration}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Abada}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Abbrescia}}, \bibinfo {author} {\bibfnamefont {A.~S.}\ \bibnamefont {S}}, \bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Abdyukhanov}}, \bibinfo {author} {\bibfnamefont {F.~J.}\ \bibnamefont {Abelleira}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Abramov}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Aburaia}}, \bibinfo {author} {\bibfnamefont {A.~A.}\ \bibnamefont {O}}, \bibinfo {author} {\bibfnamefont {A.~P.}\ \bibnamefont {R}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Agrawal}}, \bibinfo {author} {\bibfnamefont {A.-S.~J.}\ \bibnamefont {A}}, \bibinfo {author} {\bibfnamefont {A.-V.~J.}\ \bibnamefont {J}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Aiba}}, \bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Aichinger}}, \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Aielli}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Akay}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Akhundov}}, \bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Aksakal}}, \ and\ \bibinfo {author} {\bibfnamefont {A.~J.}\ \bibnamefont {L}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Fcc physics opportunities: Future circular collider conceptual design report volume 1},}\ }\href {\doibase https://doi.org/10.1140/epjc/s10052-019-6904-3} {\bibfield  {journal} {\bibinfo  {journal} {The European Physical Journal C}\ }\textbf {\bibinfo {volume} {79}},\ \bibinfo {pages} {474} (\bibinfo {year} {2019})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Siringo}\ and\ \citenamefont {Buccheri}(2025)}]{SiringoBuccheri2025}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {F.}~\bibnamefont {Siringo}}\ and\ \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Buccheri}},\ }\href@noop {} {\emph {\bibinfo {title} {Electroweak radiative corrections to higgs production via vector boson fusion using SCET: Numerical results}}}\ (\bibinfo {year} {2025})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Ellis}\ and\ \citenamefont {You}(2019)}]{ellis_eft_2019}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Ellis}}\ and\ \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {You}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Global analysis of effective field theory constraints on the {FCC-ee}},}\ }\href {\doibase 10.1140/epjc/s10052-019-7220-7} {\bibfield  {journal} {\bibinfo  {journal} {The European Physical Journal C}\ }\textbf {\bibinfo {volume} {79}},\ \bibinfo {pages} {708} (\bibinfo {year} {2019})},\ \Eprint {http://arxiv.org/abs/1901.00310} {arXiv:1901.00310 [hep-ph]} \BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Bargmann}, \citenamefont {Michel},\ and\ \citenamefont {Telegdi}(1959)}]{bargmann_michel_telegdi_1959}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Bargmann}}, \bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Michel}}, \ and\ \bibinfo {author} {\bibfnamefont {V.~L.}\ \bibnamefont {Telegdi}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Precession of the polarization of particles moving in a homogeneous electromagnetic field},}\ }\href {\doibase https://doi.org/10.1103/physrevlett.2.435} {\bibfield  {journal} {\bibinfo  {journal} {American Physical Society}\ }\textbf {\bibinfo {volume} {2}},\ \bibinfo {pages} {435–436} (\bibinfo {year} {1959})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Hamwi}\ and\ \citenamefont {Hoffstaetter}(2025)}]{hamwi_hoffstaetter_2025}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Hamwi}}\ and\ \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Hoffstaetter}},\ }\href@noop {} {\emph {\bibinfo {title} {Polarization Transmission in the Electron-Ion Collider’s Hadron Storage Ring}}}\ (\bibinfo {year} {2025})\BibitemShut {NoStop}%
+\bibitem [{meo(2023)}]{meot_huang_ptitsyn_lin_2023}%
+  \BibitemOpen
+  \href {\doibase https://doi.org/10.1007/978-3-031-16715-7} {\emph {\bibinfo {title} {Polarized Beam Dynamics and Instrumentation in Particle Accelerators}}}\ (\bibinfo  {publisher} {Springer International Publishing},\ \bibinfo {address} {Cham},\ \bibinfo {year} {2023})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Zara}\ and\ \citenamefont {Berglund}(2001)}]{zara_berglund_2001}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Zara}}\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Berglund}},\ }\href@noop {} {\emph {\bibinfo {title} {Spin-Orbit Maps and Electron Spin Dynamics for the Luminosity Upgrade Project at HERA}}}\ (\bibinfo {year} {2001})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Huang}(2019)}]{huang_2019}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Huang}},\ }\href@noop {} {\emph {\bibinfo {title} {Measurement of the Spin Tune using the coherent spin motion of polarized protons in a storage ring}}}\ (\bibinfo {year} {2019})\BibitemShut {NoStop}%
+\end{thebibliography}%

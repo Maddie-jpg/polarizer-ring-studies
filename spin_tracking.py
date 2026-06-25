@@ -18,16 +18,25 @@ import json
 import os
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
-from LatticeBuild.misalignments_corrections import misalignments, orbit_correction
+import LatticeBuild.misalignments_corrections as mc
 
 
 #%%
 design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
-mode=os.environ.get('MODE','misaligned')
+config=int(os.environ.get('CONFIG',2))
+mode=os.environ.get('MODE','corrected')
 
 # %%
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_{mode}.json')
+if mode == 'corrected':
+    pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
+    if design ==1 and config==1:
+        mc.insert_BPMs_all_as_markers(pdr)
+        mc.insert_correctors_var2(pdr)
+    else:
+        mc.insert_BPMs_all_as_markers(pdr)
+        mc.insert_correctors(pdr)
+else:
+    pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_{mode}.json')
 pdr.particle_ref.anomalous_magnetic_moment=0.001159652181
 
 line=pdr.lines['ring']
@@ -36,21 +45,25 @@ line=pdr.lines['ring']
 line.configure_spin('auto')
 
 max_seed_value = np.iinfo(np.uint32).max  
-num_seeds=50
+num_seeds=50 
 seeds = np.random.randint(0, max_seed_value, size=num_seeds)
-scan_turns=10000
-long_scan_turns=100000
+scan_turns=1000
+long_scan_turns=10000
 
 P_BKS, tau_BKS, P_DKM, tau_DKM, tau_depol, tau_pol, P_eq = [], [], [], [], [], [], []
 tune_x, tune_y, tune_s = [], [], []
 
 prepped_particles, prepped_twiss = [], []
 failed_misalignments=[]
+successful_seeds=[]
+
+
+
 
 for seed in seeds:
     try:
         line=line.copy()
-        line=misalignments(line,0.2e-3,seed=seed)
+        line=mc.misalignments(line,0.2e-3,seed=seed)
 
         line.configure_radiation('mean')
         tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
@@ -59,10 +72,10 @@ for seed in seeds:
         if mode=='corrected':
             try:
                 line.discard_tracker()
-                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
                 
             except:
-                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
                 
 
         line.discard_tracker()
@@ -87,7 +100,10 @@ for seed in seeds:
 
         prepped_particles.append(particles)
         prepped_twiss.append(tw)
-    except (RuntimeError, np.linalg.LinAlgError) as e:
+        successful_seeds.append(seed)
+
+
+    except (RuntimeError, np.linalg.LinAlgError,ValueError) as e:
         print(e)
         failed_misalignments.append(seed)
 
@@ -96,12 +112,9 @@ print(len(failed_misalignments))
 #%%
 
 line.discard_tracker()
-line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
+line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
 
-for particles, tw in zip(prepped_particles, prepped_twiss):
-    for i, seed in enumerate(seeds):
-        particles = prepped_particles[i]
-        tw = prepped_twiss[i]
+for seed, particles, tw in zip(successful_seeds, prepped_particles, prepped_twiss):
 
         line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
                 with_progress=10)
@@ -142,7 +155,7 @@ for particles, tw in zip(prepped_particles, prepped_twiss):
         tune_s.append(tw.qs)
 
 scan_results={
-    'Seed': seeds,
+    'Seed': successful_seeds,
     'P_BKS': P_BKS,
     't_BKS': tau_BKS,
     'P_DKM': P_DKM,
@@ -185,9 +198,9 @@ for group_name, df_group in [('top_3', top_3), ('bottom_3', bottom_3)]:
         print(f"Running deep 100k track for {group_name} - Seed {seed_val}...")
 
         line.discard_tracker()
-        line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
+        line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
         
-        line=misalignments(line,0.2e-3,seed=seed_val)
+        line=mc.misalignments(line,0.2e-3,seed=seed_val)
 
         line.configure_radiation('mean')
         tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
@@ -196,10 +209,10 @@ for group_name, df_group in [('top_3', top_3), ('bottom_3', bottom_3)]:
         if mode=='corrected':
             try:
                 line.discard_tracker()
-                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
                 
             except:
-                orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
         
         particles = xp.generate_matched_gaussian_bunch(
             line=line,
@@ -282,8 +295,9 @@ plt.savefig(f'Results/D{design}/C{config}/{mode}/Bottom3_Polarization_Subplots.p
 #%%
 
 # Polarization vs depol time
+df['t_depol_fitted_seconds'] = df['t_pol'] / ((df['P_BKS'] / df['P_eq']) - 1)
 
-plt.scatter(df['P_eq'],df['t_depol']/60**2)
+plt.scatter(df['P_eq'],df['t_depol_fitted_seconds']/60**2)
 plt.xlabel('Equilibrium Polarization (%)')
 plt.ylabel('Depolarization Time (hours)')
 plt.savefig(f'Results/D{design}/C{config}/{mode}/EquilibriumPol_v_DepolTime.png')
@@ -294,27 +308,26 @@ df['t_depol_fitted_seconds'] = df['t_pol'] / ((df['P_BKS'] / df['P_eq']) - 1)
 
 plt.figure(figsize=(8, 5))
 
+df=df[df['P_eq']<=100]
 # Plot histogram
 counts, bins, patches = plt.hist(
-    df['t_depol_fitted_seconds'], 
-    bins=15, 
+    df['P_eq'], 
+    bins=30, 
     color='skyblue', 
     edgecolor='black', 
     alpha=0.8
 )
-
-plt.title('Distribution of Fitted Depolarization Times across Seeds', fontsize=13, fontweight='bold')
-plt.xlabel('Depolarization Time $\\tau_{depol}$ (seconds)', fontsize=11)
+plt.title('Distribution of Equilibrium Polarization across Seeds', fontsize=13, fontweight='bold')
+plt.xlabel('Equilibrium Polarization (%)', fontsize=11)
 plt.ylabel('Number of Seeds (Frequency)', fontsize=11)
 plt.grid(True, linestyle=':', alpha=0.6)
 
 # Add a vertical line for the mean value
-mean_depol = df['t_depol_fitted_seconds'].mean()
+mean_depol = df['P_eq'].mean()
 plt.axvline(mean_depol, color='red', linestyle='--', linewidth=1.5, label=f'Mean: {mean_depol:.2e} s')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/DepolTime_v_Seed.png')
-
 
 '''if pdf_run is True:
     pdf.close()'''
+# %%

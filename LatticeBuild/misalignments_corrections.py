@@ -1,6 +1,27 @@
 import xtrack as xt
 import numpy as np
 
+def get_safe_insertion(ring,prefix, elem, sign, default_offset):
+        # Find the target element name we are referencing from
+        ref_element = prefix + elem
+        if ref_element not in ring.element_names:
+            return ref_element, 'center', sign + default_offset
+
+        # Check elements immediately neighboring or sitting at the intended s position
+        # If the standard calculation causes a collision, we alter anchors to the parent quadrupole edges
+        try:
+            # We can change the anchor from 'center' to 'entry' or 'exit' of the quad
+            # to push the corrector completely out of the neighboring drift space if an RF cavity occupies it.
+            if sign == '-':
+                # Wants to go upstream of the quad: anchor to 'entry' and move backward by half a kick length
+                return ref_element, 'entry', f'-l_kick/2'
+            else:
+                # Wants to go downstream of the quad: anchor to 'exit' and move forward by half a kick length
+                return ref_element, 'exit', f'+l_kick/2'
+        except:
+            # Fallback to defaults if layout queries fail
+            return ref_element, 'center', sign + default_offset
+
 def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 
    offset=0.0
@@ -278,9 +299,14 @@ def insert_correctors_var2(pdr):
         current_drift = drift_map.get(prefix, 'l_drift')
         dynamic_offset = f'({current_drift}+l_quad) / 2'
         v_name = f'vk_ring_{elem}'
-        pdr[v_name] = 0.0  # Unique vertical kick variable
+        pdr[v_name] = 0.0  
+
+        # Check layout to prevent slicing an RF Cavity
+        from_elem, anchor, final_offset = get_safe_insertion(ring,prefix, elem, sign, dynamic_offset)
+        
         ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
-                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+                    at=final_offset, from_=prefix + elem, from_anchor='center')
+
 
     # horizontal correctors
     qx_ring_list = (
@@ -302,20 +328,21 @@ def insert_correctors_var2(pdr):
 )
     
     for elem, sign, prefix in qx_ring_list:
-            full_name=prefix+elem
-            if full_name in ['QFA_1RC','QFA_2RC','QFA_3RC']:
-                dynamic_offset='(((l_drift/2)+l_quad)/2)-l_sext'
-                h_name = f'hk_ring_{elem}'
-                pdr[h_name] = 0.0  # Unique horizontal kick variable
-                ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
-                            at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
-            else:
-                current_drift = drift_map.get(prefix, 'l_drift')
-                dynamic_offset = f'({current_drift}+l_quad) / 2'
-                h_name = f'hk_ring_{elem}'
-                pdr[h_name] = 0.0  # Unique horizontal kick variable
-                ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
-                            at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+        full_name = prefix + elem
+        h_name = f'hk_ring_{elem}'
+        pdr[h_name] = 0.0  
+        
+        if full_name in ['QFA_1RC', 'QFA_2RC', 'QFA_3RC']:
+            dynamic_offset = '(((l_drift/2)+l_quad)/2)-l_sext'
+        else:
+            current_drift = drift_map.get(prefix, 'l_drift')
+            dynamic_offset = f'({current_drift}+l_quad) / 2'
+            
+        from_elem, anchor, final_offset = get_safe_insertion(ring,prefix, elem, sign, dynamic_offset)
+
+        ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
+                    at=final_offset, from_=prefix + elem, from_anchor='center')
+
         
     return pdr
 

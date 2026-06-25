@@ -1,0 +1,164 @@
+\documentclass[%
+ aip,
+% jmp,
+% bmf,
+% sd,
+% rsi,
+ amsmath,amssymb,
+%preprint,%
+ reprint,%
+%author-year,%
+%author-numerical,%
+% Conference Proceedings
+]{revtex4-1}
+
+\usepackage{graphicx}% Include figure files
+\usepackage{dcolumn}% Align table columns on decimal point
+\usepackage{bm}% bold math
+%\usepackage[mathlines]{lineno}% Enable numbering of text and display math
+%\linenumbers\relax % Commence numbering lines
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage{etoolbox}
+
+%% Apr 2021: AIP requests that the corresponding 
+%% email to be moved after the affiliations
+\makeatletter
+\def\@email#1#2{%
+ \endgroup
+ \patchcmd{\titleblock@produce}
+  {\frontmatter@RRAPformat}
+  {\frontmatter@RRAPformat{\produce@RRAP{*#1\href{mailto:#2}{#2}}}\frontmatter@RRAPformat}
+  {}{}
+}%
+\makeatother
+\begin{document}
+
+\preprint{AIP/123-QED}
+
+\title[]{A Review of Beam Polarization, FCC-ee and Polarizer Ring Development}
+
+% Force line breaks with \\
+\author{M. Watson}
+ \altaffiliation[Also at ]{BE-ABP , CERN.}%Lines break automatically or can be forced with \\
+\affiliation{ 
+Physics Department, University of Surrey UK
+}%
+
+
+\date{\today}% It is always \today, today,
+             %  but any date may be explicitly specified
+
+%--------------------------------------------------
+% Abstract
+%--------------------------------------------------
+
+\begin{abstract}
+
+Your abstract here.
+
+\end{abstract}
+
+\maketitle
+
+%--------------------------------------------------
+% Main Text
+%--------------------------------------------------
+
+\section{Introduction}
+
+Text here.
+
+\section{LEP vs. FCC-ee}
+
+The Large Electron-Positron Collider (LEP), which operated at CERN between 1989 and 2000, ushered in the era of modern precision electroweak physics and established the benchmark against which the performance goals of the FCC-ee are evaluated \cite{dam_precision_2016}. LEP initially operated around the $Z$-resonance before expanding its energy reach past the $W$-pair production threshold \cite{the_fcc_collaboration_fcc-ee_2019}. Through dedicated line-shape scans, compiled in the final combined legacy reports of the LEP collaborations, LEP determined the $Z$-boson mass and width to $m_Z = 91187.5 \pm 2.1\text{ MeV}$ and $\Gamma_Z = 2495.2 \pm 2.3\text{ MeV}$, respectively \cite{the_fcc_collaboration_fcc-ee_2019, LEP_precision_2006}. The collider also provided a precise determination of the number of active light neutrino species \cite{dam_precision_2016}, while measurements of fermion pair-production cross-sections around the $Z$-pole offered indirect sensitivity to the top-quark mass prior to its discovery \cite{the_fcc_collaboration_fcc-ee_2019}. Ultimately, the $W$-boson mass was measured at LEP to be $m_W = 80.379 \pm 0.012\text{ GeV}$.
+
+These precision measurements were made possible by exploiting the natural transverse polarization of the electron and positron beams via a technique known as resonant depolarization (RDP) \cite{benedikt_future_2025}. RDP allows the spin tune of the beam to be determined by exciting the particles with a transverse oscillating magnetic field until the polarization is destroyed; the frequency of the depolarizing field then directly maps to the spin precession frequency \cite{benedikt_future_2025,blondel_polarization_2019}. At LEP, a polarization level of only 5–10\% was sufficient for precise energy calibration \cite{blondel_polarization_2019}. However, this technique was fundamentally limited to beam energies below $61\text{ GeV}$ due to the rapid growth of energy spread and spin-orbit resonances observed during high-energy LEP runs \cite{blondel_polarization_2019,koratzinos_fcc-ee_2016,assmann_spin_2001}. This limitation is mitigated in the FCC-ee layout; its significantly larger bending radius keeps the relative energy spread small enough to preserve beam polarization up to the $W$-pair threshold, aiming for a $W$-boson mass measurement precision of $300\text{ keV}$ \cite{dam_precision_2016}.
+
+The FCC-ee physics programme targets luminosities up to five orders of magnitude greater than those achieved at LEP \cite{Dam2025DetectorRequirements}. Specifically, the $Z$-pole operational mode is projected to deliver approximately $10^5$ times the LEP statistics \cite{koratzinos_fcc-ee_2016}, enabling profound improvements in the measurement of key electroweak observables, including the weak mixing angle, $W$ and $Z$ masses, and widths \cite{Dam2025DetectorRequirements, denterria_physics_2016}. Current FCC-ee layout studies project uncertainties of approximately $100\text{ keV}$ and $12\text{ keV}$ on the $Z$ mass and width, respectively—representing an order of magnitude improvement over the final LEP results \cite{benedikt_future_2025, maestre_z_2021}. Fully exploiting this immense statistical data sample requires an equivalent, unprecedented improvement in beam-energy calibration, as well as drastic reductions in theoretical calculation uncertainties to ensure theory errors do not limit the experimental precision \cite{blondel_theory_2019}.
+
+Beyond the electroweak arena, the FCC-ee will act as a high-luminosity Higgs and top-quark factory \cite{the_fcccollaboration_fcc_2019}. Precise Higgs coupling measurements are vital, as the Higgs boson receives electroweak radiative corrections from heavy Standard Model particles like the top quark \cite{the_fcccollaboration_fcc_2019, SiringoBuccheri2025}. A primary objective of the high-energy operation is a precise threshold scan of the $e^+e^- \rightarrow t\bar{t}$ production cross-section, providing direct sensitivity to the top quark's mass, width, strong coupling constant, and Yukawa coupling \cite{the_fcccollaboration_fcc_2019, denterria_physics_2016}. Collectively, these high-precision measurements form the core strategy of the FCC-ee to probe physics beyond the Standard Model, providing indirect sensitivity to new physics scales approaching $100\text{ TeV}$ \cite{the_fcccollaboration_fcc_2019, denterria_physics_2016}.
+
+Achieving these milestones imposes exceptionally demanding requirements on accelerator sub-systems. Because every primary observable is sensitive to systematic shifts in the centre-of-mass energy ($E_{\text{CM}}$), the extreme statistical precision will become entirely dominated by systematic effects unless the beam energies can be determined with a precision significantly surpassing that of the LEP via global Effective Field Theory (EFT) fits \cite{the_fcccollaboration_fcc_2019, denterria_physics_2016, ellis_eft_2019}.
+
+\section{Fundamentals of Spin and Polarization}
+
+\subsection{Spin motion and tune in Storage Rings}
+
+As an electron or positron travels around an accelerator, its spin doesn't stay aligned with the guiding field, as it precesses at a different rate to the orbit revolution. Its motion is described by the Thomas-BMT equation\cite{bargmann_michel_telegdi_1959} which originates from the combination of the Larmor and Thomas precession into a single precession vector\cite{hamwi_hoffstaetter_2025}, described by:
+$$\boldsymbol{\Omega} = (1+G\gamma)\,\mathbf{B}_{\perp} + (1+G)\,\mathbf{B}_{\parallel} + \left(\frac{1}{\gamma+1}+G\right)\gamma\,\frac{\mathbf{E}\times\boldsymbol{\beta}}{c}$$\cite{meot_huang_ptitsyn_lin_2023}
+where $\mathbf{B}_\parallel$ and $\mathbf{B}_\perp$
+are the magnetic field components parallel and perpendicular to the velocity $\boldsymbol{\beta}$,
+G is the gyromagnetic anomaly, and $\gamma$ is the Lorentz factor. 
+the $\mathbf{E}\times\boldsymbol{\beta}$ term is usually negligible in circular accelerators since RF cavity fields run parallel to the velocity, leaving the much simpler $\boldsymbol{\Omega} \approx (1+G\gamma)\mathbf{B}_\perp + (1+G)\mathbf{B}_\parallel$ for most practical purposes.\cite{meot_huang_ptitsyn_lin_2023, zara_berglund_2001}
+
+The Thomas-BMT equation shows that a particle's magnetic moment is proportional to its spin. Any magnetic moment residing in a magnetic field experiences a torque that causes it to precess around a field instead of aligning with it \cite{meot_huang_ptitsyn_lin_2023}. The bending and focusing magnets in the storage ring are what keeps the beam circulating, therefore the spin is continually subject to this torque \cite{}.
+Importantly, the rate of this precession is not tied to the rate of orbital revolution: it is dependent on the gyromagnetic anomaly $a=(g-2)/2$ which arises from the particle's own rest frame continuously rotating as it is bent around the ring\cite{meot_huang_ptitsyn_lin_2023, bargmann_michel_telegdi_1959}.
+
+Berglund's independent derivation for HERA confirms that for motion through a transverse field:
+$$\delta \theta_{\text{spin}} = (1+a\gamma )\delta \theta_{\text{orbit}}$$
+Where...
+This shows that the spin turns more than the orbit does, by a factor growing with energy. Since $a\gamma$ is never an integer at a real beam energy, the spin doesn't return to its original orientation after one turn; it advances to a new phase with each revolution \cite{zara_berglund_2001}.
+
+The excess precession defines the spin tune $\nu = a\gamma$ which is the number of particles per revolution, evaluated from the particle's frame of motion\cite{meot_huang_ptitsyn_lin_2023, huang_2019}.
+The relationship between spin tune and electron energy is linear, making it incredibly useful in the RDP process as the beam energy can be yielded directly \cite{meot_huang_ptitsyn_lin_2023,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
+
+
+
+%--------------------------------------------------
+% Figures
+%--------------------------------------------------
+
+\begin{figure}[ht]
+%\includegraphics[width=\columnwidth]{figure_name}
+\caption{Caption here.}
+\label{fig:example}
+\end{figure}
+
+%--------------------------------------------------
+% Equations
+%--------------------------------------------------
+
+\begin{equation}
+P(t)=P_{\infty}
+\left(1-e^{-t/\tau_{ST}}\right)
+\label{eq:st}
+\end{equation}
+
+%--------------------------------------------------
+% Tables
+%--------------------------------------------------
+
+\begin{table}[ht]
+\caption{Caption here.}
+\label{tab:example}
+
+\begin{tabular}{cc}
+\hline
+Column 1 & Column 2 \\
+\hline
+Value & Value \\
+\hline
+\end{tabular}
+
+\end{table}
+
+%--------------------------------------------------
+% Acknowledgements
+%--------------------------------------------------
+
+\begin{acknowledgments}
+
+Acknowledgements here.
+
+\end{acknowledgments}
+
+%--------------------------------------------------
+% Bibliography
+%--------------------------------------------------
+
+\bibliography{Literature_Review}
+
+\end{document}
