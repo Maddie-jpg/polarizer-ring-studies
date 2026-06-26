@@ -15,7 +15,7 @@ def run_configuration(design, config, mode):
     if mode == 'perfect':
         scripts = ['analysis.py', 'macroparticles.py']
     else:
-        scripts = ['analysis.py', 'spin_tracking.py']
+        scripts = ['spin_tracking.py','spin_tracking_deep.py']
 
     for script in scripts:
         print(f'\n[Master] Starting run of: {script} (Design: {design}, Config: {config}, Mode: {mode})')
@@ -28,6 +28,5 @@ def run_configuration(design, config, mode):
 
 if __name__ == '__main__':
 
-    run_configuration(1, 6, 'perfect')
-    run_configuration(1, 6, 'misaligned')
-    run_configuration(1, 6, 'corrected')
+    run_configuration(1, 2, 'misaligned')
+    run_configuration(1, 2, 'corrected')

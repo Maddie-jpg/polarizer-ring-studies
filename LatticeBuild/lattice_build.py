@@ -2,13 +2,14 @@
 
 import sys
 import os
+import xtrack as xt
 
 # Adds the parent directory to the search path
 parent_dir = os.path.abspath('..')
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-import linear_optics as lo
+import LatticeBuild.linear_optics as lo
 import sextupole_configs as sc
 import misalignments_corrections as mc
 
@@ -17,27 +18,27 @@ from pathlib import Path
 #%%
 
 design=2
-config=2
-mode='perfect' # 'perfect', 'misaligned', or 'corrected'
+config=3
+mode='corrected' # 'perfect', 'misaligned', or 'corrected'
 
 #%%
 
-#Linear optics - uncomment desired optics
 
-pdr=lo.two_fold_periodicity_90_deg()
+if mode == 'perfect':
+    #Linear optics - uncomment desired optics
+    pdr=lo.two_fold_periodicity_90_deg()
 
-#pdr=lo.two_fold_periodicity_90_deg()
-
-#sextupole configuration
-
-sc.config_D2_C2(pdr)
+    #sextupole configuration
+    sc.config_D2_C3(pdr)
 
 #Misalignments
-if mode == 'misaligned':
+elif mode == 'misaligned':
+    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect.json')
     ring=pdr.lines['ring']
-    mc.misalignments(ring)
+    mc.misalignments(ring, 0.25e-3)
 
 elif mode=='corrected':
+    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect.json')
     ring=pdr.lines['ring']
 
     mc.insert_BPMs_all_as_markers(pdr)
@@ -46,7 +47,7 @@ elif mode=='corrected':
     twiss=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                    spin=True, polarization=True )
 
-    mc.misalignments(ring,0.3e-3)
+    mc.misalignments(ring,0.25e-3)
 
     try:
         ring.discard_tracker()
@@ -57,12 +58,7 @@ elif mode=='corrected':
         
 
 
-#%%
 
-
-new_json_folder=f'./JSON Files/D{design}/C{config}'
-if not os.path.exists(new_json_folder):
-    os.makedirs(new_json_folder)
 #%%
 #Save json file
 
