@@ -79,9 +79,9 @@ def prep_branch(seed, apply_correction):
     if apply_correction:
         try:
             seed_line.discard_tracker()
-            mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+            mc.orbit_correction(pdr, tw, threading=False)
         except:
-            mc.orbit_correction(pdr, tw, threading=True, rcond_x=1e-4, rcond_y=1e-2)
+            mc.orbit_correction(pdr, tw, threading=True)
         # Re-twiss after correction so tw reflects the corrected orbit/optics
         # (not the pre-correction twiss the orbit correction was based on).
         tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
@@ -396,9 +396,9 @@ def deep_track_branch(df_branch, apply_correction):
             if apply_correction:
                 try:
                     line.discard_tracker()
-                    mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                    mc.orbit_correction(pdr, tw, threading=False)
                 except:
-                    mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+                    mc.orbit_correction(pdr, tw, threading=True)
                 # Re-twiss after correction so tw reflects the corrected lattice.
                 tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                                 spin=True, polarization=True)
@@ -547,7 +547,7 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
 
     line = base_line.copy()
     line.discard_tracker()
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+    line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
     line = mc.misalignments(line, 0.2e-3, seed=seed_val)
 
@@ -558,9 +558,9 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
     if apply_correction:
         try:
             line.discard_tracker()
-            mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+            mc.orbit_correction(pdr, tw, threading=False)
         except:
-            mc.orbit_correction(pdr, tw, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+            mc.orbit_correction(pdr, tw, threading=True)
         # Orbit correction changes the closed orbit/optics, so re-twiss to get
         # the n0 vector consistent with the corrected lattice.
         tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
