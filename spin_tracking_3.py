@@ -81,120 +81,113 @@ os.makedirs(results_dir, exist_ok=True)
 results_path = f'{results_dir}/SpinTrackingResults_MisalignedVsCorrected.dat'
 
 
-def prep_branch(seed, apply_correction):
-    """Build one branch (misaligned-only, or misaligned+corrected) for a seed.
-    Returns (particles, tw, seed_line) for this branch, raises on failure."""
-    seed_line = base_line.copy()
-    seed_line = mc.misalignments(seed_line, 0.2e-3, seed=seed)
-
-    seed_line.configure_radiation('mean')
-    tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                    spin=True, polarization=True)
-
-    if apply_correction:
-        try:
-            seed_line.discard_tracker()
-            mc.orbit_correction(pdr, tw, threading=False)
-        except:
-            mc.orbit_correction(pdr, tw, threading=True)
-        # Re-twiss after correction so tw reflects the corrected orbit/optics
-        # (not the pre-correction twiss the orbit correction was based on).
-        tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                        spin=True, polarization=True)
-
-    seed_line.discard_tracker()
-    seed_line.build_tracker()
-
-    particles = xp.generate_matched_gaussian_bunch(
-        line=seed_line,
-        nemitt_x=tw.eq_nemitt_x,
-        nemitt_y=tw.eq_nemitt_y,
-        sigma_z=np.sqrt(tw.eq_gemitt_zeta * tw.bets0),
-        num_particles=300)
-    # Add stable phase
-    particles.zeta += tw.zeta[0]
-    particles.delta += tw.delta[0]
-
-    # Initialize spin of all particles along n0
-    particles.spin_x = tw.spin_x[0]
-    particles.spin_y = tw.spin_y[0]
-    particles.spin_z = tw.spin_z[0]
-    seed_line.configure_radiation(model='quantum')
-
-    return particles, tw, seed_line
-
-
 def run_scan_pass(seed_list, apply_correction):
     """Run the full 1000-turn screen for ONE branch (misaligned or corrected)
-    over seed_list, returning a DataFrame of results for just that branch."""
+    over seed_list, returning a DataFrame of results for just that branch.
+
+    Builds ONE persistent tracked line for this branch, ONCE, before the seed
+    loop -- mc.misalignments() mutates element offsets in place (it does not
+    rebuild line structure), so the same already-tracker-built line can be
+    re-misaligned seed-to-seed without ever calling discard_tracker()/
+    build_tracker() again. twiss() can run on a line that already has the
+    OpenMP tracker built (only the *tracking* step is restricted while
+    OpenMP is active, not twiss), so a single tracker build covers both
+    the twiss calls and the tracking calls for every seed in this branch.
+    """
     branch_label = 'corrected' if apply_correction else 'misaligned'
 
-    prepped_particles, prepped_twiss, prepped_lines = [], [], []
-    failed_seeds, successful_seeds_local = [], []
-
-    for seed in seed_list:
-        try:
-            particles, tw, seed_line = prep_branch(seed, apply_correction=apply_correction)
-            prepped_particles.append(particles)
-            prepped_twiss.append(tw)
-            prepped_lines.append(seed_line)
-            successful_seeds_local.append(seed)
-        except (RuntimeError, np.linalg.LinAlgError, ValueError) as e:
-            print(e)
-            failed_seeds.append(seed)
-
-    print(f"[{branch_label}] failed seeds: {len(failed_seeds)} / {len(seed_list)}")
+    # Build the persistent line for this branch ONCE. Correction structurally
+    # depends on this exact line's corrector elements, so each branch
+    # (misaligned vs corrected) keeps its own persistent line rather than
+    # sharing one across apply_correction values.
+    persistent_line = base_line.copy()
+    persistent_line.discard_tracker()
+    persistent_line.build_tracker(_context=omp_context)
 
     P_BKS, tau_BKS, P_DKM, tau_DKM, tau_depol, tau_pol, P_eq = [], [], [], [], [], [], []
     tune_x, tune_y, spin_tune = [], [], []
     t_dep_turns_list = []
     result_seeds = []
+    failed_seeds = []
 
-    for seed, particles, tw, seed_line in zip(
-            successful_seeds_local, prepped_particles, prepped_twiss, prepped_lines):
+    for seed in seed_list:
+        try:
+            # Overwrites this line's element offsets with the new seed's
+            # random values in place -- no copy, no tracker rebuild.
+            mc.misalignments(persistent_line, 0.2e-3, seed=seed)
 
-        seed_line.discard_tracker()
-        seed_line.build_tracker(_context=omp_context)
+            persistent_line.configure_radiation('mean')
+            tw = persistent_line.twiss(method='6d', radiation_integrals=True,
+                            eneloss_and_damping=True, spin=True, polarization=True)
 
-        seed_line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
-                with_progress=10)
-        mon = seed_line.record_last_track
+            if apply_correction:
+                try:
+                    mc.orbit_correction(pdr, tw, threading=False)
+                except:
+                    mc.orbit_correction(pdr, tw, threading=True)
+                # Re-twiss after correction so tw reflects the corrected
+                # orbit/optics (not the pre-correction twiss the orbit
+                # correction was based on). Tracker is still untouched.
+                tw = persistent_line.twiss(method='6d', radiation_integrals=True,
+                                eneloss_and_damping=True, spin=True, polarization=True)
 
-        # Fit depolarization time
-        mask_alive = mon.state > 0
-        pol_x = mon.spin_x.sum(axis=0)/mask_alive.sum(axis=0)
-        pol_y = mon.spin_y.sum(axis=0)/mask_alive.sum(axis=0)
-        pol_z = mon.spin_z.sum(axis=0)/mask_alive.sum(axis=0)
-        pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
+            particles = xp.generate_matched_gaussian_bunch(
+                line=persistent_line,
+                nemitt_x=tw.eq_nemitt_x,
+                nemitt_y=tw.eq_nemitt_y,
+                sigma_z=np.sqrt(tw.eq_gemitt_zeta * tw.bets0),
+                num_particles=300)
+            particles.zeta += tw.zeta[0]
+            particles.delta += tw.delta[0]
+            particles.spin_x = tw.spin_x[0]
+            particles.spin_y = tw.spin_y[0]
+            particles.spin_z = tw.spin_z[0]
+            persistent_line.configure_radiation(model='quantum')
 
-        pol_to_fit = pol[3:] / pol[3]
-        turns = np.arange(len(pol_to_fit))
-        slope, intercept, r_value, p_value, std_err = linregress(turns, pol_to_fit)
-        # Calculate depolarization time
-        t_dep_turns = -1 / slope
+            persistent_line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
+                    with_progress=10)
+            mon = persistent_line.record_last_track
 
-        p_bks=tw.spin_polarization_inf_no_depol
-        t_bks=tw.spin_t_pol_component_s
-        p_dkm=tw.spin_polarization_eq
-        t_dkm=tw.spin_t_pol_buildup_s
-        t_depol=tw.spin_t_depol_component_s
-        t_pol=t_bks/(1+t_bks/tw.T_rev0)
+            # Fit depolarization time
+            mask_alive = mon.state > 0
+            pol_x = mon.spin_x.sum(axis=0)/mask_alive.sum(axis=0)
+            pol_y = mon.spin_y.sum(axis=0)/mask_alive.sum(axis=0)
+            pol_z = mon.spin_z.sum(axis=0)/mask_alive.sum(axis=0)
+            pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
 
-        t_pol_turns = t_bks/tw.T_rev0
-        p_eq = p_bks * 1 / (1 + t_pol_turns/t_dep_turns)
+            pol_to_fit = pol[3:] / pol[3]
+            turns = np.arange(len(pol_to_fit))
+            slope, intercept, r_value, p_value, std_err = linregress(turns, pol_to_fit)
+            t_dep_turns = -1 / slope
 
-        P_BKS.append(p_bks*100)
-        tau_BKS.append(t_bks)
-        P_DKM.append(p_dkm*100)
-        tau_DKM.append(t_dkm)
-        tau_depol.append(t_depol)
-        tau_pol.append(t_pol)
-        P_eq.append(p_eq*100)
-        t_dep_turns_list.append(t_dep_turns)
-        tune_x.append(tw.qx)
-        tune_y.append(tw.qy)
-        spin_tune.append(tw.spin_tune_fractional)
-        result_seeds.append(seed)
+            p_bks=tw.spin_polarization_inf_no_depol
+            t_bks=tw.spin_t_pol_component_s
+            p_dkm=tw.spin_polarization_eq
+            t_dkm=tw.spin_t_pol_buildup_s
+            t_depol=tw.spin_t_depol_component_s
+            t_pol=t_bks/(1+t_bks/tw.T_rev0)
+
+            t_pol_turns = t_bks/tw.T_rev0
+            p_eq = p_bks * 1 / (1 + t_pol_turns/t_dep_turns)
+
+            P_BKS.append(p_bks*100)
+            tau_BKS.append(t_bks)
+            P_DKM.append(p_dkm*100)
+            tau_DKM.append(t_dkm)
+            tau_depol.append(t_depol)
+            tau_pol.append(t_pol)
+            P_eq.append(p_eq*100)
+            t_dep_turns_list.append(t_dep_turns)
+            tune_x.append(tw.qx)
+            tune_y.append(tw.qy)
+            spin_tune.append(tw.spin_tune_fractional)
+            result_seeds.append(seed)
+
+        except (RuntimeError, np.linalg.LinAlgError, ValueError) as e:
+            print(e)
+            failed_seeds.append(seed)
+
+    print(f"[{branch_label}] failed seeds: {len(failed_seeds)} / {len(seed_list)}")
 
     branch_results = {
         'Seed': result_seeds,
@@ -386,10 +379,20 @@ df_misaligned_only = df_scan_full[df_scan_full['Mode'] == 'misaligned']
 def deep_track_branch(df_branch, apply_correction):
     """Deep-track the best (top_1) and worst (bottom_1) seed within df_branch.
     Returns a dict {'top_1': [...], 'bottom_1': [...]} matching the original
-    plot_data structure, scoped to just this one branch."""
+    plot_data structure, scoped to just this one branch.
+
+    Builds ONE persistent tracked line, ONCE, reused for both the top_1 and
+    bottom_1 seed -- same reasoning as run_scan_pass: mc.misalignments and
+    mc.orbit_correction both fully overwrite from scratch each call, so the
+    tracker never needs rebuilding between the two seeds tracked here.
+    """
     top_1 = df_branch.nlargest(1, 'P_eq')
     bottom_1 = df_branch.nsmallest(1, 'P_eq')
     branch_plot_data = {'top_1': [], 'bottom_1': []}
+
+    line = base_line.copy()
+    line.discard_tracker()
+    line.build_tracker(_context=omp_context)
 
     for group_name, df_group in [('top_1', top_1), ('bottom_1', bottom_1)]:
         for idx, row in df_group.iterrows():
@@ -398,8 +401,7 @@ def deep_track_branch(df_branch, apply_correction):
             print(f"Running deep track for {group_name} - Seed {seed_val} "
                   f"({'corrected' if apply_correction else 'misaligned'})...")
 
-            line = base_line.copy()
-            line=mc.misalignments(line,0.2e-3,seed=seed_val)
+            mc.misalignments(line, 0.2e-3, seed=seed_val)
 
             line.configure_radiation('mean')
             tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
@@ -407,7 +409,6 @@ def deep_track_branch(df_branch, apply_correction):
 
             if apply_correction:
                 try:
-                    line.discard_tracker()
                     mc.orbit_correction(pdr, tw, threading=False)
                 except:
                     mc.orbit_correction(pdr, tw, threading=True)
@@ -427,10 +428,7 @@ def deep_track_branch(df_branch, apply_correction):
             particles.spin_x = tw.spin_x[0]
             particles.spin_y = tw.spin_y[0]
             particles.spin_z = tw.spin_z[0]
-
-            line.configure_radiation('quantum')
-            line.discard_tracker()
-            line.build_tracker(_context=omp_context)
+            line.configure_radiation(model='quantum')
 
             # Track for full long duration
             line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
