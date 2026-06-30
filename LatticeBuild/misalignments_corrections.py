@@ -165,9 +165,8 @@ def insert_correctors(pdr):
         
     return pdr
 
-def orbit_correction(pdr, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2):   
-    ring = pdr.lines['ring']
-    period = pdr.lines['period']
+def orbit_correction(ring, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2):   
+    
     
     tt = ring.get_table()
     bpm_names_x = tt.rows['BPMx.*'].name
@@ -196,7 +195,7 @@ def orbit_correction(pdr, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2):
         corr_handler_final.y_correction.rcond = rcond_y
         corr_handler_final.correct()
 
-    return pdr
+    return ring
 
 def insert_BPMs_all(pdr, start_at_turn, stop_at_turn, fRev):
    

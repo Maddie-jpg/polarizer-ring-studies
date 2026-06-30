@@ -79,9 +79,9 @@ def prep_branch(seed, apply_correction):
     if apply_correction:
         try:
             seed_line.discard_tracker()
-            mc.orbit_correction(pdr, tw, threading=False)
+            mc.orbit_correction(seed_line, tw, threading=False)
         except:
-            mc.orbit_correction(pdr, tw, threading=True)
+            mc.orbit_correction(seed_line, tw, threading=True)
         # Re-twiss after correction so tw reflects the corrected orbit/optics
         # (not the pre-correction twiss the orbit correction was based on).
         tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
@@ -139,7 +139,7 @@ def run_scan_pass(seed_list, apply_correction):
             successful_seeds_local, prepped_particles, prepped_twiss, prepped_lines):
 
         seed_line.discard_tracker()
-        seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+        seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
         seed_line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
                 with_progress=10)
@@ -396,9 +396,9 @@ def deep_track_branch(df_branch, apply_correction):
             if apply_correction:
                 try:
                     line.discard_tracker()
-                    mc.orbit_correction(pdr, tw, threading=False)
+                    mc.orbit_correction(line, tw, threading=False)
                 except:
-                    mc.orbit_correction(pdr, tw, threading=True)
+                    mc.orbit_correction(line, tw, threading=True)
                 # Re-twiss after correction so tw reflects the corrected lattice.
                 tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                                 spin=True, polarization=True)
@@ -418,7 +418,7 @@ def deep_track_branch(df_branch, apply_correction):
 
             line.configure_radiation('quantum')
             line.discard_tracker()
-            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+            line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
             # Track for full long duration
             line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
@@ -547,7 +547,7 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
 
     line = base_line.copy()
     line.discard_tracker()
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
+    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
 
     line = mc.misalignments(line, 0.2e-3, seed=seed_val)
 
@@ -558,9 +558,9 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
     if apply_correction:
         try:
             line.discard_tracker()
-            mc.orbit_correction(pdr, tw, threading=False)
+            mc.orbit_correction(line, tw, threading=False)
         except:
-            mc.orbit_correction(pdr, tw, threading=True)
+            mc.orbit_correction(line, tw, threading=True)
         # Orbit correction changes the closed orbit/optics, so re-twiss to get
         # the n0 vector consistent with the corrected lattice.
         tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,

@@ -51,10 +51,10 @@ elif mode=='corrected':
 
     try:
         ring.discard_tracker()
-        mc.orbit_correction(pdr, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+        mc.orbit_correction(ring, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2)
         
     except:
-        mc.orbit_correction(pdr, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+        mc.orbit_correction(ring, twiss, threading=True, rcond_x=1e-4, rcond_y=1e-2)
         
 
 
