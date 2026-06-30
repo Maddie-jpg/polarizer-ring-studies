@@ -6,7 +6,7 @@
 %Control: page (1) range
 %Control: year (1) truncated
 %Control: production of eprint (0) enabled
-\begin{thebibliography}{19}%
+\begin{thebibliography}{25}%
 \makeatletter
 \providecommand \@ifxundefined [1]{%
  \@ifx{#1\undefined}
@@ -106,4 +106,22 @@
 \bibitem [{\citenamefont {Huang}(2019)}]{huang_2019}%
   \BibitemOpen
   \bibfield  {author} {\bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Huang}},\ }\href@noop {} {\emph {\bibinfo {title} {Measurement of the Spin Tune using the coherent spin motion of polarized protons in a storage ring}}}\ (\bibinfo {year} {2019})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Keintzel}\ \emph {et~al.}(2025)\citenamefont {Keintzel}, \citenamefont {Wu}, \citenamefont {Kiel}, \citenamefont {Sagan}, \citenamefont {Wilkinson}, \citenamefont {Oide}, \citenamefont {Bauche}, \citenamefont {Höfle}, \citenamefont {Blondel}, \citenamefont {Jiang}, \citenamefont {Bogomyagkov}, \citenamefont {Roy}, \citenamefont {Martens}, \citenamefont {Hofer}, \citenamefont {Pieloni}, \citenamefont {Sittard}, \citenamefont {Zhang}, \citenamefont {Hock}, \citenamefont {Nikolaev},\ and\ \citenamefont {Gaskell}}]{keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Keintzel}}, \bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Wu}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Kiel}}, \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Sagan}}, \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Wilkinson}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Oide}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Bauche}}, \bibinfo {author} {\bibfnamefont {W.}~\bibnamefont {Höfle}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Blondel}}, \bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Jiang}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Bogomyagkov}}, \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Roy}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Martens}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Hofer}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Pieloni}}, \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Sittard}}, \bibinfo {author} {\bibfnamefont {Z.}~\bibnamefont {Zhang}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Hock}}, \bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Nikolaev}}, \ and\ \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Gaskell}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Jacow : Fcc-ee energy calibration and polarization - status and outlook},}\ }\href {\doibase https://doi.org/10.18429/JACoW-IPAC2025-MOPM007} {\bibfield  {journal} {\bibinfo  {journal} {JACoW IPAC}\ }\textbf {\bibinfo {volume} {2025}},\ \bibinfo {pages} {MOPM007} (\bibinfo {year} {2025})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Buon}\ and\ \citenamefont {Koutchouk}(1995)}]{Buon269521}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Buon}}\ and\ \bibinfo {author} {\bibfnamefont {J.-P.}\ \bibnamefont {Koutchouk}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {{Polarization of electron and proton beams}},}\ }\href {\doibase 10.5170/CERN-1995-006.879} {\  (\bibinfo {year} {1995}),\ 10.5170/CERN-1995-006.879}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Sokolov}\ and\ \citenamefont {Ternov}(1963)}]{sokolov_ternov_1963}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Sokolov}}\ and\ \bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Ternov}},\ }\href@noop {} {\emph {\bibinfo {title} {ON THE SPIN AND POLARIZATION EFFECTS IN THE THEORY OF SYNCHROTRON RADIATION}}}\ (\bibinfo {year} {1963})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Baier}(2006)}]{baier_2006}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Baier}},\ }\href@noop {} {\emph {\bibinfo {title} {Forty years of acting electron-positron colliders}}}\ (\bibinfo {year} {2006})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Mane}(2025)}]{mane2025radiativespinpolarizationhigh}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.~R.}\ \bibnamefont {Mane}},\ }\href {https://arxiv.org/abs/2512.13958} {\enquote {\bibinfo {title} {Radiative spin polarization in high energy storage rings},}\ } (\bibinfo {year} {2025}),\ \Eprint {http://arxiv.org/abs/2512.13958} {arXiv:2512.13958 [physics.acc-ph]} \BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Kroth}\ and\ \citenamefont {Tuchin}(2025)}]{kroth_tuchin_2025}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~D.}\ \bibnamefont {Kroth}}\ and\ \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Tuchin}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Sokolov-ternov effect in rotating systems},}\ }\href {\doibase https://doi.org/10.1103/physrevd.111.056004} {\bibfield  {journal} {\bibinfo  {journal} {Physical Review D}\ }\textbf {\bibinfo {volume} {111}} (\bibinfo {year} {2025}),\ https://doi.org/10.1103/physrevd.111.056004}\BibitemShut {NoStop}%
 \end{thebibliography}%

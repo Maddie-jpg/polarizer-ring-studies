@@ -109,19 +109,11 @@ for group_name, df_group in [('top_1', top_1), ('bottom_1', bottom_1)]:
         pol_to_fit = pol[3:] / pol[3]
         turns = np.arange(len(pol_to_fit))
 
-        # Exponential fit: P(t)/P(0) = exp(-t/tau)
-        # A linear fit (-1/slope) is only valid when turns << tau; once the
-        # tracked window is a sizeable fraction of tau, the curve visibly bends
-        # and a straight-line fit biases tau low (apparent depolarization too fast).
-        # Fitting the actual exponential form removes that bias regardless of
-        # how long N is relative to tau.
+        
         def exp_decay(t, tau):
             return np.exp(-t / tau)
 
-        # Use the short-scan's fitted depolarization time as the initial guess for
-        # the exponential fit, converting seconds -> turns via T_rev0. This is a much
-        # better starting point than guessing blind, and helps curve_fit converge
-        # even for seeds where tau is short relative to the long tracking window.
+        
         if 't_depol' in row and row['t_depol'] > 0:
             tau0_guess = row['t_depol'] / tw.T_rev0
         else:
@@ -138,9 +130,7 @@ for group_name, df_group in [('top_1', top_1), ('bottom_1', bottom_1)]:
             fit_curve = np.full_like(pol_to_fit, np.nan)
             fit_ok = False
 
-        # Diagnostic: how much of one depolarization time-constant did we actually track?
-        # N/tau >> 1 means the seed depolarizes fast relative to the tracked window;
-        # worth a closer look (more turns or tighter fit window) if this is large.
+        
         n_over_tau = len(turns) / t_dep_turns_long if fit_ok and t_dep_turns_long > 0 else np.nan
         print(f"  Seed {seed_val}: tau_fit = {t_dep_turns_long:.1f} turns, "
               f"N/tau = {n_over_tau:.2f}")

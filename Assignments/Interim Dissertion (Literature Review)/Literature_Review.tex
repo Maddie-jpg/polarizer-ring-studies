@@ -85,27 +85,35 @@ Achieving these milestones imposes exceptionally demanding requirements on accel
 
 \section{Fundamentals of Spin and Polarization}
 
-\subsection{Spin motion and tune in Storage Rings}
+\subsection{Spin Motion and Tune in Storage Rings}
 
 As an electron or positron travels around an accelerator, its spin doesn't stay aligned with the guiding field, as it precesses at a different rate to the orbit revolution. Its motion is described by the Thomas-BMT equation\cite{bargmann_michel_telegdi_1959} which originates from the combination of the Larmor and Thomas precession into a single precession vector\cite{hamwi_hoffstaetter_2025}, described by:
 $$\boldsymbol{\Omega} = (1+G\gamma)\,\mathbf{B}_{\perp} + (1+G)\,\mathbf{B}_{\parallel} + \left(\frac{1}{\gamma+1}+G\right)\gamma\,\frac{\mathbf{E}\times\boldsymbol{\beta}}{c}$$\cite{meot_huang_ptitsyn_lin_2023}
 where $\mathbf{B}_\parallel$ and $\mathbf{B}_\perp$
 are the magnetic field components parallel and perpendicular to the velocity $\boldsymbol{\beta}$,
 G is the gyromagnetic anomaly, and $\gamma$ is the Lorentz factor. 
-the $\mathbf{E}\times\boldsymbol{\beta}$ term is usually negligible in circular accelerators since RF cavity fields run parallel to the velocity, leaving the much simpler $\boldsymbol{\Omega} \approx (1+G\gamma)\mathbf{B}_\perp + (1+G)\mathbf{B}_\parallel$ for most practical purposes.\cite{meot_huang_ptitsyn_lin_2023, zara_berglund_2001}
+the $\mathbf{E}\times\boldsymbol{\beta}$ term is usually negligible in circular accelerators since RF cavity fields run parallel to the velocity, leaving the much simpler $$\boldsymbol{\Omega} \approx (1+G\gamma)\mathbf{B}_\perp + (1+G)\mathbf{B}_\parallel$$ for most practical purposes.\cite{meot_huang_ptitsyn_lin_2023, zara_berglund_2001}
 
-The Thomas-BMT equation shows that a particle's magnetic moment is proportional to its spin. Any magnetic moment residing in a magnetic field experiences a torque that causes it to precess around a field instead of aligning with it \cite{meot_huang_ptitsyn_lin_2023}. The bending and focusing magnets in the storage ring are what keeps the beam circulating, therefore the spin is continually subject to this torque \cite{}.
-Importantly, the rate of this precession is not tied to the rate of orbital revolution: it is dependent on the gyromagnetic anomaly $a=(g-2)/2$ which arises from the particle's own rest frame continuously rotating as it is bent around the ring\cite{meot_huang_ptitsyn_lin_2023, bargmann_michel_telegdi_1959}.
+This precession arises because a particle's magnetic moment, itself proportional to its spin, experiences a torque when placed in a magnetic field. Any magnetic moment residing in a magnetic field experiences a torque that causes it to precess around the field instead of aligning with it \cite{meot_huang_ptitsyn_lin_2023}. The bending and focusing magnets in the storage ring are what keep the beam circulating, therefore the spin is continually subject to this torque \cite{}.
+Importantly, the rate of this precession is not tied to the rate of orbital revolution: it depends on the gyromagnetic anomaly $a=(g-2)/2$, a fixed property of the particle species itself \cite{bargmann_michel_telegdi_1959, meot_huang_ptitsyn_lin_2023}. A second, independent contribution comes from Thomas precession, a purely relativistic effect arising because the particle's own rest frame continuously rotates as it is bent around the ring \cite{bargmann_michel_telegdi_1959, meot_huang_ptitsyn_lin_2023}.
 
-Berglund's independent derivation for HERA confirms that for motion through a transverse field:
-$$\delta \theta_{\text{spin}} = (1+a\gamma )\delta \theta_{\text{orbit}}$$
-Where...
-This shows that the spin turns more than the orbit does, by a factor growing with energy. Since $a\gamma$ is never an integer at a real beam energy, the spin doesn't return to its original orientation after one turn; it advances to a new phase with each revolution \cite{zara_berglund_2001}.
+Specialising this result to the simplest case of a particle passing through a single bending magnet, where $B_\perp$ dominates, Berglund's derivation for HERA gives the orbit-deflection relation directly \cite{zara_berglund_2001}: 
+$$\delta\theta_{spin} = (1+a\gamma),\delta\theta_{orbit}$$ For every degree the momentum vector turns through the bend, the spin turns by $(1+a\gamma)$ degrees more than the orbit, by a factor that grows with beam energy. Since $a\gamma$ is never an integer at a real beam energy, the spin doesn't return to its original orientation after one turn; it advances to a new phase with each revolution \cite{zara_berglund_2001}.
 
-The excess precession defines the spin tune $\nu = a\gamma$ which is the number of particles per revolution, evaluated from the particle's frame of motion\cite{meot_huang_ptitsyn_lin_2023, huang_2019}.
-The relationship between spin tune and electron energy is linear, making it incredibly useful in the RDP process as the beam energy can be yielded directly \cite{meot_huang_ptitsyn_lin_2023,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
+The excess precession defines the spin tune $\nu = a\gamma$, the number of spin precessions per orbital revolution, evaluated in the frame moving with the particle \cite{meot_huang_ptitsyn_lin_2023, huang_2019}.
+The relationship between spin tune and electron energy is linear, making it incredibly useful in the RDP process as the beam energy can be determined directly \cite{meot_huang_ptitsyn_lin_2023,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
+
+\subsection{Polarization and the Sokolov-Ternov Effect}
+Polarization is a quantity representative of the particle ensemble rather than a single-particle spin, and describes the degree to which particles align along a specified direction. It is defined as $$P=\frac{N_{\uparrow} - N_{\downarrow}}{N_{\uparrow} + N_{\downarrow}}$$ where… \cite{meot_huang_ptitsyn_lin_2023}
+
+The definition is built for $1/2$-spin systems so it is implicitly scoped to electrons/positrons \cite{Buon269521}.
 
 
+Radiative spin polarization was first predicted theoretically by Sokolov and Ternov, who derived an asymptotic polarization limit of 
+$P_0=8/(5\sqrt{3})\approx92.4\%$ for an idealised uniform field \cite{sokolov_ternov_1963}. This prediction was confirmed experimentally within a decade: the first observations of radiative polarization were made at the VEPP-2 storage ring at Novosibirsk and at the ACO ring in Orsay, with later runs at the improved VEPP-2M and ACO approaching the theoretical limit \cite{baier_2006,Buon269521}. Real machines, however, rarely reach this asymptotic value — SPEAR II, for instance, achieved an equilibrium polarization of only about 76\% at $3.7\text{GeV}$ \cite{mane2025radiativespinpolarizationhigh}, and, as mentioned in Section I, LEP itself operated with a transverse polarization around 10\%.
+
+
+The spontaneous build-up of polarization arises directly from synchrotron radiation and spin-flip asymmetry \cite{sokolov_ternov_1963, kroth_tuchin_2025}. 
 
 %--------------------------------------------------
 % Figures
