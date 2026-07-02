@@ -44,7 +44,7 @@ base_line = pdr.lines['ring'].copy()
 #%%
 
 # Pick the seed from the existing scan results, same convention as the deep-track script.
-df = pd.read_csv(f'Results/D{design}/C{config}/{mode}/SpinTrackingResults.dat')
+df = pd.read_csv(f'/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Results/D1/C1/Comparison/SpinTrackingResults_MisalignedVsCorrected.dat')
 
 if SEED_CHOICE == 'top':
     row = df.nlargest(1, 'P_eq').iloc[0]

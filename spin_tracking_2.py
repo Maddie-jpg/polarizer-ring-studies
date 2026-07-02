@@ -34,13 +34,15 @@ config=int(os.environ.get('CONFIG',1))
 # correction) rather than loading two separately-prepared JSON files that
 # might not even share the same misalignment realization.
 pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
+pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
+pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9
+
 if design == 1 and config == 1:
     mc.insert_BPMs_all_as_markers(pdr)
     mc.insert_correctors_var2(pdr)
 else:
     mc.insert_BPMs_all_as_markers(pdr)
     mc.insert_correctors(pdr)
-pdr.particle_ref.anomalous_magnetic_moment=0.001159652181
 
 # ===========================================================================
 # PART 1 — SCAN over many random misalignment seeds (1000-turn screening)
@@ -55,7 +57,7 @@ line=pdr.lines['ring']
 line.configure_spin('auto')
 
 max_seed_value = np.iinfo(np.uint32).max  
-num_seeds=50 
+num_seeds=10
 seeds = np.random.randint(0, max_seed_value, size=num_seeds)
 scan_turns=1000
 
@@ -70,26 +72,38 @@ def prep_branch(seed, apply_correction):
     """Build one branch (misaligned-only, or misaligned+corrected) for a seed.
     Returns (particles, tw, seed_line) for this branch, raises on failure."""
     seed_line = base_line.copy()
+
+    # Set radiation to 'mean' BEFORE building the tracker: twiss cannot run under
+    # the 'quantum' model, and the tracker captures the radiation mode at build
+    # time, so configure_radiation must precede build_tracker. Then build the
+    # tracker, then misalign onto the live tracker (element_refs), and never
+    # discard the tracker afterward (that would wipe the misalignments).
+    seed_line.configure_radiation('mean')
+    seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
     seed_line = mc.misalignments(seed_line, 0.2e-3, seed=seed)
 
-    seed_line.configure_radiation('mean')
     tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
 
     if apply_correction:
+        orbit_x_rms_before = np.std(tw.x)
+        orbit_y_rms_before = np.std(tw.y)
         try:
-            seed_line.discard_tracker()
             mc.orbit_correction(seed_line, tw, threading=False)
-        except:
+        except Exception as e:
+            print(f"  [seed {seed}] orbit_correction(threading=False) raised: "
+                  f"{type(e).__name__}: {e} -- retrying with threading=True")
             mc.orbit_correction(seed_line, tw, threading=True)
-        # Re-twiss after correction so tw reflects the corrected orbit/optics
-        # (not the pre-correction twiss the orbit correction was based on).
+        # Re-twiss after correction so tw reflects the corrected orbit/optics.
         tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                         spin=True, polarization=True)
+        orbit_x_rms_after = np.std(tw.x)
+        orbit_y_rms_after = np.std(tw.y)
+        print(f"  [seed {seed}] orbit RMS x: {orbit_x_rms_before:.3e} -> {orbit_x_rms_after:.3e}, "
+              f"y: {orbit_y_rms_before:.3e} -> {orbit_y_rms_after:.3e}")
 
-    seed_line.discard_tracker()
-    seed_line.build_tracker()
-
+    # Generate the matched bunch while still in 'mean' mode -- matched bunch
+    # generation can twiss internally, which fails under 'quantum'.
     particles = xp.generate_matched_gaussian_bunch(
         line=seed_line,
         nemitt_x=tw.eq_nemitt_x,
@@ -104,6 +118,10 @@ def prep_branch(seed, apply_correction):
     particles.spin_x = tw.spin_x[0]
     particles.spin_y = tw.spin_y[0]
     particles.spin_z = tw.spin_z[0]
+
+    # NOW switch to quantum radiation for tracking. configure_radiation acts on
+    # the already-built tracker and does NOT discard it or reset element_refs,
+    # so misalignments/correction remain in place. No twiss happens after this.
     seed_line.configure_radiation(model='quantum')
 
     return particles, tw, seed_line
@@ -133,14 +151,16 @@ def run_scan_pass(seed_list, apply_correction):
     P_BKS, tau_BKS, P_DKM, tau_DKM, tau_depol, tau_pol, P_eq = [], [], [], [], [], [], []
     tune_x, tune_y, spin_tune = [], [], []
     t_dep_turns_list = []
+    fit_reliable_list = []
     result_seeds = []
 
     for seed, particles, tw, seed_line in zip(
             successful_seeds_local, prepped_particles, prepped_twiss, prepped_lines):
 
-        seed_line.discard_tracker()
-        seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
-
+        # NOTE: do NOT discard_tracker here -- that would wipe the element_refs
+        # misalignments (and correction) applied in prep_branch, reverting the
+        # line to a perfect lattice. The tracker was already built (serial
+        # context) with radiation set to 'quantum' inside prep_branch.
         seed_line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
                 with_progress=10)
         mon = seed_line.record_last_track
@@ -155,18 +175,44 @@ def run_scan_pass(seed_list, apply_correction):
         pol_to_fit = pol[3:] / pol[3]
         turns = np.arange(len(pol_to_fit))
         slope, intercept, r_value, p_value, std_err = linregress(turns, pol_to_fit)
-        # Calculate depolarization time
-        t_dep_turns = -1 / slope
 
         p_bks=tw.spin_polarization_inf_no_depol
         t_bks=tw.spin_t_pol_component_s
         p_dkm=tw.spin_polarization_eq
         t_dkm=tw.spin_t_pol_buildup_s
         t_depol=tw.spin_t_depol_component_s
-        t_pol=t_bks/(1+t_bks/tw.T_rev0)
 
-        t_pol_turns = t_bks/tw.T_rev0
+        # t_pol is the polarization BUILDUP time (Sokolov-Ternov / BKS), in seconds.
+        # It is simply tw.spin_t_pol_component_s. The previous expression
+        #     t_pol = t_bks / (1 + t_bks/T_rev0)
+        # was dimensionally wrong: t_bks (~hundreds of s) divided by T_rev0 (~7e-7 s)
+        # gives ~1e9, so the whole thing collapsed to ~T_rev0 for EVERY seed --
+        # that is the "suspiciously constant t_pol ~ 7.3e-7" you were seeing, and it
+        # made every downstream t_depol_fitted_seconds ~1e9x too small.
+        t_pol = t_bks
+
+        t_pol_turns = t_bks/tw.T_rev0   # polarization time in TURNS (for the ratio below)
+
+        # Guard the fitted slope. A positive or near-zero slope means depolarisation
+        # is too slow to measure in scan_turns (flat, noise-dominated curve); -1/slope
+        # is then negative or absurdly large, which pushes p_eq above p_bks or negative.
+        # In that regime fall back to the analytic depol time from twiss.
+        MIN_SLOPE = -1.0 / (100 * scan_turns)   # trust fit only if implied tau < 100x window
+        if slope < MIN_SLOPE:
+            t_dep_turns = -1.0 / slope
+            fit_reliable = True
+        else:
+            t_dep_turns = t_depol / tw.T_rev0   # analytic depol time, converted to turns
+            fit_reliable = False
+            print(f"  [seed {seed}] slope={slope:.3e} unreliable -- "
+                  f"using analytic t_depol = {t_dep_turns:.3e} turns")
+
+        # P_eq = P_inf / (1 + tau_pol/tau_dep), both times in turns. Guaranteed in
+        # (0, p_bks] now that t_dep_turns > 0.
         p_eq = p_bks * 1 / (1 + t_pol_turns/t_dep_turns)
+
+        if p_eq > p_bks or p_eq < 0:
+            print(f"  [seed {seed}] WARNING: p_eq={p_eq*100:.3f}% outside (0, P_BKS={p_bks*100:.3f}%)")
 
         P_BKS.append(p_bks*100)
         tau_BKS.append(t_bks)
@@ -176,6 +222,7 @@ def run_scan_pass(seed_list, apply_correction):
         tau_pol.append(t_pol)
         P_eq.append(p_eq*100)
         t_dep_turns_list.append(t_dep_turns)
+        fit_reliable_list.append(fit_reliable)
         tune_x.append(tw.qx)
         tune_y.append(tw.qy)
         spin_tune.append(tw.spin_tune_fractional)
@@ -192,6 +239,7 @@ def run_scan_pass(seed_list, apply_correction):
         't_pol':tau_pol,
         'P_eq': P_eq,
         't_dep_turns': t_dep_turns_list,
+        'fit_reliable': fit_reliable_list,
         'N_over_tau': [scan_turns / t for t in t_dep_turns_list],
         'qx': tune_x,
         'qy': tune_y,
@@ -239,7 +287,7 @@ df = df_scan_full.copy()
 '''pdf_run=False
 
 if pdf_run is True:
-    pdf = PdfPages(f"Results/D{design}/C{config}/Comparison/SpinTrackingResults.pdf")
+    pdf = PdfPages(f"{results_dir}/SpinTrackingResults.pdf")
 
     _old_savefig = plt.savefig
 
@@ -255,6 +303,9 @@ if pdf_run is True:
 
 # Polarization vs depol time, split by branch mode so misaligned and
 # corrected points are visually distinguishable on the same axes.
+# t_depol = t_pol / (P_BKS/P_eq - 1), the inverse of P_eq = P_BKS/(1 + t_pol/t_depol).
+# This is now correct because t_pol holds the real buildup time in SECONDS
+# (previously it was the collapsed ~T_rev0 value, making this ~1e9x too small).
 df['t_depol_fitted_seconds'] = df['t_pol'] / ((df['P_BKS'] / df['P_eq']) - 1)
 
 fig, ax = plt.subplots()
@@ -265,7 +316,7 @@ for branch_mode, color in [('misaligned', 'tab:red'), ('corrected', 'tab:blue')]
 ax.set_xlabel('Equilibrium Polarization (%)')
 ax.set_ylabel('Depolarization Time (hours)')
 ax.legend()
-plt.savefig(f'Results/D{design}/C{config}/Comparison/EquilibriumPol_v_DepolTime.png')
+plt.savefig(f'{results_dir}/EquilibriumPol_v_DepolTime.png')
 
 
 #%%
@@ -287,7 +338,7 @@ plt.ylabel('Number of Seeds (Frequency)', fontsize=11)
 plt.grid(True, linestyle=':', alpha=0.6)
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/Comparison/EqPolDist.png')
+plt.savefig(f'{results_dir}/EqPolDist.png')
 
 
 #%%
@@ -317,7 +368,7 @@ ax.set_title('Equilibrium Polarization: Misaligned vs Corrected\n(same misalignm
 ax.grid(True, linestyle=':', alpha=0.6)
 ax.legend()
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/Comparison/PEq_Misaligned_vs_Corrected_Scatter.png', dpi=300)
+plt.savefig(f'{results_dir}/PEq_Misaligned_vs_Corrected_Scatter.png', dpi=300)
 plt.close()
 
 # Separate histograms, side by side, for direct distribution comparison
@@ -341,7 +392,7 @@ axes[1].grid(True, linestyle=':', alpha=0.6)
 
 fig.suptitle('Equilibrium Polarization Distributions — Misaligned vs Corrected', fontweight='bold')
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/Comparison/PEq_Misaligned_vs_Corrected_Histograms.png', dpi=300)
+plt.savefig(f'{results_dir}/PEq_Misaligned_vs_Corrected_Histograms.png', dpi=300)
 plt.close()
 
 # %%
@@ -384,20 +435,23 @@ def deep_track_branch(df_branch, apply_correction):
                   f"({'corrected' if apply_correction else 'misaligned'})...")
 
             line = base_line.copy()
-            line.discard_tracker()
-            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-
-            line=mc.misalignments(line,0.2e-3,seed=seed_val)
-
+            # Set mean radiation before building the tracker (twiss can't run
+            # under quantum; base_line may carry quantum state from a prior copy).
+            # Build tracker, then misalign onto the live tracker (element_refs);
+            # never discard afterward or the misalignments are lost.
             line.configure_radiation('mean')
+            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+            line = mc.misalignments(line, 0.2e-3, seed=seed_val)
+
             tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                             spin=True, polarization=True)
 
             if apply_correction:
                 try:
-                    line.discard_tracker()
                     mc.orbit_correction(line, tw, threading=False)
-                except:
+                except Exception as e:
+                    print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
+                          f"{type(e).__name__}: {e} -- retrying with threading=True")
                     mc.orbit_correction(line, tw, threading=True)
                 # Re-twiss after correction so tw reflects the corrected lattice.
                 tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
@@ -416,9 +470,9 @@ def deep_track_branch(df_branch, apply_correction):
             particles.spin_y = tw.spin_y[0]
             particles.spin_z = tw.spin_z[0]
 
+            # Switch to quantum radiation for tracking WITHOUT discarding the
+            # tracker (which would wipe misalignments + correction).
             line.configure_radiation('quantum')
-            line.discard_tracker()
-            line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
             # Track for full long duration
             line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
@@ -462,7 +516,7 @@ def deep_track_branch(df_branch, apply_correction):
             p_dkm=tw.spin_polarization_eq
             t_dkm=tw.spin_t_pol_buildup_s
             t_depol=tw.spin_t_depol_component_s
-            t_pol=t_bks/(1+t_bks/tw.T_rev0)
+            t_pol=t_bks   # polarization buildup time in seconds (see Part 1 note on the old broken formula)
 
             t_pol_turns = t_bks/tw.T_rev0
             p_eq = p_bks * 1 / (1 + t_pol_turns/t_dep_turns_long)
@@ -515,22 +569,22 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
 
 plot_seed_with_textbox(
     plot_data_corrected['top_1'][0], 'Best Seed (Corrected)',
-    f'Results/D{design}/C{config}/Comparison/TopSeed_Polarization_Corrected.png'
+    f'{results_dir}/TopSeed_Polarization_Corrected.png'
 )
 
 plot_seed_with_textbox(
     plot_data_corrected['bottom_1'][0], 'Worst Seed (Corrected)',
-    f'Results/D{design}/C{config}/Comparison/BottomSeed_Polarization_Corrected.png'
+    f'{results_dir}/BottomSeed_Polarization_Corrected.png'
 )
 
 plot_seed_with_textbox(
     plot_data_misaligned['top_1'][0], 'Best Seed (Misaligned)',
-    f'Results/D{design}/C{config}/Comparison/TopSeed_Polarization_Misaligned.png'
+    f'{results_dir}/TopSeed_Polarization_Misaligned.png'
 )
 
 plot_seed_with_textbox(
     plot_data_misaligned['bottom_1'][0], 'Worst Seed (Misaligned)',
-    f'Results/D{design}/C{config}/Comparison/BottomSeed_Polarization_Misaligned.png'
+    f'{results_dir}/BottomSeed_Polarization_Misaligned.png'
 )
 
 
@@ -546,20 +600,23 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
           f"{'corrected' if apply_correction else 'misaligned'})...")
 
     line = base_line.copy()
-    line.discard_tracker()
+    # Set mean radiation before building the tracker (twiss can't run under
+    # quantum). Build tracker, then misalign onto the live tracker; do not
+    # discard afterward (that wiped the misalignments and produced the flat
+    # n0_y=1.0 perfect-lattice plot).
+    line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-
     line = mc.misalignments(line, 0.2e-3, seed=seed_val)
 
-    line.configure_radiation('mean')
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
 
     if apply_correction:
         try:
-            line.discard_tracker()
             mc.orbit_correction(line, tw, threading=False)
-        except:
+        except Exception as e:
+            print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
+                  f"{type(e).__name__}: {e} -- retrying with threading=True")
             mc.orbit_correction(line, tw, threading=True)
         # Orbit correction changes the closed orbit/optics, so re-twiss to get
         # the n0 vector consistent with the corrected lattice.
@@ -589,7 +646,7 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
 
     plt.tight_layout()
     branch_tag = 'Corrected' if apply_correction else 'Misaligned'
-    out_path = (f'Results/D{design}/C{config}/Comparison/'
+    out_path = (f'{results_dir}/'
                 f'InvariantSpinVector_{seed_label.replace(" ", "")}_{branch_tag}.png')
     plt.savefig(out_path, dpi=300)
     plt.close()

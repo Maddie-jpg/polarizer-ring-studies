@@ -6,7 +6,7 @@
 %Control: page (1) range
 %Control: year (1) truncated
 %Control: production of eprint (0) enabled
-\begin{thebibliography}{25}%
+\begin{thebibliography}{32}%
 \makeatletter
 \providecommand \@ifxundefined [1]{%
  \@ifx{#1\undefined}
@@ -124,4 +124,25 @@
 \bibitem [{\citenamefont {Kroth}\ and\ \citenamefont {Tuchin}(2025)}]{kroth_tuchin_2025}%
   \BibitemOpen
   \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~D.}\ \bibnamefont {Kroth}}\ and\ \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Tuchin}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Sokolov-ternov effect in rotating systems},}\ }\href {\doibase https://doi.org/10.1103/physrevd.111.056004} {\bibfield  {journal} {\bibinfo  {journal} {Physical Review D}\ }\textbf {\bibinfo {volume} {111}} (\bibinfo {year} {2025}),\ https://doi.org/10.1103/physrevd.111.056004}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Assmann}(1999)}]{assmann_1999}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Assmann}},\ }\href@noop {} {\emph {\bibinfo {title} {THE REGIMES OF POLARIZATION IN A HIGH ENERGY e + e -STORAGE RING}}}\ (\bibinfo {year} {1999})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Derbenev}\ and\ \citenamefont {Kondratenko}(1973)}]{derbenev_kondratenko_1973}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Derbenev}}\ and\ \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Kondratenko}},\ }\href {https://wiki.jlab.org/ciswiki/images/4/4b/E_037_06_0968.pdf} {\emph {\bibinfo {title} {Polarization kinetics of particles in storage rings}}}\ (\bibinfo {year} {1973})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Suleiman}(2023)}]{suleiman_2023}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Suleiman}},\ }\href {https://arxiv.org/html/2105.11575} {\enquote {\bibinfo {title} {On possibilities of high precision fundamental physics experiments in spin-transparent storage rings of low energy polarized electron beams},}\ } (\bibinfo {year} {2023})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Baier}\ and\ \citenamefont {Orlov}(1965)}]{Baier1965tr}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.~N.}\ \bibnamefont {Baier}}\ and\ \bibinfo {author} {\bibfnamefont {Y.~F.}\ \bibnamefont {Orlov}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {{QUANTUM DEPOLARIZATION OF ELECTRONS IN A MAGNETIC FIELD}},}\ }\href@noop {} {\bibfield  {journal} {\bibinfo  {journal} {Dokl. Akad. Nauk Ser. Fiz.}\ }\textbf {\bibinfo {volume} {165}},\ \bibinfo {pages} {783} (\bibinfo {year} {1965})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Gianfelice-Wendt}(2019)}]{inproceedings}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Gianfelice-Wendt}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Self-polarization in storage rings},}\ \ }(\bibinfo {year} {2019})\ p.\ \bibinfo {pages} {013}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Baier}, \citenamefont {Katkov},\ and\ \citenamefont {Strakhovenko}(1970)}]{baier_katkov_strakhovenko_1970}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Baier}}, \bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Katkov}}, \ and\ \bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Strakhovenko}},\ }\bibfield  {title} {\enquote {\bibinfo {title} {Kinetics of radiative polarization},}\ }\href {https://jetp.ras.ru/cgi-bin/dn/e_031_05_0908.pdf} {\bibfield  {journal} {\bibinfo  {journal} {PHYSICS JETP}\ }\textbf {\bibinfo {volume} {31}} (\bibinfo {year} {1970})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Heinemann}\ \emph {et~al.}(2026)\citenamefont {Heinemann}, \citenamefont {Abell}, \citenamefont {Agudelo}, \citenamefont {Barber}, \citenamefont {Beznosov}, \citenamefont {Devlin}, \citenamefont {Ellison}, \citenamefont {Hamwi}, \citenamefont {Nash},\ and\ \citenamefont {Vogt}}]{heinemann2026elaborationkineticapproachderbenev}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Heinemann}}, \bibinfo {author} {\bibfnamefont {D.~T.}\ \bibnamefont {Abell}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Agudelo}}, \bibinfo {author} {\bibfnamefont {D.~P.}\ \bibnamefont {Barber}}, \bibinfo {author} {\bibfnamefont {O.}~\bibnamefont {Beznosov}}, \bibinfo {author} {\bibfnamefont {J.~P.}\ \bibnamefont {Devlin}}, \bibinfo {author} {\bibfnamefont {J.~A.}\ \bibnamefont {Ellison}}, \bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Hamwi}}, \bibinfo {author} {\bibfnamefont {B.}~\bibnamefont {Nash}}, \ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Vogt}},\ }\href {https://arxiv.org/abs/2601.00586} {\enquote {\bibinfo {title} {Elaboration on the kinetic approach of derbenev and kondratenko to spin-polarized beams in electron storage rings},}\ } (\bibinfo {year} {2026}),\ \Eprint {http://arxiv.org/abs/2601.00586} {arXiv:2601.00586 [physics.acc-ph]} \BibitemShut {NoStop}%
 \end{thebibliography}%
