@@ -20,18 +20,19 @@ import LatticeBuild.misalignments_corrections as mc
 
 #%%
 
-SEED = 585968990
+SEED = 3578530
 
 design = int(os.environ.get('DESIGN', 1))
 config = int(os.environ.get('CONFIG', 1))
 
-long_scan_turns = 10000  
+long_scan_turns = 20000  
 
 # %%
 
 pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
+energy=2.86e9
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
-pdr.lines['ring'].particle_ref.kinetic_energy0 = 2.86e9
+pdr.lines['ring'].particle_ref.kinetic_energy0 = energy
 
 if design == 1 and config == 1:
     mc.insert_BPMs_all_as_markers(pdr)
@@ -45,7 +46,7 @@ line.configure_spin('auto')
 
 base_line = line.copy()
 
-results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}'
+results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}_{energy/1e9}GeV'
 os.makedirs(results_dir, exist_ok=True)
 
 
