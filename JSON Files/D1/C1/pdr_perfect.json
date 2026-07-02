@@ -26520,14 +26520,14 @@
   },
   "RFCav": {
    "__class__": "Cavity",
-   "voltage": 16000000.0,
+   "voltage": 2000000.0,
    "frequency": 400271588.199473,
    "lag": 175.00480486738138,
    "length": 1.5
   },
   "RFCav_1": {
    "__class__": "Cavity",
-   "voltage": 16000000.0,
+   "voltage": 2000000.0,
    "frequency": 400271588.199473,
    "lag": 175.00480486738138,
    "length": 1.5,

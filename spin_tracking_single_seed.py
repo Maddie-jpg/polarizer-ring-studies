@@ -64,6 +64,7 @@ os.makedirs(results_dir, exist_ok=True)
 # ===========================================================================
 
 def deep_track_single(seed_val, apply_correction):
+    
     """Deep-track a single seed (misaligned-only or misaligned+corrected).
     Returns a dict of decay curve + fitted quantities for plotting."""
     branch_label = 'corrected' if apply_correction else 'misaligned'
@@ -113,6 +114,7 @@ def deep_track_single(seed_val, apply_correction):
     # Switch to quantum radiation for tracking WITHOUT discarding the tracker
     # (which would wipe misalignments + correction).
     line.configure_radiation('quantum')
+    line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
     line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
     mon = line.record_last_track
