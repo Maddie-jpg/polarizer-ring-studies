@@ -19,25 +19,16 @@ import LatticeBuild.misalignments_corrections as mc
 
 
 #%%
-# ===========================================================================
-# SINGLE-SEED run: deep track (10k-turn decay + exponential fit) AND invariant
-# spin vector, for ONE hardcoded seed, in BOTH the misaligned and corrected
-# lattice. No scan, no cross-seed comparison plots.
-# ===========================================================================
 
-# ---- EDIT THIS: the seed to run ------------------------------------------
 SEED = 585968990
-# --------------------------------------------------------------------------
 
 design = int(os.environ.get('DESIGN', 1))
 config = int(os.environ.get('CONFIG', 1))
 
-long_scan_turns = 10000   # turns for the deep polarization-decay track
+long_scan_turns = 10000  
 
 # %%
-# Start from the PERFECT base lattice; misalignments (and optionally correction)
-# are applied per branch to a copy of it, using the SAME seed for both branches
-# so misaligned vs corrected is a fair paired comparison.
+
 pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0 = 2.86e9
@@ -59,21 +50,16 @@ os.makedirs(results_dir, exist_ok=True)
 
 
 #%%
-# ===========================================================================
-# DEEP TRACK — 10k-turn polarization decay + exponential fit for one seed
-# ===========================================================================
+
 
 def deep_track_single(seed_val, apply_correction):
     
-    """Deep-track a single seed (misaligned-only or misaligned+corrected).
-    Returns a dict of decay curve + fitted quantities for plotting."""
+
     branch_label = 'corrected' if apply_correction else 'misaligned'
     print(f"Running deep track for Seed {seed_val} ({branch_label})...")
 
     line = base_line.copy()
-    # Set mean radiation before building the tracker (twiss can't run under
-    # quantum). Build tracker, then misalign onto the live tracker (element_refs);
-    # never discard afterward or the misalignments are lost.
+
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
     line = mc.misalignments(line, 0.2e-3, seed=seed_val)
@@ -111,8 +97,7 @@ def deep_track_single(seed_val, apply_correction):
     particles.spin_y = tw.spin_y[0]
     particles.spin_z = tw.spin_z[0]
 
-    # Switch to quantum radiation for tracking WITHOUT discarding the tracker
-    # (which would wipe misalignments + correction).
+   
     line.configure_radiation('quantum')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
 
@@ -132,7 +117,6 @@ def deep_track_single(seed_val, apply_correction):
     def exp_decay(t, tau):
         return np.exp(-t / tau)
 
-    # No scan CSV to draw an initial guess from; use half the tracking window.
     tau0_guess = max(len(turns) / 2, 10)
     try:
         popt, pcov = curve_fit(exp_decay, turns, pol_to_fit, p0=[tau0_guess], maxfev=10000)
@@ -204,18 +188,14 @@ plot_seed_with_textbox(
 
 
 #%%
-# ===========================================================================
-# INVARIANT SPIN VECTOR along the ring, for the same seed
-# ===========================================================================
+
 
 def plot_invariant_spin_vector(seed_val, apply_correction):
     branch_label = 'corrected' if apply_correction else 'misaligned'
     print(f"Plotting invariant spin vector for Seed {seed_val} ({branch_label})...")
 
     line = base_line.copy()
-    # Set mean radiation before building the tracker (twiss can't run under
-    # quantum). Build tracker, then misalign onto the live tracker; do not
-    # discard afterward or the misalignments are lost.
+
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
     line = mc.misalignments(line, 0.2e-3, seed=seed_val)
@@ -240,7 +220,6 @@ def plot_invariant_spin_vector(seed_val, apply_correction):
     sy = tw.spin_y
     sz = tw.spin_z
 
-    # Sanity check: |n0| should be 1 everywhere (it's a unit vector by construction).
     n0_mag = np.sqrt(sx**2 + sy**2 + sz**2)
     print(f"  |n0| range: [{n0_mag.min():.6f}, {n0_mag.max():.6f}] (should be ~1.0)")
     print(f"  spin tune = {tw.spin_tune_fractional:.6f}")
