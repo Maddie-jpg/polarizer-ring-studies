@@ -193,12 +193,9 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
 
     ax.plot(data['turns'], data['pol'], label='Tracking Data', color='blue', alpha=0.7)
     ax.plot(data['turns'], data['fit'], color='red', linestyle='--',
-            label=f"Exp. fit (transient removed, from turn {data['icTrns']})")
-    if 'fit_all' in data:
-        ax.plot(data['turns'], data['fit_all'], color='orange', linestyle=':',
-                label='Exp. fit (all turns)')
-    ax.axvline(data['icTrns'], color='gray', linestyle='-.', alpha=0.5,
-               label=f"icTrns = {data['icTrns']}")
+            label=f"Exp. fit")
+  
+
     ax.set_ylabel('$P(t)$')
     ax.set_xlabel('Turns')
     ax.grid(True, linestyle=':', alpha=0.6)
@@ -207,8 +204,8 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
     info_text = (
         f"$P_{{BKS}}$ = {data['p_bks']:.2f}%   "
         f"$P_{{eq}}$ (long track) = {data['p_eq_long']:.2f}%\n"
-        f"$\\tau_{{depol}}$ (all turns) = {data['t_dep_turns_all']:.1f} turns   "
-        f"$\\tau_{{depol}}$ (transient removed) = {data['t_dep_turns_long']:.1f} turns\n"
+        f"$\\tau_{{depol}}$ = {data['t_dep_turns_all']:.1f} turns   "
+        
         f"$t_{{pol}}$ = {data['t_pol']:.4e} s\n"
     )
     fig.text(0.5, 0.02, info_text, ha='center', va='bottom', fontsize=10,
