@@ -1,4 +1,3 @@
-
 import sys
 import os
 
@@ -67,8 +66,14 @@ def matchingBeta( betxS, betyS, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, ar
                     bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
                     dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0],).plot() 
        
-def three_fold_periodicity_90_deg():
+def three_fold_periodicity_90_deg(fringe_fields=True):
     # %% create environment, parameters and first simple cells & structures
+
+    # Fringe field settings derived from the fringe_fields parameter.
+    # quad_edge: passed to edge_entry_active/edge_exit_active on all Quadrupoles.
+    # bend_edge: passed to edge_entry_model/edge_exit_model on all Bends.
+    quad_edge  = fringe_fields
+    bend_edge  = 'full' if fringe_fields else 'linear'
 
     pdr = xt.Environment()
     pdr.particle_ref = xt.Particles(kinetic_energy0=2.86e9, mass0 = xt.ELECTRON_MASS_EV)
@@ -96,28 +101,28 @@ def three_fold_periodicity_90_deg():
     U0 = (0.88463e-31)*E0**4*(2.*np.pi)/(6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']) )
 
     pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model='full', edge_exit_model='full')
-    pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc', edge_entry_active=True, edge_exit_active=True)
+            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+    pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('Drarc',  xt.Drift,      length='l_drift')
     pdr.new('DrarcS', xt.Drift,      length='l_drift + dl_drift')
-    pdr.new('QDarc',  xt.Quadrupole, length='l_quad',    k1='kQDarc', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QFarcM', xt.Quadrupole, length='l_quad',    k1='kQFarcM', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDarcM', xt.Quadrupole, length='l_quad',    k1='kQDarcM', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QDarc',  xt.Quadrupole, length='l_quad',    k1='kQDarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFarcM', xt.Quadrupole, length='l_quad',    k1='kQFarcM', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDarcM', xt.Quadrupole, length='l_quad',    k1='kQDarcM', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('BendDS', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model='full', edge_exit_model='full')
-    pdr.new('QFDS',   xt.Quadrupole, length='l_quad',    k1='kQFDS', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDDS',   xt.Quadrupole, length='l_quad',    k1='kQDDS', edge_entry_active=True, edge_exit_active=True)
+            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+    pdr.new('QFDS',   xt.Quadrupole, length='l_quad',    k1='kQFDS', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDDS',   xt.Quadrupole, length='l_quad',    k1='kQDDS', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrDSL',  xt.Drift,      length='2*l_drift + l_bend + dl_noben')
     pdr.new('DrTrans',xt.Drift,      length='l_drift + dl_trans')
-    pdr.new('QFDoub', xt.Quadrupole, length='l_quad',    k1='kQFDoub', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDDoub', xt.Quadrupole, length='l_quad',    k1='kQDDoub', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QFDoub', xt.Quadrupole, length='l_quad',    k1='kQFDoub', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDDoub', xt.Quadrupole, length='l_quad',    k1='kQDDoub', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrDoub', xt.Drift,      length='l_doub')
 
-    pdr.new('QFtr',    xt.Quadrupole, length='l_quad',    k1='kQFtr', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QFtrH',   xt.Quadrupole, length='l_quad/2.', k1='kQFtr', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDtr',    xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDtrH',   xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QFtr',    xt.Quadrupole, length='l_quad',    k1='kQFtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFtrH',   xt.Quadrupole, length='l_quad/2.', k1='kQFtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDtr',    xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDtrH',   xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrTripl', xt.Drift,      length='l_tripl')
     pdr.new('DrTrips', xt.Drift,      length='l_trips')
 
@@ -219,7 +224,7 @@ def three_fold_periodicity_90_deg():
             lag=(180/np.pi)*(np.pi - np.arcsin(U0/VRF)) - 1.8 ) 
     ring.insert( pdr.new('RFCav_1', 'RFCav'), at='(l_tripl+l_quad)/2', from_='QDDoub_1R' )
     ring.configure_radiation(model='mean')
-    ring.configure_bend_model(edge='full')
+    ring.configure_bend_model(edge=bend_edge)
 
 
     # %% Routine for several matchings in a row for 90 degrees arc cells and given tunes
@@ -257,10 +262,13 @@ def three_fold_periodicity_90_deg():
 
     return pdr
 
-def three_fold_periodicity_90_deg_many_sext():
+def three_fold_periodicity_90_deg_many_sext(fringe_fields=True):
     #Pre-defined params
     # create environment, parameters and first simple cells & structures
     #reupload
+
+    quad_edge = fringe_fields
+    bend_edge = 'full' if fringe_fields else 'linear'
 
     pdr = xt.Environment()
     pdr.particle_ref = xt.Particles(kinetic_energy0=2.86e9, mass0 = xt.ELECTRON_MASS_EV)
@@ -303,28 +311,30 @@ def three_fold_periodicity_90_deg_many_sext():
     U0 = (0.88463e-31)*E0**4*(2.*np.pi)/(6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']) )
 
     pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2')
-    pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc' )
-    pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc' )
+            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2',
+            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+    pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('Drarc',  xt.Drift,      length='l_drift' )
     pdr.new('DrarcS', xt.Drift,      length='l_drift + dl_drift' )
-    pdr.new('QDarc',  xt.Quadrupole, length='l_quad',    k1='kQDarc' )
-    pdr.new('QFarcM', xt.Quadrupole, length='l_quad',    k1='kQFarcM' )
-    pdr.new('QDarcM', xt.Quadrupole, length='l_quad',    k1='kQDarcM' )
+    pdr.new('QDarc',  xt.Quadrupole, length='l_quad',    k1='kQDarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFarcM', xt.Quadrupole, length='l_quad',    k1='kQFarcM', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDarcM', xt.Quadrupole, length='l_quad',    k1='kQDarcM', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('BendDS', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2')
-    pdr.new('QFDS',   xt.Quadrupole, length='l_quad',    k1='kQFDS' )
-    pdr.new('QDDS',   xt.Quadrupole, length='l_quad',    k1='kQDDS' )
+            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2',
+            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+    pdr.new('QFDS',   xt.Quadrupole, length='l_quad',    k1='kQFDS', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDDS',   xt.Quadrupole, length='l_quad',    k1='kQDDS', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrDSL',  xt.Drift,      length='2*l_drift + l_bend + dl_noben' )
     pdr.new('DrTrans',xt.Drift,      length='l_drift + dl_trans' )
-    pdr.new('QFDoub', xt.Quadrupole, length='l_quad',    k1='kQFDoub' )
-    pdr.new('QDDoub', xt.Quadrupole, length='l_quad',    k1='kQDDoub' )
+    pdr.new('QFDoub', xt.Quadrupole, length='l_quad',    k1='kQFDoub', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDDoub', xt.Quadrupole, length='l_quad',    k1='kQDDoub', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrDoub', xt.Drift,      length='l_doub' )
 
-    pdr.new('QFtr',    xt.Quadrupole, length='l_quad',    k1='kQFtr' )
-    pdr.new('QFtrH',   xt.Quadrupole, length='l_quad/2.', k1='kQFtr' )
-    pdr.new('QDtr',    xt.Quadrupole, length='l_quad',    k1='kQDtr' )
-    pdr.new('QDtrH',   xt.Quadrupole, length='l_quad',    k1='kQDtr' )
+    pdr.new('QFtr',    xt.Quadrupole, length='l_quad',    k1='kQFtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFtrH',   xt.Quadrupole, length='l_quad/2.', k1='kQFtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDtr',    xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDtrH',   xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrTripl', xt.Drift,      length='l_tripl' )
     pdr.new('DrTrips', xt.Drift,      length='l_trips' )
 
@@ -333,8 +343,8 @@ def three_fold_periodicity_90_deg_many_sext():
 
     pdr.new('Drarc2', xt.Drift, length='(l_drift-l_sext)/2')
     pdr.new('Drarc3', xt.Drift, length='((l_drift-l_sext)/2)+l_sext')
-    pdr.new('SFDS', xt.Sextupole, length='l_sext',k2='kSF')
-    pdr.new('SDDS', xt.Sextupole, length='l_sext',k2='kSD')
+    pdr.new('SFDS', xt.Sextupole, length='l_sext', k2='kSF', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('SDDS', xt.Sextupole, length='l_sext', k2='kSD', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
 
 
     # just an arc cell
@@ -505,7 +515,7 @@ def three_fold_periodicity_90_deg_many_sext():
             lag=(180/np.pi)*(np.pi - np.arcsin(U0/VRF)) - 1.8 ) 
     ring.insert( pdr.new('RFCav_1', 'RFCav'), at='(l_tripl+l_quad)/2', from_='QDDoub_1R' )
     ring.configure_radiation(model='mean')
-    ring.configure_bend_model(edge='full')
+    ring.configure_bend_model(edge=bend_edge)
 
     ring.match(
         solve=True,
@@ -525,9 +535,12 @@ def three_fold_periodicity_90_deg_many_sext():
     return pdr
 
 
-def two_fold_periodicity_90_deg():
+def two_fold_periodicity_90_deg(fringe_fields=True):
     pdr = xt.Environment()
     pdr.particle_ref = xt.Particles(kinetic_energy0=2.86e9, mass0 = xt.ELECTRON_MASS_EV)
+
+    quad_edge = fringe_fields
+    bend_edge = 'full' if fringe_fields else 'linear'
 
     E0 = 2.86e9  
     VRF = 4.0e6  
@@ -544,35 +557,35 @@ def two_fold_periodicity_90_deg():
     U0 = (0.88463e-31)*E0**4*(2.*np.pi)/(4*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']) )
 
     pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model='full', edge_exit_model='full')
+            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model=bend_edge, edge_exit_model=bend_edge)
     pdr.new('Bend_R', xt.Bend, length='l_bend', angle='hBarc*l_bend', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model='full', edge_exit_model='full')
+            edge_entry_angle='hBarc*l_bend/2', edge_exit_angle='hBarc*l_bend/2', edge_entry_model=bend_edge, edge_exit_model=bend_edge)
 
-    pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('Drarc',  xt.Drift,      length='l_drift')
     pdr.new('DrarcS', xt.Drift,      length='l_drift + dl_drift')
-    pdr.new('QDarc',  xt.Quadrupole, length='l_quad',    k1='kQDarc', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QFarcM', xt.Quadrupole, length='l_quad',    k1='kQFarcM', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDarcM', xt.Quadrupole, length='l_quad',    k1='kQDarcM', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QDarc',  xt.Quadrupole, length='l_quad',    k1='kQDarc', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFarcM', xt.Quadrupole, length='l_quad',    k1='kQFarcM', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDarcM', xt.Quadrupole, length='l_quad',    k1='kQDarcM', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
 
     pdr.new('BendDS', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model='full', edge_exit_model='full')
+            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model=bend_edge, edge_exit_model=bend_edge)
     pdr.new('BendDS_R', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS', k0_from_h=True, 
-            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model='full', edge_exit_model='full')
+            edge_entry_angle='hBarc*l_bendDS/2', edge_exit_angle='hBarc*l_bendDS/2', edge_entry_model=bend_edge, edge_exit_model=bend_edge)
 
-    pdr.new('QFDS',   xt.Quadrupole, length='l_quad',    k1='kQFDS', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDDS',   xt.Quadrupole, length='l_quad',    k1='kQDDS', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QFDS',   xt.Quadrupole, length='l_quad',    k1='kQFDS', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDDS',   xt.Quadrupole, length='l_quad',    k1='kQDDS', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrDSL',  xt.Drift,      length='2*l_drift + l_bend + dl_noben')
     pdr.new('DrTrans',xt.Drift,      length='l_drift + dl_trans')
-    pdr.new('QFDoub', xt.Quadrupole, length='l_quad',    k1='kQFDoub', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDDoub', xt.Quadrupole, length='l_quad',    k1='kQDDoub', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QFDoub', xt.Quadrupole, length='l_quad',    k1='kQFDoub', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDDoub', xt.Quadrupole, length='l_quad',    k1='kQDDoub', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrDoub', xt.Drift,      length='l_doub')
 
-    pdr.new('QFtr',    xt.Quadrupole, length='l_quad',    k1='kQFtr', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QFtrH',   xt.Quadrupole, length='l_quad/2.', k1='kQFtr', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDtr',    xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('QDtrH',   xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=True, edge_exit_active=True)
+    pdr.new('QFtr',    xt.Quadrupole, length='l_quad',    k1='kQFtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QFtrH',   xt.Quadrupole, length='l_quad/2.', k1='kQFtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDtr',    xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
+    pdr.new('QDtrH',   xt.Quadrupole, length='l_quad',    k1='kQDtr', edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('DrTripl', xt.Drift,      length='l_tripl')
     pdr.new('DrTrips', xt.Drift,      length='l_trips')
 
@@ -613,18 +626,18 @@ def two_fold_periodicity_90_deg():
             comps = comps + [ pdr.new(f'Drarc_{name}_{ind}_3', 'Drarc'), pdr.new('Bend2_' + name + str(ind+1), b_type)]
             comps = comps + [ pdr.new(f'Drarc_{name}_{ind}_4', 'Drarc'), pdr.new('QFA_' + name + str(ind+1), 'QFarc')]
 
-        comps[-1] = pdr.new('QFA_M' + name + str(pdr['N_cells_S']-1), xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFarcM'])
+        comps[-1] = pdr.new('QFA_M' + name + str(pdr['N_cells_S']-1), xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFarcM'], edge_entry_active=quad_edge, edge_exit_active=quad_edge)
         comps = comps + [pdr.new(f'Drarc_{name}_m1', 'Drarc'), pdr.new('Bend1_' + name + str(pdr['N_cells_S']), b_type)]
-        comps = comps + [pdr.new(f'Drarc_{name}_m2', 'Drarc'), pdr.new('QDA_M' + name + str(pdr['N_cells_S']), xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDarcM'])]
+        comps = comps + [pdr.new(f'Drarc_{name}_m2', 'Drarc'), pdr.new('QDA_M' + name + str(pdr['N_cells_S']), xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDarcM'], edge_entry_active=quad_edge, edge_exit_active=quad_edge)]
         comps = comps + [pdr.new(f'Drarc_{name}_m3', 'Drarc'), pdr.new('Bend2_' + name + str(pdr['N_cells_S']), b_type)]
 
-        comps = comps + [pdr.new(f'DrarcS_{name}', 'DrarcS'), pdr.new('QFDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDS']) ]
-        comps = comps + [pdr.new(f'DrDSL_{name}', 'DrDSL'), pdr.new('QDDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDS']) ]
+        comps = comps + [pdr.new(f'DrarcS_{name}', 'DrarcS'), pdr.new('QFDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDS'], edge_entry_active=quad_edge, edge_exit_active=quad_edge) ]
+        comps = comps + [pdr.new(f'DrDSL_{name}', 'DrDSL'), pdr.new('QDDS_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDS'], edge_entry_active=quad_edge, edge_exit_active=quad_edge) ]
         comps = comps + [pdr.new(f'Drarc_{name}_ds', 'Drarc'), pdr.new('BendDS_' + name, bds_type)]
 
-        comps = comps + [pdr.new(f'DrTrans_{name}', 'DrTrans'), pdr.new('QFDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDoub'])]
-        comps = comps + [pdr.new(f'DrDoub_{name}', 'DrDoub'), pdr.new('QDDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDoub'])]   
-        comps = comps + [pdr.new(f'DrTripl_{name}', 'DrTripl'), pdr.new('QDTrip_' + name + '1', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDtr'])]  
+        comps = comps + [pdr.new(f'DrTrans_{name}', 'DrTrans'), pdr.new('QFDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFDoub'], edge_entry_active=quad_edge, edge_exit_active=quad_edge)]
+        comps = comps + [pdr.new(f'DrDoub_{name}', 'DrDoub'), pdr.new('QDDoub_' + name, xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDDoub'], edge_entry_active=quad_edge, edge_exit_active=quad_edge)]   
+        comps = comps + [pdr.new(f'DrTripl_{name}', 'DrTripl'), pdr.new('QDTrip_' + name + '1', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQDtr'], edge_entry_active=quad_edge, edge_exit_active=quad_edge)]  
 
         if fall == 'symm':
             comps = [ pdr.new('QFA_' + name + 'CH', 'QFarcH' ) ] + comps
@@ -632,7 +645,7 @@ def two_fold_periodicity_90_deg():
         elif fall == 'right':
             comps = [ pdr.new('QFA_' + name + 'C', 'QFarc'  ) ] + comps + [ pdr.new(f'DrTrips_{name}', 'DrTrips') ]
         elif fall == 'left':
-            comps = comps + [pdr.new(f'DrTrips_{name}', 'DrTrips'), pdr.new('QFTripC_' + name + '2', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFtr']) ]
+            comps = comps + [pdr.new(f'DrTrips_{name}', 'DrTrips'), pdr.new('QFTripC_' + name + '2', xt.Quadrupole, length='l_quad', k1=pdr.vars['kQFtr'], edge_entry_active=quad_edge, edge_exit_active=quad_edge) ]
             comps = list( reversed(comps) )
         return pdr.new_line( components = comps )
 
@@ -706,7 +719,7 @@ def two_fold_periodicity_90_deg():
     pdr.new('RFCav',  xt.Cavity, length=1.5, frequency=fRF, voltage=VRF, lag=(180/np.pi)*(np.pi - np.arcsin(U0/VRF)) - 1.8 ) 
     ring.insert( pdr.new('RFCav_1', 'RFCav'), at='(l_tripl+l_quad)/2', from_='QDDoub_1R' )
     ring.configure_radiation(model='mean')
-    ring.configure_bend_model(edge='full')
+    ring.configure_bend_model(edge=bend_edge)
 
     pdr.lines['arc1R'] = arc1R
     pdr.lines['cell_arc'] = cell_arc
