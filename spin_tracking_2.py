@@ -12,7 +12,7 @@ import xpart as xp
 import xfields as xf 
 import xobjects as xo
 import numpy as np
-from scipy.stats import linregress
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import json
 import os
@@ -57,7 +57,7 @@ line=pdr.lines['ring']
 line.configure_spin('auto')
 
 max_seed_value = np.iinfo(np.uint32).max  
-num_seeds=10
+num_seeds=20
 seeds = np.random.randint(0, max_seed_value, size=num_seeds)
 scan_turns=1000
 
@@ -172,9 +172,38 @@ def run_scan_pass(seed_list, apply_correction):
         pol_z = mon.spin_z.sum(axis=0)/mask_alive.sum(axis=0)
         pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
 
-        pol_to_fit = pol[3:] / pol[3]
-        turns = np.arange(len(pol_to_fit))
-        slope, intercept, r_value, p_value, std_err = linregress(turns, pol_to_fit)
+        n_turns_rec = len(pol)
+        turns = np.arange(n_turns_rec)
+
+        # Two-parameter exponential: free amplitude 'a' and decay rate 'tauinv'.
+        def exp_decay(t, a, tauinv):
+            return a * np.exp(-tauinv * t)
+
+        # Two-step fit: lstsq gives robust starting values, curve_fit refines.
+        def two_step_exp_fit(t, p):
+            t = np.asarray(t, dtype=float)
+            p = np.asarray(p, dtype=float)
+            A = np.vstack([t, np.ones_like(t)]).T
+            lin_slope, intercept = np.linalg.lstsq(A, p, rcond=None)[0]
+            p0 = [intercept, -lin_slope / intercept]
+            popt, pcov = curve_fit(exp_decay, t, p, p0=p0, maxfev=10000)
+            return popt, pcov
+
+        icTrns = int(np.clip(scan_turns // 5, 0, n_turns_rec - 2))
+
+        try:
+            popt_all, _ = two_step_exp_fit(turns, pol)
+            popt_cut, _ = two_step_exp_fit(turns[icTrns:], pol[icTrns:])
+            _, tauinv_all = popt_all
+            _, tauinv_cut = popt_cut
+            t_dep_turns_all = 1.0 / tauinv_all if tauinv_all > 0 else np.nan
+            t_dep_turns   = 1.0 / tauinv_cut if tauinv_cut > 0 else np.nan
+            fit_reliable = np.isfinite(t_dep_turns) and t_dep_turns < 100 * scan_turns
+        except (RuntimeError, ValueError) as e:
+            print(f"  [seed {seed}] two-step fit failed: {e} -- using analytic t_depol")
+            t_dep_turns_all = np.nan
+            t_dep_turns = np.nan
+            fit_reliable = False
 
         p_bks=tw.spin_polarization_inf_no_depol
         t_bks=tw.spin_t_pol_component_s
@@ -183,28 +212,16 @@ def run_scan_pass(seed_list, apply_correction):
         t_depol=tw.spin_t_depol_component_s
 
         # t_pol is the polarization BUILDUP time (Sokolov-Ternov / BKS), in seconds.
-        # It is simply tw.spin_t_pol_component_s. The previous expression
-        #     t_pol = t_bks / (1 + t_bks/T_rev0)
-        # was dimensionally wrong: t_bks (~hundreds of s) divided by T_rev0 (~7e-7 s)
-        # gives ~1e9, so the whole thing collapsed to ~T_rev0 for EVERY seed --
-        # that is the "suspiciously constant t_pol ~ 7.3e-7" you were seeing, and it
-        # made every downstream t_depol_fitted_seconds ~1e9x too small.
+        # It is simply tw.spin_t_pol_component_s.
         t_pol = t_bks
 
         t_pol_turns = t_bks/tw.T_rev0   # polarization time in TURNS (for the ratio below)
 
-        # Guard the fitted slope. A positive or near-zero slope means depolarisation
-        # is too slow to measure in scan_turns (flat, noise-dominated curve); -1/slope
-        # is then negative or absurdly large, which pushes p_eq above p_bks or negative.
-        # In that regime fall back to the analytic depol time from twiss.
-        MIN_SLOPE = -1.0 / (100 * scan_turns)   # trust fit only if implied tau < 100x window
-        if slope < MIN_SLOPE:
-            t_dep_turns = -1.0 / slope
-            fit_reliable = True
-        else:
-            t_dep_turns = t_depol / tw.T_rev0   # analytic depol time, converted to turns
+        # Fall back to analytic depol time if the fit was unreliable.
+        if not fit_reliable or not np.isfinite(t_dep_turns):
+            t_dep_turns = t_depol / tw.T_rev0
             fit_reliable = False
-            print(f"  [seed {seed}] slope={slope:.3e} unreliable -- "
+            print(f"  [seed {seed}] fit unreliable -- "
                   f"using analytic t_depol = {t_dep_turns:.3e} turns")
 
         # P_eq = P_inf / (1 + tau_pol/tau_dep), both times in turns. Guaranteed in
@@ -406,8 +423,6 @@ plt.close()
 # always working from the scan that was JUST run, never a stale prior file.
 #%%
 
-from scipy.optimize import curve_fit
-
 long_scan_turns=10000
 
 # df_scan_full contains BOTH branches (misaligned and corrected). Deep-track
@@ -474,6 +489,7 @@ def deep_track_branch(df_branch, apply_correction):
             # tracker (which would wipe misalignments + correction).
             line.configure_radiation('quantum')
 
+            line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
             # Track for full long duration
             line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
             mon = line.record_last_track
@@ -485,30 +501,47 @@ def deep_track_branch(df_branch, apply_correction):
             pol_z = mon.spin_z.sum(axis=0) / mask_alive.sum(axis=0)
             pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
 
-            pol_to_fit = pol[3:] / pol[3]
-            turns = np.arange(len(pol_to_fit))
+            n_turns_rec = len(pol)
+            turns = np.arange(n_turns_rec)
+            
+            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+            # Two-parameter exponential: free amplitude 'a' and decay rate 'tauinv'.
+            def exp_decay(t, a, tauinv):
+                return a * np.exp(-tauinv * t)
 
-            def exp_decay(t, tau):
-                return np.exp(-t / tau)
+            # Two-step fit: lstsq gives robust starting values, curve_fit refines.
+            def two_step_exp_fit(t, p):
+                t = np.asarray(t, dtype=float)
+                p = np.asarray(p, dtype=float)
+                A = np.vstack([t, np.ones_like(t)]).T
+                lin_slope, intercept = np.linalg.lstsq(A, p, rcond=None)[0]
+                p0 = [intercept, -lin_slope / intercept]
+                popt, pcov = curve_fit(exp_decay, t, p, p0=p0, maxfev=10000)
+                return popt, pcov
 
-            if 't_depol' in row and row['t_depol'] > 0:
-                tau0_guess = row['t_depol'] / tw.T_rev0
-            else:
-                tau0_guess = max(len(turns) / 2, 10)
+            icTrns = int(np.clip(long_scan_turns // 5, 0, n_turns_rec - 2))
+
             try:
-                popt, pcov = curve_fit(exp_decay, turns, pol_to_fit, p0=[tau0_guess],
-                                        maxfev=10000)
-                t_dep_turns_long = popt[0]
-                fit_curve = exp_decay(turns, t_dep_turns_long)
+                popt_all, _ = two_step_exp_fit(turns, pol)
+                popt_cut, _ = two_step_exp_fit(turns[icTrns:], pol[icTrns:])
+                amp_all, tauinv_all = popt_all
+                amp_cut, tauinv_cut = popt_cut
+                t_dep_turns_all  = 1.0 / tauinv_all if tauinv_all > 0 else np.nan
+                t_dep_turns_long = 1.0 / tauinv_cut if tauinv_cut > 0 else np.nan
+                fit_curve     = exp_decay(turns, amp_cut, tauinv_cut)
+                fit_curve_all = exp_decay(turns, amp_all, tauinv_all)
                 fit_ok = True
             except (RuntimeError, ValueError) as e:
                 print(f"  Exponential fit failed for seed {seed_val}: {e}")
+                t_dep_turns_all = np.nan
                 t_dep_turns_long = np.nan
-                fit_curve = np.full_like(pol_to_fit, np.nan)
+                fit_curve = np.full_like(pol, np.nan)
+                fit_curve_all = np.full_like(pol, np.nan)
                 fit_ok = False
 
-            n_over_tau = len(turns) / t_dep_turns_long if fit_ok and t_dep_turns_long > 0 else np.nan
-            print(f"  Seed {seed_val}: tau_fit = {t_dep_turns_long:.1f} turns, "
+            n_over_tau = n_turns_rec / t_dep_turns_long if fit_ok and t_dep_turns_long > 0 else np.nan
+            print(f"  Seed {seed_val}: tau_fit(all) = {t_dep_turns_all:.1f} turns, "
+                  f"tau_fit(cut@{icTrns}) = {t_dep_turns_long:.1f} turns, "
                   f"N/tau = {n_over_tau:.2f}")
 
             p_bks=tw.spin_polarization_inf_no_depol
@@ -527,12 +560,15 @@ def deep_track_branch(df_branch, apply_correction):
             branch_plot_data[group_name].append({
                 'seed': seed_val,
                 'turns': turns,
-                'pol': pol_to_fit,
+                'pol': pol,
                 'fit': fit_curve,
+                'fit_all': fit_curve_all,
+                'icTrns': icTrns,
                 'p_eq_long': p_eq_long,
                 'p_bks': p_bks * 100,
                 't_pol': t_pol,
-                't_dep_turns_long': t_dep_turns_long
+                't_dep_turns_long': t_dep_turns_long,
+                't_dep_turns_all': t_dep_turns_all,
             })
 
     return branch_plot_data
@@ -547,8 +583,12 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
     fig.suptitle(f"{title_prefix} - Seed {data['seed']}", fontsize=14, fontweight='bold')
 
     ax.plot(data['turns'], data['pol'], label='Tracking Data', color='blue', alpha=0.7)
-    ax.plot(data['turns'], data['fit'], label='Exponential Fit', color='red', linestyle='--')
-    ax.set_ylabel('$P(t)/P(0)$')
+    ax.plot(data['turns'], data['fit'], color='red', linestyle='--')
+    if 'fit_all' in data:
+        ax.plot(data['turns'], data['fit_all'], color='orange', linestyle=':',
+                label='Exp. fit')
+   
+    ax.set_ylabel('$P(t)$')
     ax.set_xlabel('Turns')
     ax.grid(True, linestyle=':', alpha=0.6)
     ax.legend()
@@ -556,7 +596,8 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
     info_text = (
         f"$P_{{BKS}}$ = {data['p_bks']:.2f}%   "
         f"$P_{{eq}}$ (long track) = {data['p_eq_long']:.2f}%\n"
-        f"$\\tau_{{depol}}$ (fitted) = {data['t_dep_turns_long']:.1f} turns   "
+        f"$\\tau_{{depol}}$ (all turns) = {data['t_dep_turns_all']:.1f} turns   "
+        f"$\\tau_{{depol}}$ (transient removed) = {data['t_dep_turns_long']:.1f} turns\n"
         f"$t_{{pol}}$ = {data['t_pol']:.4e} s\n"
     )
     fig.text(0.5, 0.02, info_text, ha='center', va='bottom', fontsize=10,
@@ -634,9 +675,9 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
     print(f"  spin tune = {tw.spin_tune_fractional:.6f}")
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(s, sx, label='$n_{0,x}$', color='tab:blue')
+    ax.plot(s, sx*100, label='$100(n_{0,x})$', color='tab:blue')
     ax.plot(s, sy, label='$n_{0,y}$', color='tab:green')
-    ax.plot(s, sz, label='$n_{0,z}$', color='tab:red')
+    ax.plot(s, sz*100 +0.2, label='$100(n_{0,z})+0.2$', color='tab:red')
 
     ax.set_xlabel('s (m)')
     ax.set_ylabel('Invariant spin vector $n_0$ component')
@@ -654,9 +695,7 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
     print(f"  Saved to {out_path}")
 
 
-# Best/worst seeds for each branch, selected within that branch's own results
-# (a seed that's "best" when corrected isn't necessarily the same seed that's
-# "best" when misaligned, so each branch gets its own top/bottom pick).
+
 df_mis_full = df_scan_full[df_scan_full['Mode'] == 'misaligned']
 df_cor_full = df_scan_full[df_scan_full['Mode'] == 'corrected']
 

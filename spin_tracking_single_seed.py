@@ -53,7 +53,7 @@ os.makedirs(results_dir, exist_ok=True)
 #%%
 
 
-def deep_track_single(seed_val, apply_correction):
+def deep_track_single(seed_val, apply_correction, transient_turns=200):
     
 
     branch_label = 'corrected' if apply_correction else 'misaligned'
@@ -105,33 +105,65 @@ def deep_track_single(seed_val, apply_correction):
     line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
     mon = line.record_last_track
 
-    # Polarization decay curve
+    # --- Turn-by-turn polarization ---
     mask_alive = mon.state > 0
-    pol_x = mon.spin_x.sum(axis=0) / mask_alive.sum(axis=0)
-    pol_y = mon.spin_y.sum(axis=0) / mask_alive.sum(axis=0)
-    pol_z = mon.spin_z.sum(axis=0) / mask_alive.sum(axis=0)
+    n_alive = mask_alive.sum(axis=0)
+    pol_x = mon.spin_x.sum(axis=0) / n_alive
+    pol_y = mon.spin_y.sum(axis=0) / n_alive
+    pol_z = mon.spin_z.sum(axis=0) / n_alive
     pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
 
-    pol_to_fit = pol[3:] / pol[3]
-    turns = np.arange(len(pol_to_fit))
+    n_turns_rec = len(pol)
+    turns = np.arange(n_turns_rec)
 
-    def exp_decay(t, tau):
-        return np.exp(-t / tau)
+    # Two-parameter exponential: free amplitude 'a' and decay rate 'tauinv' (= 1/tau).
+    # Letting the amplitude float means we no longer have to force the curve through
+    # the first point (as pol[3:]/pol[3] did), so an initial transient does not bias
+    # the whole fit.
+    def exp_decay(t, a, tauinv):
+        return a * np.exp(-tauinv * t)
 
-    tau0_guess = max(len(turns) / 2, 10)
+    # Two-step fit: (1) a linear least-squares fit provides robust starting values
+    # for the amplitude and slope, then (2) curve_fit refines the exponential.
+    def two_step_exp_fit(t, p):
+        t = np.asarray(t, dtype=float)
+        p = np.asarray(p, dtype=float)
+        # Step 1: straight line P(t) ~ intercept + slope * t  ->  initial guesses.
+        A = np.vstack([t, np.ones_like(t)]).T
+        slope, intercept = np.linalg.lstsq(A, p, rcond=None)[0]
+        # a0 = value extrapolated to t=0; tauinv0 = -slope/a0 (positive for decay).
+        p0 = [intercept, -slope / intercept]
+        popt, pcov = curve_fit(exp_decay, t, p, p0=p0, maxfev=10000)
+        return popt, pcov
+
+    # Turn index from which to fit, to drop the initial transient before the spin
+    # distribution settles. Tune via the transient_turns argument.
+    icTrns = int(np.clip(transient_turns, 0, n_turns_rec - 2))
+
+    # Stage A: fit through *all* turns.
+    # Stage B: fit from turn icTrns to the end (transient removed) -> primary result.
     try:
-        popt, pcov = curve_fit(exp_decay, turns, pol_to_fit, p0=[tau0_guess], maxfev=10000)
-        t_dep_turns_long = popt[0]
-        fit_curve = exp_decay(turns, t_dep_turns_long)
+        popt_all, _ = two_step_exp_fit(turns, pol)
+        popt_cut, _ = two_step_exp_fit(turns[icTrns:], pol[icTrns:])
+        amp_all, tauinv_all = popt_all
+        amp_cut, tauinv_cut = popt_cut
+        t_dep_turns_all = 1.0 / tauinv_all if tauinv_all > 0 else np.nan
+        t_dep_turns_long = 1.0 / tauinv_cut if tauinv_cut > 0 else np.nan
+        fit_curve = exp_decay(turns, amp_cut, tauinv_cut)      # primary fit, full range
+        fit_curve_all = exp_decay(turns, amp_all, tauinv_all)  # all-turns fit, full range
         fit_ok = True
     except (RuntimeError, ValueError) as e:
         print(f"  Exponential fit failed for seed {seed_val}: {e}")
+        amp_cut = np.nan
+        t_dep_turns_all = np.nan
         t_dep_turns_long = np.nan
-        fit_curve = np.full_like(pol_to_fit, np.nan)
+        fit_curve = np.full_like(pol, np.nan)
+        fit_curve_all = np.full_like(pol, np.nan)
         fit_ok = False
 
-    n_over_tau = len(turns) / t_dep_turns_long if fit_ok and t_dep_turns_long > 0 else np.nan
-    print(f"  Seed {seed_val}: tau_fit = {t_dep_turns_long:.1f} turns, N/tau = {n_over_tau:.2f}")
+    n_over_tau = n_turns_rec / t_dep_turns_long if fit_ok and t_dep_turns_long > 0 else np.nan
+    print(f"  Seed {seed_val}: tau_fit(all) = {t_dep_turns_all:.1f} turns, "
+          f"tau_fit(cut@{icTrns}) = {t_dep_turns_long:.1f} turns, N/tau = {n_over_tau:.2f}")
 
     p_bks = tw.spin_polarization_inf_no_depol
     t_bks = tw.spin_t_pol_component_s
@@ -142,12 +174,16 @@ def deep_track_single(seed_val, apply_correction):
     return {
         'seed': seed_val,
         'turns': turns,
-        'pol': pol_to_fit,
+        'pol': pol,
         'fit': fit_curve,
+        'fit_all': fit_curve_all,
+        'amp': amp_cut,
+        'icTrns': icTrns,
         'p_eq_long': p_eq_long,
         'p_bks': p_bks * 100,
         't_pol': t_pol,
         't_dep_turns_long': t_dep_turns_long,
+        't_dep_turns_all': t_dep_turns_all,
     }
 
 
@@ -156,8 +192,14 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
     fig.suptitle(f"{title_prefix} - Seed {data['seed']}", fontsize=14, fontweight='bold')
 
     ax.plot(data['turns'], data['pol'], label='Tracking Data', color='blue', alpha=0.7)
-    ax.plot(data['turns'], data['fit'], label='Exponential Fit', color='red', linestyle='--')
-    ax.set_ylabel('$P(t)/P(0)$')
+    ax.plot(data['turns'], data['fit'], color='red', linestyle='--',
+            label=f"Exp. fit (transient removed, from turn {data['icTrns']})")
+    if 'fit_all' in data:
+        ax.plot(data['turns'], data['fit_all'], color='orange', linestyle=':',
+                label='Exp. fit (all turns)')
+    ax.axvline(data['icTrns'], color='gray', linestyle='-.', alpha=0.5,
+               label=f"icTrns = {data['icTrns']}")
+    ax.set_ylabel('$P(t)$')
     ax.set_xlabel('Turns')
     ax.grid(True, linestyle=':', alpha=0.6)
     ax.legend()
@@ -165,7 +207,8 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
     info_text = (
         f"$P_{{BKS}}$ = {data['p_bks']:.2f}%   "
         f"$P_{{eq}}$ (long track) = {data['p_eq_long']:.2f}%\n"
-        f"$\\tau_{{depol}}$ (fitted) = {data['t_dep_turns_long']:.1f} turns   "
+        f"$\\tau_{{depol}}$ (all turns) = {data['t_dep_turns_all']:.1f} turns   "
+        f"$\\tau_{{depol}}$ (transient removed) = {data['t_dep_turns_long']:.1f} turns\n"
         f"$t_{{pol}}$ = {data['t_pol']:.4e} s\n"
     )
     fig.text(0.5, 0.02, info_text, ha='center', va='bottom', fontsize=10,
@@ -226,9 +269,9 @@ def plot_invariant_spin_vector(seed_val, apply_correction):
     print(f"  spin tune = {tw.spin_tune_fractional:.6f}")
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(s, sx, label='$n_{0,x}$', color='tab:blue')
+    ax.plot(s, sx * 100, label='$100(n_{0,x})$', color='tab:blue')
     ax.plot(s, sy, label='$n_{0,y}$', color='tab:green')
-    ax.plot(s, sz, label='$n_{0,z}$', color='tab:red')
+    ax.plot(s, (sz* 100)+0.2, label='$100(n_{0,z})+0.2$', color='tab:red')
 
     ax.set_xlabel('s (m)')
     ax.set_ylabel('Invariant spin vector $n_0$ component')
@@ -246,4 +289,74 @@ def plot_invariant_spin_vector(seed_val, apply_correction):
 
 plot_invariant_spin_vector(SEED, apply_correction=False)
 plot_invariant_spin_vector(SEED, apply_correction=True)
+
+#%%
+
+
+def track_single_particle_nx1(seed_val, apply_correction):
+    branch_label = 'corrected' if apply_correction else 'misaligned'
+    print(f"Plotting spin vector (nx=1 init) for Seed {seed_val} ({branch_label})...")
+    line = base_line.copy()
+
+    tw_0 = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
+                    spin=True, polarization=True)
+
+    
+    line.configure_radiation('mean')
+    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
+ 
+    tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
+                    spin=True, polarization=True)
+ 
+    if apply_correction:
+        try:
+            mc.orbit_correction(line, tw, threading=False)
+        except Exception as e:
+            print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
+                  f"{type(e).__name__}: {e} -- retrying with threading=True")
+            mc.orbit_correction(line, tw, threading=True)
+ 
+    tw_nx1 = line.twiss(start=tw_0.name[0], end=tw_0.name[-2], init_at=tw_0.name[0],
+                        x=tw_0.x[0],       px=tw_0.px[0],
+                        y=tw_0.y[0],       py=tw_0.py[0],
+                        zeta=tw_0.zeta[0], delta=tw_0.delta[0],
+                        alfx=tw_0.alfx[0], betx=tw_0.betx[0],
+                        alfy=tw_0.alfy[0], bety=tw_0.bety[0],
+                        dx=tw_0.dx[0],     dpx=tw_0.dpx[0],
+                        spin=True, spin_x=1, spin_y=0, spin_z=0,
+                        _continue_if_lost=True)
+
+
+
+ 
+    s  = tw_nx1.s
+    sx = tw_nx1.spin_x
+    sy = tw_nx1.spin_y
+    sz = tw_nx1.spin_z
+ 
+    n0_mag = np.sqrt(sx**2 + sy**2 + sz**2)
+    print(f"  |s| range: [{n0_mag.min():.6f}, {n0_mag.max():.6f}]")
+ 
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(s, sx , label='$s_x$',        color='tab:blue')
+    ax.plot(s, sy,       label='$s_y$',              color='tab:green')
+    ax.plot(s, sz , label='$s_z$', color='tab:red')
+ 
+    ax.set_xlabel('s (m)')
+    ax.set_ylabel('Spin vector component')
+    branch_tag = 'Corrected' if apply_correction else 'Misaligned'
+    ax.set_title(f'Spin Vector Along the Ring $(s_x(0)=1)$ — Seed {seed_val} ({branch_tag})')
+    ax.grid(True, linestyle=':', alpha=0.6)
+    ax.legend()
+ 
+    plt.tight_layout()
+    out_path = f'{results_dir}/SpinVector_nx1_{branch_tag}.png'
+    plt.savefig(out_path, dpi=300)
+    plt.close()
+    print(f"  Saved to {out_path}")
+
+
+track_single_particle_nx1(SEED, apply_correction=False)
+track_single_particle_nx1(SEED, apply_correction=True)
 # %%
