@@ -280,14 +280,14 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
 
 
 data_misaligned = deep_track_single(SEED, apply_correction=False)
-#data_corrected = deep_track_single(SEED, apply_correction=True)
+data_corrected = deep_track_single(SEED, apply_correction=True)
 
 plot_seed_with_textbox(
     data_misaligned, 'Misaligned',
     f'{results_dir}/Polarization_Misaligned.png')
-'''plot_seed_with_textbox(
+plot_seed_with_textbox(
     data_corrected, 'Corrected',
-    f'{results_dir}/Polarization_Corrected.png')'''
+    f'{results_dir}/Polarization_Corrected.png')
 
 
 #%%
