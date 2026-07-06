@@ -101,7 +101,7 @@ def ChromCorrect_ddq(ring, pdr, ksf, ksd,ksf2,ksd2,ddqx_val,ddqy_val,tol_val, Ma
     print(f"Matched kSF: {pdr.vars[f'{ksf2}']._get_value():.6f}")
     print(f"Matched kSD: {pdr.vars[f'{ksd2}']._get_value():.6f}")  
 
-def config_D1_C1(pdr):
+def config_D1_C1(pdr, fringe_fields=True):
 
     """
     8 SF's and 8 SD's in each half-arc
@@ -113,8 +113,8 @@ def config_D1_C1(pdr):
     period=pdr.lines['period']
 
     pdr.vars( {'l_sext':0.1, 'k2XF2arc': 0.00, 'k2XD2arc': 0.00} )  # Sextupoles - 3 families defined here
-    pdr.new('XF2arc',  xt.Sextupole, length='l_sext',    k2='k2XF2arc' , edge_entry_active=True, edge_exit_active=True)
-    pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XD2arc' , edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XF2arc',  xt.Sextupole, length='l_sext',    k2='k2XF2arc' , edge_entry_active=fringe_fields, edge_exit_active=fringe_fields)
+    pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XD2arc' , edge_entry_active=fringe_fields, edge_exit_active=fringe_fields)
 
 
     # Defocusing (QDA)

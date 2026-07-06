@@ -17,19 +17,18 @@ from pathlib import Path
 
 #%%
 
-design=2
-config=3
-mode='corrected' # 'perfect', 'misaligned', or 'corrected'
+design=1
+config=1
+mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
 #%%
 
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.two_fold_periodicity_90_deg()
+    pdr=lo.three_fold_periodicity_90_deg_many_sext(fringe_fields=True)
 
     #sextupole configuration
-    sc.config_D2_C3(pdr)
 
 #Misalignments
 elif mode == 'misaligned':
