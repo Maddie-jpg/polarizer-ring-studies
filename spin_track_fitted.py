@@ -20,7 +20,7 @@ import LatticeBuild.misalignments_corrections as mc
 
 #%%
 
-SEED = 4
+SEED = 3578530
 
 design = int(os.environ.get('DESIGN', 1))
 config = int(os.environ.get('CONFIG', 1))
@@ -53,6 +53,124 @@ results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}_CC'
 os.makedirs(results_dir, exist_ok=True)
 
 
+# ===========================================================================
+# Shared exponential-decay fit for the depolarization time.
+#
+# BOUNDED, matching the supervisor's fitfu/curve_fit approach:
+#   - amplitude 'a' constrained to [0.9, 1.1]  (pol starts at ~1 by
+#     construction, so a well-behaved fit should stay near there)
+#   - decay rate 'tauinv' constrained to [0, 1/TAU_MIN_TURNS]
+#     i.e. tau_depol >= TAU_MIN_TURNS turns.
+#
+# Without these bounds, an unconstrained curve_fit on a polarization trace
+# that is dominated by shot noise (no visible trend) is free to converge on
+# an almost-zero decay rate, which inverts to an astronomically large and
+# meaningless tau_depol. Bounding tauinv away from zero forces the fit to
+# report a physically plausible decay time even when it can't resolve the
+# true one, and the reliability check below then flags those cases
+# explicitly instead of silently reporting nonsense.
+# ===========================================================================
+
+TAU_MIN_TURNS = 1000  # floor on fitted depolarization time, in turns (matches
+                       # supervisor's tauinv upper bound of 1/1000 per turn)
+
+
+def exp_decay(t, a, tauinv):
+    return a * np.exp(-tauinv * t)
+
+
+def two_step_exp_fit(t, p, amp_bounds=(0.9, 1.1), tau_min_turns=TAU_MIN_TURNS):
+    """Two-step fit: lstsq gives a robust starting guess, curve_fit refines
+    it within bounds. Returns (popt, pcov) with popt = [a, tauinv]."""
+    t = np.asarray(t, dtype=float)
+    p = np.asarray(p, dtype=float)
+
+    A = np.vstack([t, np.ones_like(t)]).T
+    lin_slope, intercept = np.linalg.lstsq(A, p, rcond=None)[0]
+    tauinv0 = -lin_slope / intercept if intercept != 0 else 0.0
+
+    tauinv_max = 1.0 / tau_min_turns
+    p0 = [np.clip(intercept, *amp_bounds), np.clip(tauinv0, 0.0, tauinv_max)]
+    bounds = ([amp_bounds[0], 0.0], [amp_bounds[1], tauinv_max])
+
+    popt, pcov = curve_fit(exp_decay, t, p, p0=p0, bounds=bounds, maxfev=10000)
+    return popt, pcov
+
+
+def fit_is_reliable(t, p, popt, min_snr=3.0):
+    """A fitted decay is only trustworthy if the amplitude it predicts the
+    signal actually moves by, over the tracked window, is well above the
+    noise floor of the residuals. Otherwise the fit is just tracking noise."""
+    a, tauinv = popt
+    if not (np.isfinite(tauinv) and tauinv > 0):
+        return False
+    n = len(t)
+    predicted_amplitude_change = a * (1 - np.exp(-tauinv * n))
+    residual_rms = np.std(p - exp_decay(t, *popt))
+    if residual_rms == 0:
+        return True
+    return predicted_amplitude_change > min_snr * residual_rms
+
+
+
+
+def generate_bunch(tw, particle_ref, num_particles, fct=0.0,
+                                     seed=None, match_supervisor_epsy_bug=True):
+   
+    rng = np.random.default_rng(seed)
+
+    epsx  = tw.eq_gemitt_x
+    epsy  = tw.eq_gemitt_y
+    epsl  = tw.eq_gemitt_zeta
+
+    betxin, alfxin = tw.betx[0], tw.alfx[0]
+    betyin, alfyin = tw.bety[0], tw.alfy[0]
+    dxin, dpxin    = tw.dx[0], tw.dpx[0]
+    betlin         = tw.bets0
+
+    xin, pxin      = tw.x[0], tw.px[0]
+    yin, pyin      = tw.y[0], tw.py[0]
+    zetain, deltain = tw.zeta[0], tw.delta[0]
+
+    sPxin, sPyin, sPzin = tw.spin_x[0], tw.spin_y[0], tw.spin_z[0]
+    dsPddx = tw.spin_dn_ddelta_x[0]
+    dsPddy = tw.spin_dn_ddelta_y[0]
+    dsPddz = tw.spin_dn_ddelta_z[0]
+
+    eps_y_row = epsx if match_supervisor_epsy_bug else epsy
+
+    normat = np.array([
+        [(epsx*betxin)**.5,          0,                       0, 0, 0, dxin*(epsl/betlin)**.5],
+        [-alfxin*(epsx/betxin)**.5,  (epsx/betxin)**.5,        0, 0, 0, dpxin*(epsl/betlin)**.5],
+        [0, 0,  (eps_y_row*betyin)**.5,          0,                       0, 0],
+        [0, 0,  -alfyin*(eps_y_row/betyin)**.5,  (eps_y_row/betyin)**.5,  0, 0],
+        [0, 0, 0, 0, (epsl*betlin)**.5, 0],
+        [0, 0, 0, 0, 0,                 (epsl/betlin)**.5],
+    ])
+
+    def make_macro_part():
+        x, px, y, py, zeta, delta = normat @ rng.standard_normal(6)
+        sPx = sPxin + fct*(6.5*px*sPzin + delta*dsPddx)
+        sPy = sPyin + fct*(6.5*py*sPzin + delta*dsPddy)
+        sPz = sPzin + fct*(-6.5*(px*sPxin + py*sPyin) + delta*dsPddz)
+        return (x + xin, px + pxin, y + yin, py + pyin,
+                zeta + zetain, delta + deltain, sPx, sPy, sPz)
+
+    parts = np.array([make_macro_part() for _ in range(num_particles)]).T
+
+    particles = xt.Particles(
+        p0c=particle_ref.p0c[0],
+        mass0=particle_ref.mass0,
+        q0=particle_ref.q0,
+        anomalous_magnetic_moment=0.00,
+        x=parts[0], px=parts[1],
+        y=parts[2], py=parts[3],
+        zeta=parts[4], delta=parts[5],
+        spin_x=parts[6], spin_y=parts[7], spin_z=parts[8],
+    )
+    return particles
+
+
 #%%
 
 
@@ -66,7 +184,7 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
 
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    #line = mc.misalignments(line, 0.2e-3, seed=seed_val)
+    #line = mc.misalignments(line, 0.25e-3, seed=seed_val)
 
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
@@ -87,123 +205,36 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
         orbit_y_rms_after = np.std(tw.y)
         print(f"  [seed {seed_val}] orbit RMS x: {orbit_x_rms_before:.3e} -> {orbit_x_rms_after:.3e}, "
               f"y: {orbit_y_rms_before:.3e} -> {orbit_y_rms_after:.3e}")
-        
-    num_particles=300
 
-    '''particles = xp.generate_matched_gaussian_bunch(
-        line=line,
-        nemitt_x=tw.eq_nemitt_x,
-        nemitt_y=tw.eq_nemitt_y,
-        sigma_z=np.sqrt(tw.eq_gemitt_zeta * tw.bets0),
-        num_particles=num_particles)
 
-    particles.zeta += tw.zeta[0]
-    particles.delta += tw.delta[0]
-    particles.spin_x = tw.spin_x[0]
-    particles.spin_y = tw.spin_y[0]
-    particles.spin_z = tw.spin_z[0]'''
+    particles = generate_bunch(
+        tw, line.particle_ref, num_particles=300, fct=0.0, seed=seed_val)
 
-    rng = np.random.default_rng(seed_val)
-    fct=0
- 
-    epsx  = tw.eq_gemitt_x
-    epsy  = tw.eq_gemitt_y
-    epsl  = tw.eq_gemitt_zeta
- 
-    betxin, alfxin = tw.betx[0], tw.alfx[0]
-    betyin, alfyin = tw.bety[0], tw.alfy[0]
-    dxin, dpxin    = tw.dx[0], tw.dpx[0]
-    betlin         = tw.bets0
- 
-    xin, pxin      = tw.x[0], tw.px[0]
-    yin, pyin      = tw.y[0], tw.py[0]
-    zetain, deltain = tw.zeta[0], tw.delta[0]
- 
-    sPxin, sPyin, sPzin = tw.spin_x[0], tw.spin_y[0], tw.spin_z[0]
-    dsPddx = tw.spin_dn_ddelta_x[0]
-    dsPddy = tw.spin_dn_ddelta_y[0]
-    dsPddz = tw.spin_dn_ddelta_z[0]
- 
-    
- 
-    normat = np.array([
-        [(epsx*betxin)**.5,          0,                       0, 0, 0, dxin*(epsl/betlin)**.5],
-        [-alfxin*(epsx/betxin)**.5,  (epsx/betxin)**.5,        0, 0, 0, dpxin*(epsl/betlin)**.5],
-        [0, 0,  (epsx*betyin)**.5,          0,                       0, 0],
-        [0, 0,  -alfyin*(epsx/betyin)**.5,  (epsx/betyin)**.5,  0, 0],
-        [0, 0, 0, 0, (epsl*betlin)**.5, 0],
-        [0, 0, 0, 0, 0,                 (epsl/betlin)**.5],
-    ])
- 
-    def make_macro_part():
-        x, px, y, py, zeta, delta = normat @ rng.standard_normal(6)
-        sPx = sPxin + fct*(6.5*px*sPzin + delta*dsPddx)
-        sPy = sPyin + fct*(6.5*py*sPzin + delta*dsPddy)
-        sPz = sPzin + fct*(-6.5*(px*sPxin + py*sPyin) + delta*dsPddz)
-        return (x + xin, px + pxin, y + yin, py + pyin,
-                zeta + zetain, delta + deltain, sPx, sPy, sPz)
- 
-    parts = np.array([make_macro_part() for _ in range(num_particles)]).T
- 
-    particles = xt.Particles(
-        p0c=pdr.lines['ring'].particle_ref.p0c[0],
-        mass0=pdr.lines['ring'].particle_ref.mass0,
-        q0=pdr.lines['ring'].particle_ref.q0,
-        anomalous_magnetic_moment=pdr.lines['ring'].particle_ref.anomalous_magnetic_moment[0],
-        x=parts[0], px=parts[1],
-        y=parts[2], py=parts[3],
-        zeta=parts[4], delta=parts[5],
-        spin_x=parts[6], spin_y=parts[7], spin_z=parts[8],
-    )
-    
-
-    line.discard_tracker()
-   
     line.configure_radiation('quantum')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
-
-    line.configure_spin('auto')
 
     line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
     mon = line.record_last_track
 
-    # --- Turn-by-turn polarization ---
+    num_particles = 300
+    pol_x = mon.spin_x.sum(axis=0) / num_particles
+    pol_y = mon.spin_y.sum(axis=0) / num_particles
+    pol_z = mon.spin_z.sum(axis=0) / num_particles
+    pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
+
     mask_alive = mon.state > 0
     n_alive = mask_alive.sum(axis=0)
-    pol_x = mon.spin_x.sum(axis=0) / n_alive
-    pol_y = mon.spin_y.sum(axis=0) / n_alive
-    pol_z = mon.spin_z.sum(axis=0) / n_alive
-    pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
+    if n_alive.min() < num_particles:
+        print(f"  [seed {seed_val}] WARNING: particle losses detected "
+              f"(min alive = {n_alive.min()}/{num_particles}) -- the fixed-"
+              f"denominator polarization is biased low after losses begin.")
 
     n_turns_rec = len(pol)
     turns = np.arange(n_turns_rec)
 
-    # Two-parameter exponential: free amplitude 'a' and decay rate 'tauinv' (= 1/tau).
-    # Letting the amplitude float means we no longer have to force the curve through
-    # the first point (as pol[3:]/pol[3] did), so an initial transient does not bias
-    # the whole fit.
-    def exp_decay(t, a, tauinv):
-        return a * np.exp(-tauinv * t)
-
-    # Two-step fit: (1) a linear least-squares fit provides robust starting values
-    # for the amplitude and slope, then (2) curve_fit refines the exponential.
-    def two_step_exp_fit(t, p):
-        t = np.asarray(t, dtype=float)
-        p = np.asarray(p, dtype=float)
-        # Step 1: straight line P(t) ~ intercept + slope * t  ->  initial guesses.
-        A = np.vstack([t, np.ones_like(t)]).T
-        slope, intercept = np.linalg.lstsq(A, p, rcond=None)[0]
-        # a0 = value extrapolated to t=0; tauinv0 = -slope/a0 (positive for decay).
-        p0 = [intercept, -slope / intercept]
-        popt, pcov = curve_fit(exp_decay, t, p, p0=p0, maxfev=10000)
-        return popt, pcov
-
-    # Turn index from which to fit, to drop the initial transient before the spin
-    # distribution settles. Tune via the transient_turns argument.
     icTrns = int(np.clip(transient_turns, 0, n_turns_rec - 2))
 
-    # Stage A: fit through *all* turns.
-    # Stage B: fit from turn icTrns to the end (transient removed) -> primary result.
+   
     try:
         popt_all, _ = two_step_exp_fit(turns, pol)
         popt_cut, _ = two_step_exp_fit(turns[icTrns:], pol[icTrns:])
@@ -211,9 +242,13 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
         amp_cut, tauinv_cut = popt_cut
         t_dep_turns_all = 1.0 / tauinv_all if tauinv_all > 0 else np.nan
         t_dep_turns_long = 1.0 / tauinv_cut if tauinv_cut > 0 else np.nan
-        fit_curve = exp_decay(turns, amp_cut, tauinv_cut)      # primary fit, full range
-        fit_curve_all = exp_decay(turns, amp_all, tauinv_all)  # all-turns fit, full range
-        fit_ok = True
+        fit_curve = exp_decay(turns, amp_cut, tauinv_cut)     
+        fit_curve_all = exp_decay(turns, amp_all, tauinv_all)  
+        fit_ok = (
+            np.isfinite(t_dep_turns_long)
+            and t_dep_turns_long < 100 * long_scan_turns
+            and fit_is_reliable(turns[icTrns:], pol[icTrns:], popt_cut)
+        )
     except (RuntimeError, ValueError) as e:
         print(f"  Exponential fit failed for seed {seed_val}: {e}")
         amp_cut = np.nan
@@ -223,9 +258,18 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
         fit_curve_all = np.full_like(pol, np.nan)
         fit_ok = False
 
-    n_over_tau = n_turns_rec / t_dep_turns_long if fit_ok and t_dep_turns_long > 0 else np.nan
-    print(f"  Seed {seed_val}: tau_fit = {t_dep_turns_all:.1f} turns, "
-          f"tau_fit(cut@{icTrns}) = {t_dep_turns_long:.1f} turns, N/tau = {n_over_tau:.2f}")
+    # Fall back to the analytic depol time if the tracked fit isn't reliable
+    # (e.g. no resolvable decay above the noise floor over the tracked window).
+    if not fit_ok:
+        t_depol = tw.spin_t_depol_component_s
+        t_dep_turns_long = t_depol / tw.T_rev0
+        print(f"  Seed {seed_val}: fit unreliable -- "
+              f"using analytic t_depol = {t_dep_turns_long:.3e} turns")
+
+    n_over_tau = n_turns_rec / t_dep_turns_long if t_dep_turns_long > 0 else np.nan
+    print(f"  Seed {seed_val}: tau_fit(all) = {t_dep_turns_all:.1f} turns, "
+          f"tau_fit(cut@{icTrns}) = {t_dep_turns_long:.1f} turns, "
+          f"N/tau = {n_over_tau:.2f}, fit_reliable = {fit_ok}")
 
     p_bks = tw.spin_polarization_inf_no_depol
     t_bks = tw.spin_t_pol_component_s
@@ -246,6 +290,7 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
         't_pol': t_pol,
         't_dep_turns_long': t_dep_turns_long,
         't_dep_turns_all': t_dep_turns_all,
+        'fit_reliable': fit_ok,
     }
 
 
@@ -263,12 +308,13 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
     ax.grid(True, linestyle=':', alpha=0.6)
     ax.legend()
 
+    reliability_tag = ('fit reliable' if data.get('fit_reliable', True)
+                        else 'FIT UNRELIABLE -- using analytic tau_depol')
     info_text = (
         f"$P_{{BKS}}$ = {data['p_bks']:.2f}%   "
         f"$P_{{eq}}$ (long track) = {data['p_eq_long']:.2f}%\n"
-        f"$\\tau_{{depol}}$ = {data['t_dep_turns_long']:.1f} turns   "
-        
-        f"$t_{{pol}}$ = {data['t_pol']:.4e} s\n"
+        f"$\\tau_{{depol}}$ = {data['t_dep_turns_all']:.1f} turns   "
+        f"$t_{{pol}}$ = {data['t_pol']:.4e} s   [{reliability_tag}]\n"
     )
     fig.text(0.5, 0.02, info_text, ha='center', va='bottom', fontsize=10,
              bbox=dict(boxstyle='round', facecolor='whitesmoke', edgecolor='gray', alpha=0.9))
@@ -280,14 +326,14 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
 
 
 data_misaligned = deep_track_single(SEED, apply_correction=False)
-#data_corrected = deep_track_single(SEED, apply_correction=True)
+data_corrected = deep_track_single(SEED, apply_correction=True)
 
 plot_seed_with_textbox(
     data_misaligned, 'Misaligned',
     f'{results_dir}/Polarization_Misaligned.png')
-'''plot_seed_with_textbox(
+plot_seed_with_textbox(
     data_corrected, 'Corrected',
-    f'{results_dir}/Polarization_Corrected.png')'''
+    f'{results_dir}/Polarization_Corrected.png')
 
 
 #%%
@@ -301,7 +347,9 @@ def plot_invariant_spin_vector(seed_val, apply_correction):
 
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.26e-3, seed=seed_val)
+
+    #line=mc.misalignments(line,2.5e-3,seed_val)
+    
 
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
@@ -363,7 +411,7 @@ def track_single_particle_nx1(seed_val, apply_correction):
     
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.26e-3, seed=seed_val)
+    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
  
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)

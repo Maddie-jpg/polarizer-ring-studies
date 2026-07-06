@@ -14,6 +14,7 @@ Another polarizer ring design attempt based 90 degrees phase FODO cells in arcs
    sextupole pairs spaced by 180 degrees phase advance lead to large 
    off-momentum beta-beating!
 """
+#%%
 
 import xtrack             as xt
 import xobjects           as xo
@@ -377,13 +378,7 @@ ringS3_chroma = ringS3.match( method='4d', solve=False,
 ringS3_chroma.run_jacobian(10)
 #SpuckParsAus( periodS3_sliced.twiss(method='4d', delta0=-.000), periodS3, (0., 38.), (0., 10.), (0., 1.), [.08, .0005], 'NoGraph', 0.05 )
 
-pdr.lines['arc1R'] = arc1R
-pdr.lines['cell_arc'] = cell_arc
-pdr.lines['cell_tr'] = cell_tr
-pdr.lines['period'] = periodS3
-pdr.lines['ring'] = ringS3
 
-pdr.to_json('pdr_perfect_CC.json')
 # %% Add orbit perturbations to lattice with 12 X-poles per family and per period
 
 ringS3imp = ringS3.select()
@@ -416,8 +411,17 @@ for iter in range(10):
 
 print([ringS3imp_tw.method, ringS3imp_tw.radiation_method])
 # print(ringS3imp_tw.keys())
+pdr.lines['arc1R'] = arc1R
+pdr.lines['cell_arc'] = cell_arc
+pdr.lines['cell_tr'] = cell_tr
+pdr.lines['period'] = periodS3
+pdr.lines['ring'] = ringS3imp
 
+pdr.to_json('pdr_perfect_CC.json')
 # %% looping over several cases of misalignment to get spin build-up properties
+pdr = xt.Environment()
+pdr=pdr.from_json('/home/mwatson/Documents/laughing-octo-bassoon/JSON Files/D1/C1/pdr_perfect_CC.json')
+ringS3=pdr.lines['ring']
 
 MisAlignrms = .26e-3 # larger gives unstable optics in vertical in some cases!!
 nPts, nTrns, icTrns, nMchs, fct = 300, 20000, 8000, 10, 0.
@@ -435,6 +439,9 @@ for iMch in range(1, nMchs+1):
     ringS3imp.configure_radiation(model='mean')
     ringS3imp_tw = ringS3imp.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                        spin=True, polarization=True )
+
+
+    pdr.to_json('pdr_misaligned_CC.json')
 
     epsx, epsy, epsl    = ringS3imp_tw.eq_gemitt_x, ringS3imp_tw.eq_gemitt_y, ringS3imp_tw.eq_gemitt_zeta  # starting with somewhat large emittances
     betxin, alfxin      = ringS3imp_tw.betx[0], ringS3imp_tw.alfx[0] 
@@ -471,20 +478,22 @@ for iMch in range(1, nMchs+1):
 
     parts = np.array( [makeMacroPart(fct) for _ in range(nPts) ]).T
 
-    p2 = xt.Particles(kinetic_energy0 = 2860.e6, mass0 = xt.ELECTRON_MASS_EV,
+    p2 = xt.Particles(kinetic_energy0 = 2860.e6, mass0 = xt.ELECTRON_MASS_EV, anomalous_magnetic_moment=0.001159652181,
             x      = parts[0], px   = parts[1],
             y      = parts[2], py   = parts[3],
             zeta   = parts[4], delta = parts[5],
             spin_x = parts[6], spin_y = parts[7], spin_z = parts[8] )
     ringS3imp.configure_radiation(model='quantum')
     
-#   ringS3imp.discard_tracker()
-#   ringS3imp.build_tracker(_context=xo.ContextCpu(omp_num_threads=4) )#, use_prebuilt_kernels=False)
+    ringS3imp.discard_tracker()
+    ringS3imp.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto') )#, use_prebuilt_kernels=False)
     ringS3imp.configure_spin('auto')
     ringS3imp.track( p2, num_turns = nTrns, turn_by_turn_monitor = True,
                with_progress = True )
     dattr = ringS3imp.record_last_track
- 
+    
+    ringS3imp.build_tracker(_context=xo.ContextCpu(omp_num_threads=0) )#, use_prebuilt_kernels=False)
+    
     fig = plt.figure( figsize = (12, 12) )
 #   ax = fig.subplots(2, 2)
     ax = fig.add_subplot(2, 2, 1)
@@ -530,7 +539,7 @@ for iMch in range(1, nMchs+1):
     ax.text(0.67, 0.73, r'$P_{eq}$'+f' ={100.*PeqBKS/(1+tauBKS/tauDep0):6.3f} % and '+r'$\tau_{Pol}$'+f' ={tauBKS/(1+tauBKS/tauDep0):7.2f} s', transform=ax.transAxes)
     ax.text(0.64, 0.66, r'with $\tau_{Dep}$' + f' ={tauDep1:7.2f} s:', transform=ax.transAxes )
     ax.text(0.67, 0.61, r'$P_{eq}$'+f' ={100.*PeqBKS/(1+tauBKS/tauDep1):6.3f} % and '+r'$\tau_{Pol}$'+f' ={tauBKS/(1+tauBKS/tauDep1):7.2f} s', transform=ax.transAxes)
-    fig.savefig( '/Users/ccarli/Documents/FCC/PolarizerRing/Short90DegPer3/DepolSim' + f'{iMch:3d}'.replace(' ','0') )
+    fig.savefig( '/home/mwatson/Documents/laughing-octo-bassoon/External Files' + f'{iMch:3d}'.replace(' ','0') )
     
 # %%
 
