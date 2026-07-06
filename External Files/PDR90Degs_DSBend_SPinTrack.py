@@ -235,11 +235,11 @@ arc1R.insert( pdr.new('CtrS1_xR1', xt.Marker ), at='(l_tripl+l_quad)/2', from_='
 period = makesextant( 'PR', 'symm') + ( -makesextant( 'PL', 'symm') )
 period_sliced = period.select()
 period_sliced.cut_at_s( np.linspace(.05, period.get_length()-.05, int(period.get_length()/.05-.5)) )
-SpuckParsAus( period_sliced.twiss(method='4d'), arc1R, (0., 38.), (0., 10.), (0., 1.), [.08, .01], "Standard.pdf" )
+#SpuckParsAus( period_sliced.twiss(method='4d'), arc1R, (0., 38.), (0., 10.), (0., 1.), [.08, .01], "Standard.pdf" )
 
 # Full ring without X-poles, RF and wigglers
 ring  = makesextant( '1R', 'right') + makesextant( '2L', 'left') + makesextant( '2R', 'right') + makesextant( '3L', 'left') + makesextant( '3R', 'right') + makesextant( '1L', 'left')
-fRev = 1./(ring.twiss(method='4d').t_rev0)
+fRev = 1./(ring.twiss(method='4d').T_rev0)
 fRF  = fRev*round(4.e8/fRev)  # at integer harmonics and close to 400 MHz
 pdr.new('RFCav',  xt.Cavity, length=1.5, frequency=fRF, voltage=VRF, 
         lag=(180/np.pi)*(np.pi - np.arcsin(U0/VRF)) - 1.8 ) 
@@ -373,9 +373,17 @@ ringS3_chroma = ringS3.match( method='4d', solve=False,
     vary = [ xt.VaryList(['k2XF3arc', 'k2XD3arc'], step=1e-4 )],
     targets = [ xt.TargetSet(dqx=0, dqy=0, tol=1e-8 ) ]  )
 
-SpuckParsAus( periodS3_sliced.twiss(method='4d', delta0=-.000), periodS3, (0., 38.), (0., 10.), (0., 1.), [.08, .0005], 'NoGraph', 0.05 )
+#SpuckParsAus( periodS3_sliced.twiss(method='4d', delta0=-.000), periodS3, (0., 38.), (0., 10.), (0., 1.), [.08, .0005], 'NoGraph', 0.05 )
 ringS3_chroma.run_jacobian(10)
-SpuckParsAus( periodS3_sliced.twiss(method='4d', delta0=-.000), periodS3, (0., 38.), (0., 10.), (0., 1.), [.08, .0005], 'NoGraph', 0.05 )
+#SpuckParsAus( periodS3_sliced.twiss(method='4d', delta0=-.000), periodS3, (0., 38.), (0., 10.), (0., 1.), [.08, .0005], 'NoGraph', 0.05 )
+
+pdr.lines['arc1R'] = arc1R
+pdr.lines['cell_arc'] = cell_arc
+pdr.lines['cell_tr'] = cell_tr
+pdr.lines['period'] = periodS3
+pdr.lines['ring'] = ringS3
+
+pdr.to_json('pdr_perfect_CC.json')
 # %% Add orbit perturbations to lattice with 12 X-poles per family and per period
 
 ringS3imp = ringS3.select()
@@ -512,7 +520,7 @@ for iMch in range(1, nMchs+1):
         return a*np.exp(-tauinv*x)
     popt0, pcov0 = curve_fit(fitfu, [iTrn for iTrn in range( nTrns)], pols, bounds=([0.9, 0.], [1.1, .001]) )
     popt1, pcov1 = curve_fit(fitfu, [iTrn for iTrn in range(icTrns, nTrns)], pols[icTrns:], bounds=([0.9, 0.], [1.1, .001]) )
-    tauDep0, tauDep1 = ringS3imp_tw.t_rev0/popt0[1], ringS3imp_tw.t_rev0/popt1[1]
+    tauDep0, tauDep1 = ringS3imp_tw.T_rev0/popt0[1], ringS3imp_tw.T_rev0/popt1[1]
     ax.plot( [iturn for iturn in range(nTrns)], [popt0[0]*np.exp(-popt0[1]*iturn) - 1 for iturn in range(nTrns)], c='C1' )
     ax.plot( [iturn for iturn in range(icTrns,nTrns)], [popt1[0]*np.exp(-popt1[1]*iturn) - 1 for iturn in range(icTrns,nTrns)], c='C1' )
 
@@ -557,7 +565,7 @@ def fitfu(x, a, tauinv):
         return a*np.exp(-tauinv*x)
 popt0, pcov0 = curve_fit(fitfu, [iTrn for iTrn in range( nTrns)], pols, bounds=([0.9, 0.], [1.1, .001]) )
 popt1, pcov1 = curve_fit(fitfu, [iTrn for iTrn in range(4000, nTrns)], pols[4000:], bounds=([0.9, 0.], [1.1, .001]) )
-tauDep0, tauDep1 = ringS3imp_tw.t_rev0/popt0[1], ringS3imp_tw.t_rev0/popt1[1]
+tauDep0, tauDep1 = ringS3imp_tw.T_rev0/popt0[1], ringS3imp_tw.T_rev0/popt1[1]
 
 ax.plot( [iturn for iturn in range(nTrns)], [popt0[0]*np.exp(-popt0[1]*iturn) - 1 for iturn in range(nTrns)], c='C1' )
 ax.plot( [iturn for iturn in range(4000,nTrns)], [popt1[0]*np.exp(-popt1[1]*iturn) - 1 for iturn in range(4000,nTrns)], c='C1' )

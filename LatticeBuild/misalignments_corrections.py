@@ -118,6 +118,9 @@ def insert_correctors(pdr):
         'QDDoub_': 'l_doub',             # Doublet drift
         'QFDoub_': 'l_doub',
         'QDTrip_': 'l_tripl',            # Triplet drift
+        'QFA_1RC': 'l_drift-l_sext',     # RC centre quads (many-sext lattice)
+        'QFA_2RC': 'l_drift-l_sext',
+        'QFA_3RC': 'l_drift-l_sext',
     }
 
     #vertical correctors
@@ -139,8 +142,11 @@ def insert_correctors(pdr):
         dynamic_offset = f'({current_drift}+l_quad) / 2'
         v_name = f'vk_ring_{elem}'
         pdr[v_name] = 0.0  # Unique vertical kick variable
-        ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
-                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+
+        from_elem, anchor, final_offset = get_safe_insertion(ring, prefix, elem, sign, dynamic_offset)
+
+        ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'),
+                    at=final_offset, from_=prefix + elem, from_anchor='center')
 
     # horizontal correctors
     qx_ring_list = (
@@ -156,12 +162,20 @@ def insert_correctors(pdr):
     )
 
     for elem, sign, prefix in qx_ring_list:
-        current_drift = drift_map.get(prefix, 'l_drift')
-        dynamic_offset = f'({current_drift}+l_quad) / 2'
+        full_name = prefix + elem
         h_name = f'hk_ring_{elem}'
         pdr[h_name] = 0.0  # Unique horizontal kick variable
-        ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
-                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+
+        if full_name in ['QFA_1RC', 'QFA_2RC', 'QFA_3RC']:
+            dynamic_offset = '(((l_drift/2)+l_quad)/2)-l_sext'
+        else:
+            current_drift = drift_map.get(prefix, 'l_drift')
+            dynamic_offset = f'({current_drift}+l_quad) / 2'
+
+        from_elem, anchor, final_offset = get_safe_insertion(ring, prefix, elem, sign, dynamic_offset)
+
+        ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),
+                    at=final_offset, from_=prefix + elem, from_anchor='center')
         
     return pdr
 

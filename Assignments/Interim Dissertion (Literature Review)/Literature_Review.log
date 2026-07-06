@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.17)  1 JUL 2026 16:57
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.17)  5 JUL 2026 13:01
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -329,27 +329,27 @@ LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 64.
  [1{/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/cm-super/cm-super-t1.enc}{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/base/8r.enc}] [2]
-Overfull \hbox (90.21388pt too wide) detected at line 220
+Overfull \hbox (90.21388pt too wide) detected at line 223
 []\OML/ztmcm/m/it/10 P[] \OT1/ztmcm/m/n/10 = \OML/ztmcm/m/it/10 P[] [];  \OMS/ztmcm/m/n/10 h[]i[] \OT1/ztmcm/m/n/10 = \OML/ztmcm/m/it/10 P[]\OMS/ztmcm/m/n/10 h[]i[]
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 226--227
+Underfull \hbox (badness 10000) in paragraph at lines 229--230
 []\T1/ptm/m/n/10 Together, Baier-Katkov-Strakhovenko and Derbenev-
  []
 
 
-Underfull \hbox (badness 3138) in paragraph at lines 226--227
+Underfull \hbox (badness 3138) in paragraph at lines 229--230
 \T1/ptm/m/n/10 Kondratenko the-ory move the pre-dic-tion of achiev-able
  []
 
 
-Underfull \hbox (badness 1412) in paragraph at lines 226--227
+Underfull \hbox (badness 1412) in paragraph at lines 229--230
 \T1/ptm/m/n/10 in-ho-mo-ge-neous lat-tice. Both for-malisms re-duce to the
  []
 
 
-Underfull \hbox (badness 1354) in paragraph at lines 226--227
+Underfull \hbox (badness 1354) in paragraph at lines 229--230
 \T1/ptm/m/n/10 or-bital am-pli-tude pushes $[]$ away from ver-ti-cal be-comes
  []
 
@@ -390,15 +390,15 @@ L3 programming layer <2025-01-18>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 5650 strings out of 473190
- 80555 string characters out of 5715800
- 531439 words of memory out of 5000000
- 28805 multiletter control sequences out of 15000+600000
+ 5649 strings out of 473190
+ 80546 string characters out of 5715800
+ 531438 words of memory out of 5000000
+ 28804 multiletter control sequences out of 15000+600000
  615450 words of font info for 131 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  71i,11n,79p,1939b,294s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/cm-super/sfss0800.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/cm-super/sfss1000.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/cm-super/sfsx0900.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/cm-super/sfsx1440.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/symbol/usyr.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/symbol/usyr.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on Literature_Review.pdf (4 pages, 185550 bytes).
+Output written on Literature_Review.pdf (4 pages, 186022 bytes).
 PDF statistics:
  94 PDF objects out of 1000 (max. 8388607)
  57 compressed objects within 1 object stream
