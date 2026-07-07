@@ -16,11 +16,13 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import pandas as pd
 import LatticeBuild.misalignments_corrections as mc
+import my_functions as mf
+import random
 
 
 #%%
 
-SEED = 4
+SEED = random.randint(0,int(1e6))
 
 design = int(os.environ.get('DESIGN', 1))
 config = int(os.environ.get('CONFIG', 1))
@@ -28,8 +30,8 @@ config = int(os.environ.get('CONFIG', 1))
 long_scan_turns = 20000  
 
 # %%
-'''
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_CC.json')
+
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
 energy=2.86e9
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0 = energy
@@ -39,9 +41,8 @@ if design == 1 and config == 1:
     mc.insert_correctors_var2(pdr)
 else:
     mc.insert_BPMs_all_as_markers(pdr)
-    mc.insert_correctors(pdr)'''
+    mc.insert_correctors(pdr)
 
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_misaligned_CC.json')
 
 
 line = pdr.lines['ring']
@@ -49,8 +50,12 @@ line.configure_spin('auto')
 
 base_line = line.copy()
 
-results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}_CC'
+results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}'
 os.makedirs(results_dir, exist_ok=True)
+
+scan = mf.spin_tune_resonance_scan(line, nu_min=5.5, nu_max=7.5, n_points=80,
+                                 misalign_sigma=0.25e-3, seed=SEED)
+mf.plot_spin_resonance_scan(scan, out_path=f'{results_dir}/spin_resonance_scan.png')
 
 
 #%%
@@ -66,7 +71,7 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
 
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    #line = mc.misalignments(line, 0.2e-3, seed=seed_val)
+    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
 
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)

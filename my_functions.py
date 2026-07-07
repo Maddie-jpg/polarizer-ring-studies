@@ -243,7 +243,6 @@ def survey_plot(ring):
     ax.legend(*zip(*unique))
 
     ax.set_aspect('equal')
-    plt.show()
 
 
 import pandas as pd
@@ -816,3 +815,96 @@ def insert_BPMs_all_as_markers(pdr):
             )
    return pdr
 
+import LatticeBuild.misalignments_corrections as mc
+import xobjects as xo
+
+def spin_tune_resonance_scan(ring, nu_min=5.0, nu_max=6.0, n_points=60,
+                              misalign_sigma=None, seed=None):
+    
+    ring0 = ring
+    a_gyro = ring0.particle_ref.anomalous_magnetic_moment[0]
+    mass0 = ring0.particle_ref.mass0  # eV
+
+    nu_targets = np.linspace(nu_min, nu_max, n_points)
+    gammas = nu_targets / a_gyro
+    energies = gammas * mass0             # total energy, eV
+
+    results = {'nu_target': [], 'nu_spin': [], 'qx': [], 'qy': [], 'qs': [],
+               'p_bks': [], 'energy': []}
+
+    for nu_target, energy in zip(nu_targets, energies):
+        line = ring0.copy()
+        line.particle_ref.kinetic_energy0 = energy - mass0
+        line.configure_spin('auto')
+
+        if misalign_sigma is not None:
+            line.configure_radiation('mean')
+            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+            line = mc.misalignments(line, misalign_sigma, seed=seed)
+
+        try:
+            tw = line.twiss(method='6d', radiation_integrals=True,
+                             eneloss_and_damping=True, spin=True, polarization=True)
+            nu_spin = tw.spin_tune_fractional + np.floor(nu_target)
+            p_bks = tw.spin_polarization_inf_no_depol * 100
+            qx, qy, qs = tw.qx % 1, tw.qy % 1, abs(tw.qs) % 1
+        except Exception as e:
+            print(f"  nu_target={nu_target:.4f}: twiss/spin failed ({type(e).__name__}: {e})")
+            nu_spin = p_bks = qx = qy = qs = np.nan
+
+        results['nu_target'].append(nu_target)
+        results['nu_spin'].append(nu_spin)
+        results['qx'].append(qx)
+        results['qy'].append(qy)
+        results['qs'].append(qs)
+        results['p_bks'].append(p_bks)
+        results['energy'].append(energy)
+
+    return {k: np.array(v) for k, v in results.items()}
+
+
+def plot_spin_resonance_scan(results, out_path=None):
+    nu = results['nu_target']
+    p_bks = results['p_bks']
+    qx = np.nanmedian(results['qx'])
+    qy = np.nanmedian(results['qy'])
+    qs = np.nanmedian(results['qs'])
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(nu, p_bks, 'o-', color='tab:blue', markersize=4, label='$P_{BKS}$ (DK limit)')
+
+    n_lo, n_hi = int(np.floor(nu.min())), int(np.ceil(nu.max()))
+    seen = set()
+
+    # Imperfection resonances: ν = n (bare integer)
+    for n in range(n_lo, n_hi + 1):
+        if nu.min() <= n <= nu.max():
+            ax.axvline(n, linestyle='-', color='black', alpha=0.5, linewidth=1.5,
+                       label=f'Imperfection: $\\nu={n}$')
+
+    # Intrinsic resonances: ν = n ± Q
+    for n in range(n_lo, n_hi + 1):
+        for Q, label, color in [(qx, 'Q_x', 'tab:red'),
+                                 (qy, 'Q_y', 'tab:green'),
+                                 (qs, 'Q_s', 'tab:purple')]:
+            for sign, tag in [(+1, '+'), (-1, '-')]:
+                res = n + sign * Q
+                if nu.min() <= res <= nu.max():
+                    key = (label, round(res, 4))
+                    if key not in seen:
+                        seen.add(key)
+                        ax.axvline(res, linestyle='--', color=color, alpha=0.6,
+                                   label=f'${n}{tag}{label}$ = {res:.3f}')
+
+    ax.set_xlabel(r'Spin tune target $\nu = a\gamma$')
+    ax.set_ylabel(r'$P_{BKS}$ (%)')
+    ax.set_title('First-order spin resonance scan')
+    ax.grid(True, linestyle=':', alpha=0.6)
+    handles, labels = ax.get_legend_handles_labels()
+    unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
+    ax.legend(*zip(*unique), fontsize=8, loc='best')
+
+    plt.tight_layout()
+    if out_path:
+        plt.savefig(out_path, dpi=300)
+    plt.show()

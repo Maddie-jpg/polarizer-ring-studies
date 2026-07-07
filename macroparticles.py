@@ -922,67 +922,7 @@ plt.show()
 
 print(f"\nThe best injection efficiency is at {best_energy:.3f} MeV.")
 
-# %%
-rand_range = range(1, 51) 
-efficiency_results = []
-n_particles = 500 
-#p0c_reference = df['p[MeV/c]'].mean() * 1e6 
-fixed_e_mev = p0c_reference / 1e6
-ring.particle_ref = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
-
-print(f"Starting Random Number Scan at {fixed_e_mev:.2f} MeV...")
-
-for r in rand_range:
-    df_subset = df.sample(n=n_particles, random_state=r)
-    
-    # Re-map coordinates for the new subset
-    x_in = df_subset['x[mm]'].values / 1000.0
-    px_in = df_subset['xp[mrad]'].values / 1000.0
-    y_in = df_subset['y[mm]'].values / 1000.0
-    py_in = df_subset['yp[mrad]'].values / 1000.0
-    zeta_in = df_subset['t[mm/c]'].values / 1000.0
-    delta_in = (df_subset['p[MeV/c]'].values - fixed_e_mev) / fixed_e_mev
-
-    # Apply matching (Assuming ring_tw is already defined)
-    x_matched = x_in + ring_tw.dx[0] * delta_in
-    px_matched = px_in + ring_tw.dpx[0] * delta_in
-    y_matched = y_in + ring_tw.dy[0] * delta_in
-    py_matched = py_in + ring_tw.dpy[0] * delta_in
-
-    p_test = xp.Particles(
-        p0c=p0c_reference,
-        mass0=xp.ELECTRON_MASS_EV,
-        x=x_matched, px=px_matched,
-        y=y_matched, py=py_matched,
-        delta=delta_in,
-        zeta=zeta_in
-    )
-
-    ring.track(p_test, num_turns=100)
-    
-    survived = np.sum(p_test.state > 0)
-    efficiency = (survived / n_particles) * 100
-    efficiency_results.append(efficiency)
-    
-    print(f"Seed: {r} | Efficiency: {efficiency:.1f}%")
-
-avg_eff = np.mean(efficiency_results)
 
 
-# %%
-
-plt.figure(figsize=(10, 6))
-plt.plot(rand_range, efficiency_results, 'o-', color='purple', linewidth=1.5, markersize=4)
-plt.axhline(avg_eff, color='red', linestyle='--', label=f'Average Efficiency: {avg_eff:.1f}%')
-
-plt.title(f'Injection Efficiency vs. Random Seed ({fixed_e_mev:.2f} MeV)', fontsize=14)
-plt.xlabel('Random Seed', fontsize=12)
-plt.ylabel('Survival Efficiency [%]', fontsize=12)
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.savefig(f'efficiency_random_scan_{int(fixed_e_mev)}MeV.png')
-plt.show()
-
-print(f"\nScan Complete. Average efficiency across {len(rand_range)} samples: {avg_eff:.2f}%")
 
 
