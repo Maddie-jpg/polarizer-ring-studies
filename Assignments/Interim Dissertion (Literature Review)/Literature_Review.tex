@@ -83,10 +83,55 @@ Beyond the electroweak arena, the FCC-ee will act as a high-luminosity Higgs and
 
 Achieving these milestones imposes exceptionally demanding requirements on accelerator sub-systems. Because every primary observable is sensitive to systematic shifts in the centre-of-mass energy ($E_{\text{CM}}$), the extreme statistical precision will become entirely dominated by systematic effects unless the beam energies can be determined with a precision significantly surpassing that of the LEP via global Effective Field Theory (EFT) fits \cite{the_fcccollaboration_fcc_2019, denterria_physics_2016, ellis_eft_2019}.
 
-\section{Storage Rings and Lattice Physics}
 
+\section{Theoretical Background}
+\subsection{Beam Optics}
 
-\section{Fundamentals of Spin and Polarization}
+The transverse motion of a particle traversing a storage ring resembles that of a linear oscillator subject to periodic focusing.
+Bending is imposed upon the beam by dipole magnets, whilst focusing is provided by quadrupole magnets, causing each particle to oscillate in the transverse plane about a reference trajectory known as the closed orbit.
+This oscillatory displacement is governed by Hill's equation:
+
+\begin{equation}
+x''(s)+K(s)x(s)=0
+\end{equation}
+
+where $K(s)$ is the periodic focusing strength of the lattice.
+It is this linear character of the motion that underpins the definition of the beam emittance.
+The coordinate framework employed consists of three canonically conjugate pairs: $(x, p_x)$ and $(y, p_y)$ for the transverse phase space, where $p_x$ and $p_y$ are the transverse momenta normalised by the reference momentum $P_0$, and $(z, \delta)$ for the longitudinal phase space, where $z$ denotes the longitudinal position relative to the reference particle and $\delta$ is the fractional energy deviation.
+In the absence of synchrotron radiation, particle motion is symplectic: the phase-space area enclosed by the beam distribution, termed the emittance, is conserved under transport.
+This conservation is expressed by the condition $R^T S R = S$, where $R$ is the one-turn transfer matrix and $S$ is the symplectic form.
+The transverse oscillations of a particle, referred to as betatron motion, trace an ellipse in phase space whose shape is determined by the Twiss parameters $(\alpha, \beta, \gamma)$, which describe the size and angular divergence of the particle distribution at a given location in the ring.
+The Twiss parameters serve to decouple the machine optics from the beam properties, permitting the lattice functions to be factored from a single amplitude parameter.
+The action variable $J$ characterises the stable, periodic motion of an individual circulating particle and is defined in terms of the Twiss parameters as
+
+\begin{equation}
+  2J_x = \gamma_x x^2 + 2\alpha_x x p_x + \beta_x p_x^2
+\end{equation}
+
+The emittance is subsequently given by the ensemble average of the action, $\epsilon_x = \langle J_x \rangle$, and is invariant under any radiation-free linear transport.
+The number of betatron oscillations completed per revolution defines the betatron tune,
+
+\begin{equation}
+\nu=\frac{1}{2\pi} \oint \frac{1}{\beta(s)} \, ds
+\end{equation}
+
+Tunes at integer or half-integer values must be avoided, as periodic perturbations at these resonances accumulate coherently over successive turns and may lead to beam loss.
+This description of transverse motion is supplemented by the concept of dispersion, which accounts for the dependence of the closed orbit upon particle energy: a particle with a fractional energy offset $\delta$ circulates on a displaced closed orbit relative to the reference trajectory.
+As a consequence, the path length becomes energy dependent, and a momentum compaction factor $\alpha_p$ is acquired.
+Energy deviations are converted into transverse displacements through the dispersion function,
+
+\begin{equation}
+x_\delta (s)=D(s)\delta
+\end{equation}
+
+This constitutes the mechanism by which the beam becomes coupled to its spatial distribution and, subsequently, to its spin distribution.
+The transverse emittance and relative energy spread are determined by the equilibrium between synchrotron radiation damping and quantum excitation, yielding a beam size of
+
+\begin{equation}
+\sigma (s)=\sqrt{\epsilon \beta (s) + (D(s)\sigma_\delta)^2}
+\end{equation}
+
+Since the beam size is proportional to the energy spread, the FCC-ee, operating at exceptionally high beam energies, is expected to exhibit a large energy spread, with significant consequences for depolarisation.
 
 \subsection{Spin Motion and Tune in Storage Rings}
 
@@ -112,8 +157,9 @@ Specialising this result to the simplest case of a particle passing through a si
 The excess precession defines the spin tune $\nu = a\gamma$, the number of spin precessions per orbital revolution, evaluated in the frame moving with the particle \cite{meot_huang_ptitsyn_lin_2023, huang_2019}.
 The relationship between spin tune and electron energy is linear, making it incredibly useful in the RDP process as the beam energy can be determined directly \cite{meot_huang_ptitsyn_lin_2023,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
 
+\section{Radiative Polarization}
 
-\subsection{Polarization and the Sokolov-Ternov Effect}
+\subsection{Self Polarization and the Sokolov-Ternov Effect}
 
 Polarization is a quantity representative of the particle ensemble rather than a single-particle spin, and describes the degree to which particles align along a specified direction. It is defined as 
 
@@ -219,7 +265,10 @@ Because Thomas-BMT precession is so much faster than either radiation damping or
 The resulting equilibrium polarization formula is:
 
 \begin{equation}
-P_{DK} = P_{ST}\,\frac{\displaystyle\left\langle\oint\frac{1}{|\rho(s)|^3}\,\hat{b}\cdot\left(\hat{n}-\frac{\partial\hat{n}}{\partial\delta}\right)ds\right\rangle_s}{\displaystyle\left\langle\oint\frac{1}{|\rho(s)|^3}\left[1-\frac{2}{9}(\hat{n}\cdot\hat{s})^2+\frac{11}{18}\left(\frac{\partial\hat{n}}{\partial\delta}\right)^2\right]ds\right\rangle_s}, \qquad \langle\vec{P}_{DK}\rangle_{ens} = P_{DK}\langle\hat{n}\rangle_s
+  \begin{gathered}
+  P_{DK} = P_{ST}\,\frac{\displaystyle\left\langle\oint\frac{1}{|\rho(s)|^3}\,\hat{b}\cdot\left(\hat{n}-\frac{\partial\hat{n}}{\partial\delta}\right)ds\right\rangle_s}{\displaystyle\left\langle\oint\frac{1}{|\rho(s)|^3}\left[1-\frac{2}{9}(\hat{n}\cdot\hat{s})^2+\frac{11}{18}\left(\frac{\partial\hat{n}}{\partial\delta}\right)^2\right]ds\right\rangle_s}, \\[2ex]
+  \langle\vec{P}_{DK}\rangle_{ens} = P_{DK}\,\langle\hat{n}\rangle_s
+  \end{gathered}
 \end{equation}
 
 The Derbenev-Kondratenko formula differs from the Baier-Katkov-Strakhovenko result in two ways:$ \hat{n}_0$ is replaced by the full phase-space invariant spin field $\hat{n}$, and new terms involving $\partial\hat{n}/\partial\delta$ appear throughout, this partial derivative measures how sharply the invariant spin direction changes in response to the fractional energy jumps $\delta$ that accompany each photon emission. \cite{zara_berglund_2001}
@@ -230,6 +279,15 @@ Together, Baier-Katkov-Strakhovenko and Derbenev-Kondratenko theory move the pre
 
 This formalism remains an active area of research directly relevant to FCC-ee. A recent reformulation of the Derbenev-Kondratenko approach has been explicitly validated for storage rings with a wide range of energies, extending the original 1973 theory with corrections and providing estimates of its reliability at FCC-ee-relevant energies \cite{heinemann2026elaborationkineticapproachderbenev}.
 
+\subsection{Spin Orbit Resonances}
+
+\section{Polarization at FCC-ee Energies}
+
+\section{The Polarizer Ring}
+
+\section{Research Project}
+
+\section{Summary}
 
 \begin{acknowledgments}
 

@@ -1,15 +1,15 @@
 # Fdb version 4
-["bibtex Literature_Review"] 1783249309.91125 "Literature_Review.aux" "Literature_Review.bbl" "Literature_Review" 1783249313.36531 0
+["bibtex Literature_Review"] 1783512322.03448 "Literature_Review.aux" "Literature_Review.bbl" "Literature_Review" 1783512327.70968 0
   "./Literature_Review.bib" 1782916479.04156 12070 45d82e55390d56c6fd2a93c0c38f3247 ""
-  "./Literature_ReviewNotes.bib" 1783249312.87799 69 7fe5a2a5b0ca4322ba6c6ddff14c7fd3 ""
+  "./Literature_ReviewNotes.bib" 1783512327.18682 69 7fe5a2a5b0ca4322ba6c6ddff14c7fd3 ""
   "/usr/local/texlive/2025/texmf-dist/bibtex/bst/revtex4-1/aipnum4-1.bst" 1602107945 71940 a50ebfb042bce391330bc2a8a8568e8d ""
-  "Literature_Review.aux" 1783249312.87708 7791 b4aa4ea20ed74e49970c0279fcdef1d4 "pdflatex"
+  "Literature_Review.aux" 1783512327.18576 8270 072a07913e27f58a57f6ef12000dcf53 "pdflatex"
   (generated)
   "Literature_Review.bbl"
   "Literature_Review.blg"
   (rewritten before read)
-["pdflatex"] 1783249312.27871 "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Interim Dissertion (Literature Review)/Literature_Review.tex" "Literature_Review.pdf" "Literature_Review" 1783249313.36558 0
-  "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Interim Dissertion (Literature Review)/Literature_Review.tex" 1783249312.05496 21485 d1b5fdae31501e9c743b626f61c1c446 ""
+["pdflatex"] 1783512326.45268 "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Interim Dissertion (Literature Review)/Literature_Review.tex" "Literature_Review.pdf" "Literature_Review" 1783512327.71 0
+  "/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Assignments/Interim Dissertion (Literature Review)/Literature_Review.tex" 1783512326.22436 25435 d2085ea6ef61a7ad2812a8939e8df29e ""
   "/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/cm-super/cm-super-t1.enc" 1136849721 2971 def0b6c1f0b107b3b936def894055589 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -119,9 +119,9 @@
   "/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1742230541 5467155 19efa205003f9ecad95fbbaa6ff24da1 ""
   "/usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt" 1742230406 3345739 c0dbaaf7d4df3d1296850fcc7500354c ""
   "/usr/local/texlive/2025/texmf.cnf" 1741450484 577 418a7058ec8e006d8704f60ecd22c938 ""
-  "Literature_Review.aux" 1783249312.87708 7791 b4aa4ea20ed74e49970c0279fcdef1d4 "pdflatex"
-  "Literature_Review.bbl" 1783249310.06417 29525 6c7b67a28ec842c59e72d6d99bad67bf "bibtex Literature_Review"
-  "Literature_Review.tex" 1783249312.05496 21485 d1b5fdae31501e9c743b626f61c1c446 ""
+  "Literature_Review.aux" 1783512327.18576 8270 072a07913e27f58a57f6ef12000dcf53 "pdflatex"
+  "Literature_Review.bbl" 1783512322.18513 29525 6c7b67a28ec842c59e72d6d99bad67bf "bibtex Literature_Review"
+  "Literature_Review.tex" 1783512326.22436 25435 d2085ea6ef61a7ad2812a8939e8df29e ""
   (generated)
   "Literature_Review.aux"
   "Literature_Review.log"
