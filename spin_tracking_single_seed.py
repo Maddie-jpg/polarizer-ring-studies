@@ -23,6 +23,7 @@ import random
 #%%
 
 SEED = random.randint(0,int(1e6))
+SEED=4
 
 design = int(os.environ.get('DESIGN', 1))
 config = int(os.environ.get('CONFIG', 1))
@@ -31,7 +32,7 @@ long_scan_turns = 20000
 
 # %%
 
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_CC.json')
 energy=2.86e9
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0 = energy
@@ -50,7 +51,7 @@ line.configure_spin('auto')
 
 base_line = line.copy()
 
-results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}'
+results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}_CC'
 os.makedirs(results_dir, exist_ok=True)
 
 scan = mf.spin_tune_resonance_scan(line, nu_min=5.5, nu_max=7.5, n_points=80,
@@ -95,7 +96,7 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
         
     num_particles=300
 
-    '''particles = xp.generate_matched_gaussian_bunch(
+    particles = xp.generate_matched_gaussian_bunch(
         line=line,
         nemitt_x=tw.eq_nemitt_x,
         nemitt_y=tw.eq_nemitt_y,
@@ -106,9 +107,9 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
     particles.delta += tw.delta[0]
     particles.spin_x = tw.spin_x[0]
     particles.spin_y = tw.spin_y[0]
-    particles.spin_z = tw.spin_z[0]'''
+    particles.spin_z = tw.spin_z[0]
 
-    rng = np.random.default_rng(seed_val)
+    '''rng = np.random.default_rng(seed_val)
     fct=0
  
     epsx  = tw.eq_gemitt_x
@@ -159,7 +160,7 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
         y=parts[2], py=parts[3],
         zeta=parts[4], delta=parts[5],
         spin_x=parts[6], spin_y=parts[7], spin_z=parts[8],
-    )
+    )'''
     
 
     line.discard_tracker()

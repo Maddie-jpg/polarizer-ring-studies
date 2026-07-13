@@ -420,7 +420,7 @@ pdr.lines['ring'] = ringS3imp
 pdr.to_json('pdr_perfect_CC.json')
 # %% looping over several cases of misalignment to get spin build-up properties
 pdr = xt.Environment()
-pdr=pdr.from_json('/home/mwatson/Documents/laughing-octo-bassoon/JSON Files/D1/C1/pdr_perfect_CC.json')
+pdr=pdr.from_json('/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/JSON Files/D1/C1/pdr_perfect.json')
 ringS3=pdr.lines['ring']
 
 MisAlignrms = .26e-3 # larger gives unstable optics in vertical in some cases!!
@@ -464,8 +464,8 @@ for iMch in range(1, nMchs+1):
     normat = np.array([
         [(epsx*betxin)**.5,         0,                 0,  0, 0, dxin*(epsl/betlin)**.5],
         [-alfxin*(epsx/betxin)**.5, (epsx/betxin)**.5, 0,  0, 0, dpxin*(epsl/betlin)**.5],
-        [0,  0,  (epsx*betyin)**.5,         0,                 0, 0],
-        [0,  0,  -alfyin*(epsx/betyin)**.5, (epsx/betyin)**.5, 0, 0],
+        [0,  0,  (epsy*betyin)**.5,         0,                 0, 0],
+        [0,  0,  -alfyin*(epsy/betyin)**.5, (epsy/betyin)**.5, 0, 0],
         [0, 0, 0, 0, (epsl*betlin)**.5, 0                ],
         [0, 0, 0, 0, 0,                 (epsl/betlin)**.5] ])
     
@@ -539,7 +539,7 @@ for iMch in range(1, nMchs+1):
     ax.text(0.67, 0.73, r'$P_{eq}$'+f' ={100.*PeqBKS/(1+tauBKS/tauDep0):6.3f} % and '+r'$\tau_{Pol}$'+f' ={tauBKS/(1+tauBKS/tauDep0):7.2f} s', transform=ax.transAxes)
     ax.text(0.64, 0.66, r'with $\tau_{Dep}$' + f' ={tauDep1:7.2f} s:', transform=ax.transAxes )
     ax.text(0.67, 0.61, r'$P_{eq}$'+f' ={100.*PeqBKS/(1+tauBKS/tauDep1):6.3f} % and '+r'$\tau_{Pol}$'+f' ={tauBKS/(1+tauBKS/tauDep1):7.2f} s', transform=ax.transAxes)
-    fig.savefig( '/home/mwatson/Documents/laughing-octo-bassoon/External Files' + f'{iMch:3d}'.replace(' ','0') )
+    fig.savefig( '/Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/External Files/' + f'{iMch:3d}'.replace(' ','0') )
     
 # %%
 
