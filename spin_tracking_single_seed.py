@@ -23,16 +23,16 @@ import random
 #%%
 
 SEED = random.randint(0,int(1e6))
-SEED=4
 
-design = int(os.environ.get('DESIGN', 1))
-config = int(os.environ.get('CONFIG', 1))
+
+design = int(os.environ.get('DESIGN', 2))
+config = int(os.environ.get('CONFIG', 3))
 
 long_scan_turns = 20000  
 
 # %%
 
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_CC.json')
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
 energy=2.86e9
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0 = energy
@@ -51,7 +51,7 @@ line.configure_spin('auto')
 
 base_line = line.copy()
 
-results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}_CC'
+results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}'
 os.makedirs(results_dir, exist_ok=True)
 
 scan = mf.spin_tune_resonance_scan(line, nu_min=5.5, nu_max=7.5, n_points=80,
@@ -353,7 +353,7 @@ def plot_invariant_spin_vector(seed_val, apply_correction):
 
 
 plot_invariant_spin_vector(SEED, apply_correction=False)
-#plot_invariant_spin_vector(SEED, apply_correction=True)
+plot_invariant_spin_vector(SEED, apply_correction=True)
 
 #%%
 

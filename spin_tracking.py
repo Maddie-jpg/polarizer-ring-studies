@@ -33,7 +33,7 @@ config=int(os.environ.get('CONFIG',1))
 # fair paired comparison (same misalignment pattern, with vs without
 # correction) rather than loading two separately-prepared JSON files that
 # might not even share the same misalignment realization.
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_120.json')
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9
 
@@ -80,7 +80,7 @@ def prep_branch(seed, apply_correction):
     # discard the tracker afterward (that would wipe the misalignments).
     seed_line.configure_radiation('mean')
     seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    seed_line = mc.misalignments(seed_line, 0.2e-3, seed=seed)
+    seed_line = mc.misalignments(seed_line, 0.26e-3, seed=seed)
 
     tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)

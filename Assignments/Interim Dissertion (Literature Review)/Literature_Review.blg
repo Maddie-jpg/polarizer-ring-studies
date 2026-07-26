@@ -1,7 +1,8 @@
 This is BibTeX, Version 0.99d (TeX Live 2025)
 Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: Literature_Review.aux
-The style file: aipnum4-1.bst
+The style file: aipnum4-2.bst
+Reallocated singl_function (elt_size=4) to 100 items from 50.
 Reallocated singl_function (elt_size=4) to 100 items from 50.
 Reallocated singl_function (elt_size=4) to 100 items from 50.
 Reallocated singl_function (elt_size=4) to 100 items from 50.
@@ -14,11 +15,12 @@ Database file #2: Literature_Review.bib
 Warning--entry type for "blondel_theory_2019" isn't style-file defined
 --line 139 of file Literature_Review.bib
 Warning--I didn't find a database entry for ""
-control{REVTEX41Control}, control.key{N/A}, control.author{N/A}, control.editor{N/A}, control.title{N/A}, control.pages{N/A}, control.year{N/A}, control.eprint{N/A}, 
+control{REVTEX42Control}, control.key{N/A}, control.author{N/A}, control.editor{N/A}, control.title{N/A}, control.pages{N/A}, control.year{N/A}, control.eprint{N/A}, 
 control{aip41Control}, control.key{N/A}, control.author{N/A}, control.editor{N/A}, control.title{0}, control.pages{1}, control.year{N/A}, control.eprint{N/A}, 
 Warning--jnrlst (dependency: not reversed) set 1
 Reallocated singl_function (elt_size=4) to 100 items from 50.
-merlin.mbs aipnum4-1.bst 2010-07-25 4.21a (PWD, AO, DPC) hacked
+Reallocated wiz_functions (elt_size=4) to 9000 items from 6000.
+aipnum4-2.bst 2019-01-14 (MD) hand-edited version of apsrev4-1.bst
 Control: key (0) 
 Control: author (8) initials jnrlst
 Control: editor formatted (1) identically to author
@@ -27,10 +29,10 @@ Control: page (1) range
 Control: year (1) truncated
 Control: production of eprint (0) enabled
 Warning--missing journal in dam_precision_2016
+Warning--missing journal in denterria_physics_2016
 Warning--missing publisher in benedikt_future_2025
 Warning--missing journal in blondel_polarization_2019
 Warning--missing publisher in Dam2025DetectorRequirements
-Warning--missing journal in denterria_physics_2016
 Warning--missing publisher in SiringoBuccheri2025
 Warning--missing publisher in hamwi_hoffstaetter_2025
 Warning--empty author and editor in meot_huang_ptitsyn_lin_2023
@@ -41,45 +43,47 @@ Warning--missing publisher in sokolov_ternov_1963
 Warning--missing publisher in baier_2006
 Warning--missing publisher in assmann_1999
 Warning--missing publisher in derbenev_kondratenko_1973
-You've used 34 entries,
-            5918 wiz_defined-function locations,
-            1804 strings with 22859 characters,
-and the built_in function-call counts, 39087 in all, are:
-= -- 2000
-> -- 1532
-< -- 249
-+ -- 474
-- -- 418
-* -- 6604
-:= -- 3816
-add.period$ -- 53
-call.type$ -- 34
-change.case$ -- 149
-chr.to.int$ -- 35
-cite$ -- 51
-duplicate$ -- 3610
-empty$ -- 2806
-format.name$ -- 813
-if$ -- 7598
-int.to.chr$ -- 2
-int.to.str$ -- 41
-missing$ -- 440
-newline$ -- 148
-num.names$ -- 93
-pop$ -- 1428
+Warning--missing publisher in keskar_bartosik_carli_2026
+Warning--missing journal in Ogur:2713264
+You've used 55 entries,
+            6039 wiz_defined-function locations,
+            1968 strings with 27955 characters,
+and the built_in function-call counts, 62986 in all, are:
+= -- 3400
+> -- 2361
+< -- 332
++ -- 738
+- -- 635
+* -- 10550
+:= -- 6217
+add.period$ -- 91
+call.type$ -- 55
+change.case$ -- 260
+chr.to.int$ -- 61
+cite$ -- 74
+duplicate$ -- 5826
+empty$ -- 4585
+format.name$ -- 1247
+if$ -- 12254
+int.to.chr$ -- 3
+int.to.str$ -- 62
+missing$ -- 708
+newline$ -- 211
+num.names$ -- 156
+pop$ -- 2224
 preamble$ -- 1
-purify$ -- 160
+purify$ -- 265
 quote$ -- 0
-skip$ -- 1201
+skip$ -- 1915
 stack$ -- 0
-substring$ -- 611
-swap$ -- 3586
-text.length$ -- 164
+substring$ -- 1138
+swap$ -- 5813
+text.length$ -- 260
 text.prefix$ -- 0
 top$ -- 10
-type$ -- 527
-warning$ -- 16
-while$ -- 110
+type$ -- 846
+warning$ -- 18
+while$ -- 193
 width$ -- 0
-write$ -- 307
-(There were 18 warnings)
+write$ -- 477
+(There were 20 warnings)

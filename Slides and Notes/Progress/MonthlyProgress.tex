@@ -1,0 +1,264 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+\usepackage{dsfont}
+\usepackage[margin=1in]{geometry}
+
+\title{Placement progress and notes}
+\author{Madeleine Watson}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+%---------
+% MONTH 1
+%---------
+
+\section{Month 1: 23/02/2026 - 20/03/2026}
+\subsection{Overview}
+
+Spent the first week familiarising myself with beam optics concepts and Xsuite functions. Then began understanding and editing a code for a compact ring with 90$^\circ$ phase advance.
+
+\subsection{Work completed}
+
+\begin{itemize}
+\item Initially read papers to understand how the ring functions and what processes go into it.
+\item Made notes on initial ring design code and started compiling work into a GitHub repository.
+\item Added sextupoles to the ring design and performed chromaticity correction.
+\item Corrected beta-functions to create uniform Twiss plot.
+\item Corrected working point and found two potential candidates.
+\end{itemize}
+
+\subsection{Problems encountered}
+
+\textbf{Breaking the ring:} \texttt{Invalid n1}, \texttt{Invalid n2}, and \texttt{Invalid n3} errors arose when trying to add sextupoles. This scenario halted progress the most.
+\begin{itemize}
+    \item \textbf{Solution:} There was no set solution to this error but there were some common causes: changing the geometry of the ring, not matching/rematching the quadrupole strengths. The `breakage' could be identified by computing a Twiss with specified conditions.
+\end{itemize}
+
+\textbf{Sextupole positioning:} This would cause ring breakage. It took a week or so to identify sextupole positions that worked.
+\begin{itemize}
+    \item \textbf{Solution:} I tried creating a function that identified the best positions for sextupoles, but the best solution was trial and error and knowledge of ring properties.
+\end{itemize}
+
+\textbf{Large beta-functions:} Changing parameters resulted in increased beta-functions
+\begin{itemize}
+    \item \textbf{Solution:} Consistently running matching functions and identifying best positions and working points.
+\end{itemize}
+
+\subsection{Results and progress}
+\begin{itemize}
+    \item The initial compact ring now has sextupoles inserted: there are currently 16 in each arc (8 focusing, 8 defocusing).
+    \item Strengths and beta-functions have been corrected
+    \item Two potential working points have been identified and plotted on resonance graphs to show suitability
+    \item Using these working points resulted in reduced beta-functions, more uniform Twiss plots, and slightly reduced sextupole strengths.
+    \item Another configuration with a decreased triplet drift length is being explored and shows signs of reduced beta-functions
+    \item Chromatic functions are plotted and show slightly different, but periodic, results for both working points.
+\end{itemize}
+
+\subsection{Next steps}
+\begin{itemize}
+    \item Further refine suitability of the working point
+    \item Track off-momentum particles
+    \item Track dynamic aperture and momentum acceptance
+    \item Work on different sextupole configurations with different positions, families, and cell lengths in parallel
+\end{itemize}
+
+\subsection{Skills developed}
+\begin{itemize}
+    \item \textbf{Knowledge of beam optics concepts:} Twiss parameters, chromaticity, tune, basics of synchrotron radiation, and dynamic aperture
+    \item \textbf{Xsuite:} Building rings and inserting elements, calculating Twiss plots, creating matching functions
+\end{itemize}
+
+%---------
+% MONTH 2
+%---------
+
+\section{Month 2: 23/03/2026 - 24/04/2026}
+\subsection{Overview}
+
+Completed dynamic aperture and momentum acceptance studies for different configurations. Experimented with slicing, integrators, and fringe fields. Now introducing misalignments and corrections.
+
+\subsection{Work completed}
+
+\begin{itemize}
+\item Plotted DA/MA for 7 different sextupole configurations 
+\item Optimised configurations to increase DA/MA
+\item Changed number of slices in integrators to increase quality of plots
+\item Introduced fringe fields for every magnet type and compared with "perfect" results
+\item Performed frequency map analysis
+\item Introduced misalignments, inserted BPMs and correctors, and performed orbit correction
+\end{itemize}
+
+\subsection{Problems encountered}
+
+\textbf{Reducing non-linearities:} Chromatic correction is working for $dqx$ and $dqy$ but often plotting tune against momentum deviation showed that $ddqx$ and $ddqy$ had not been properly corrected. This contributed to smaller DA/MA. Performing chromaticity correction to get these values to 0 often failed as it was too much of a jump.
+\begin{itemize}
+    \item \textbf{Solution:} The chromaticity correction tries to match to 80\% of the value of $ddqx$ and $ddqy$. If this is successful, it iterates through 80\% of the resulting values until the code fails. It takes the strengths from the iteration with the smallest second order chromaticity.
+\end{itemize}
+
+
+\textbf{Code organisation:} Many scripts and results in different places
+\begin{itemize}
+    \item \textbf{Solution:} Everything has been modularised so it is easier to see where errors arise and can edit things more efficiently. This will also help with later lattice designs.
+\end{itemize}
+
+\subsection{Results and progress}
+\begin{itemize}
+    \item Increasing the number of slices for the quadrupoles created smoother curves in the DA/MA plots, but there were no differences when increasing the slices for bends and quadrupoles.
+    \item Fringe fields reduced the less stable configurations' DA/MA considerably, but not as much for stable configurations.
+    \item Added another focusing sextupole pair to the configuration with two sextupole pairs at 180$^\circ$ phase advance, which dramatically improved momentum acceptance.
+    \item Frequency map analysis calculated and shows stable diffusion
+    \item BPMs and correctors are currently placed around every quadrupole (horizontal and vertical) and the MICADO algorithm is used for corrections
+    \item With corrections, the orbits are currently oscillating at less than 1mm
+\end{itemize}
+
+\subsection{Next steps}
+\begin{itemize}
+    \item Studies on spin tracking and polarization build-up time
+    \item Looking at integration with the rest of the injector complex using current macroparticle distribution
+    \item Assess injection efficiency
+\end{itemize}
+
+\subsection{Skills developed}
+\begin{itemize}
+    \item \textbf{Dynamic aperture and momentum acceptance:} how it is calculated and the effects of adjusting integrators and slices
+    \item \textbf{Knowledge of beam optics concepts:} fringe fields, FMA, BPMs, correctors, synchrotron radiation damping
+\end{itemize}
+
+%---------
+% MONTH 3
+%---------
+
+\section{Month 3: 27/04/2026 - 22/05/2026}
+\subsection{Overview}
+Simulated injection efficiency using the most recent macroparticle distribution and varied reference energy. Observed the effect of misalignments on dynamic aperture. Created a code based on A.Verdier's paper that identifies dangerous resonances. Spent time studying theory in a more in depth way.
+\subsection{Work completed}
+
+\begin{itemize}
+\item Using the most recent macroparticle distribution:
+    \begin{itemize}
+    \item Plotted transverse and longitudinal phase space
+    \item Calculated emittances, Twiss parameters, and momentum spread
+    \item Normalised distribution (taking dispersion into account) and performed initial injection simulation 
+    \item Performed energy scan to find most efficient injection energy and ran simulation at this value 
+    \end{itemize}
+\item Ran dynamic aperture calculation with misalignments and corrections to see how much it is affected (for 2 configurations)
+\item Created code that identifies which resonances the working point could potentially be excited to, for a specific lattice
+\item Spent time studying the derivation of particle motion equations, limits of emittance, and limits of synchrotron radiation
+\end{itemize}
+
+\subsection{Problems encountered}
+
+\textbf{Macroparticle distribution size:} The distribution contained 25,000 macroparticles which took up too much memory to be able to run in one go.
+\begin{itemize}
+    \item \textbf{Solution:} Took random subsets of 500 particles and averaged across seeds to get the injection efficiency.
+\end{itemize}
+
+\subsection{Results and progress}
+\begin{itemize}
+    \item Using configuration 1 at the average energy obtained $\approx 33\%$ injection efficiency
+    \item Using configuration 2 at the average energy obtained $\approx 57\%$ injection efficiency
+    \item Optimising the energy for injection increased the injection efficiency for configuration 2
+    \item For both configurations, DA was around $5\sigma$ after misalignments and corrections but MA significantly reduced for configuration 2
+    \item The Verdier resonance scan revealed that the current working point is close to several non-structural resonances
+\end{itemize}
+
+\subsection{Next steps}
+\begin{itemize}
+    \item Run DA/MA for newly calculated emittances 
+    \item Simulate an energy compressor to see if the injection efficiency can increase further and reduce energy spread
+    \item Spin tracking and equilibrium polarization
+\end{itemize}
+
+\subsection{Skills developed}
+\begin{itemize}
+    \item Simulations of particle distributions in the ring 
+    \item Particle motion understanding
+\end{itemize}
+
+%---------
+% MONTH 4
+%---------
+
+\section{Month 4: 26/05/2026 - 03/07/2026}
+\subsection{Overview}
+Used an energy compressor with optimised parameters to reduce energy spread and increase injection efficiency. Coded spin tracking simulations to calculate equilibrium polarization for multiple misalignment and correction cases.
+
+\subsection{Work completed}
+
+\begin{itemize}
+\item Re-worked code structure to make it more sreamlined and ran configurations with newly calculated emittances
+\item Introduced an energy compression system into the macroparticle script distribution using $\delta_{new}=\delta_{old}+V_{deb}\sin{2\pi\cdot\zeta_{new}+\frac{V_{RF}}{c}+\phi_{deb}}$ where $\zeta_{new}=\zeta_{old}+R_{56}\cdot\delta$
+\item $V_{deb}$,$R_{56}$, and $\phi_{deb}$ were optimised to minimise energy spread
+\item Studied theory for Thomas-BMT equation, spin tune and motion, Debrenev-Kondratenko-Mane and Baier-Khatkov-Strakhovenko formalisms
+\item Built a spin tracking code based on this theory that calculates $P_{eq}$ for multiple misalignment seeds
+\end{itemize}
+
+\subsection{Problems encountered}
+
+\textbf{Very low equilibrium polarization values:} Each result produced very low equilibrium polarization values which only became worse when corrections were implemented. However, there was no obvious error with the calculations.
+\begin{itemize}
+    \item \textbf{Solution:} The anomolous magnetic moment was not explicitly set which greatly affected results. Once this was corrected, results dramatically improved. To confirm the magnetic moment was correct; a plot of the invariant spin vector, using a particle with initialised spin, was used.
+\end{itemize}
+
+\subsection{Results and progress}
+\begin{itemize}
+    \item With the optimised energy and energy compressor, the efficiency of configuration 1 increased from $\approx 33\%$ to $\approx 85\%$
+    \item The original longitudinal distribution had an energy spread of $6.48\%$ and this has decreased to $5.82\%$
+    \item It should also be noted that part of the distribution has been sheared to reduce the tail
+    \item Spin tracking is producing very high equilibrium polarization rates, around the asymptotic limit of $92.4\%$ with a polarization time of $\approx 13$ minutes
+\end{itemize}
+
+\subsection{Next steps}
+\begin{itemize}
+    \item Verify spin tracking results and compare with supervisor's code, understand where discrepancies come from
+    \item Understand how synchrotron tune plays a role and spin coupling
+    \item Explore other cell types, for example TME cells, to try and reduce equilibrium emittance by a factor of 10 
+    \item Optimise racetrack configuration
+\end{itemize}
+
+\subsection{Skills developed}
+\begin{itemize}
+    \item Increased understanding of spin motion and tune and how other formalisms introduce radiative depolarizing effects into spin polarization.
+\end{itemize}
+
+%---------
+% MONTH 5
+%---------
+
+\section{Month : dd/mm/2026 - dd/mm/2026}
+\subsection{Overview}
+
+\subsection{Work completed}
+
+\begin{itemize}
+\item
+\end{itemize}
+
+\subsection{Problems encountered}
+
+\textbf{Problem:} text
+\begin{itemize}
+    \item \textbf{Solution:}
+\end{itemize}
+
+\subsection{Results and progress}
+\begin{itemize}
+    \item 
+\end{itemize}
+
+\subsection{Next steps}
+\begin{itemize}
+    \item 
+\end{itemize}
+
+\subsection{Skills developed}
+\begin{itemize}
+    \item \textbf{Theme:} text
+\end{itemize}
+
+\end{document}

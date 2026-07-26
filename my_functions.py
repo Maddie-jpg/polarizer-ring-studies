@@ -90,8 +90,8 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     
     return axt
 
-# Routine generating graphical and text output describing the ring    
-def SpuckParsAus( line,acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGraph' ):
+# Routine generating graphical and text output describing the ring
+def SpuckParsAus(line, acc_tw, acc, lims, limy1, limy2, scK1, pdr, grname='NoGraph'):
 
     element_names = line.element_names
     sectors = set()
@@ -105,45 +105,57 @@ def SpuckParsAus( line,acc_tw, acc, lims, limy1, limy2, scK1,pdr, grname='NoGrap
     N_c = len(sectors) if len(sectors) > 0 else 1
     # Fallback default if your specific layout operates on a hardcoded sector configuration:
     if N_c == 1:
-        N_c = 2  
+        N_c = 2
 
-    axt = addSketchBL( acc_tw, acc, lims, limy1, limy2, scK1 )
-    axt.text( 0.0, .7, f'C ={N_c*acc_tw.circumference:8.4f} m', horizontalalignment='left' )
-    axt.text( 1.0, .7, f'T ={N_c*1e6*acc_tw.T_rev0:8.4f} us', horizontalalignment='left')
-    axt.text( 2.0, .7, r'($Q_x$, $Q_y$)' + f' = ({N_c*acc_tw.qx:9.5f}, {N_c*acc_tw.qy:9.5f})',horizontalalignment='left')
+    axt = addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1)
+    axt.text(0.0, .7, f'C ={N_c*acc_tw.circumference:8.4f} m', horizontalalignment='left')
+    axt.text(1.0, .7, f'T ={N_c*1e6*acc_tw.T_rev0:8.4f} us', horizontalalignment='left')
+    axt.text(2.0, .7, r'($Q_x$, $Q_y$)' + f' = ({N_c*acc_tw.qx:9.5f}, {N_c*acc_tw.qy:9.5f})',
+             horizontalalignment='left')
 
-    
-    pos=0
-    for item in pdr.vars.keys()[2:]:
-         val = pdr[item]
-         if abs(val) > 1e-12: 
+    pos = 0
+    for item in pdr.vars.keys():
+        if item.startswith('__'):        # internal entries like __vary_default__
+            continue
+        val = pdr[item]
+        if not isinstance(val, (int, float, np.floating, np.integer)):
+            continue                     # skip dicts/expressions/anything non-scalar
+        if np.abs(val) > 1e-12:
             print("'" + item + f"': {val:8.4f},")
-            axt.text(pos%4 , .6 - .1*int(pos/4),
-                  "'" + item + f"': {val:8.4f},",
-                  horizontalalignment='left')
+            axt.text(pos % 4, .6 - .1 * int(pos / 4),
+                     "'" + item + f"': {val:8.4f},",
+                     horizontalalignment='left')
             pos += 1
-    file=os.getcwd()
-    if grname != 'NoGraph': 
-       if grname in file:
-          print( ' Error: file ' + grname + ' exists <<<<<<<<<<<================' )
-       else:
-          plt.savefig( f"{file}/{grname}" )
+
+    file = os.getcwd()
+    if grname != 'NoGraph':
+        out_path = os.path.join(file, grname)
+        if os.path.exists(out_path):
+            print(' Error: file ' + grname + ' exists <<<<<<<<<<<================')
+        else:
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            plt.savefig(out_path)
+
     tab_pan = acc.get_table(attr=True).to_pandas()
     print('  Name        Type      L(m)     sin(m)   sout(m)  driftl  driftr    k1(1/m^2)')
-    for ind in range( len(tab_pan.T.columns) - 1 ):
-       eltyp = tab_pan['element_type'][ind]
-       if eltyp.find('Drift') < 0:
-          elnam = tab_pan['name'][ind]
-          if ind < 1: sin = '  0.0000'
-          else: sin = f"{tab_pan['length'][ind-1]:8.4f}"         
-          k1expr = pdr.element_refs[elnam].k1._expr
-          if k1expr == None: k1expr = ' None'
-          else: k1expr = str(k1expr)[5:-1]
-          print(  "  " + elnam.ljust( 12 ) + eltyp.ljust(12)[:8] + f" {tab_pan['length'][ind]:7.4f} " + 
-               f"{tab_pan['s'][ind]:8.4f} {tab_pan['s'][ind+1]:8.4f} " + sin +
-               f"{tab_pan['length'][ind+1]:8.4f} " + k1expr.ljust(9) + 
-               f"= {tab_pan['k1l'][ind]/max(tab_pan['length'][ind],1e-6):7.4f}  " )
-          
+    for ind in range(len(tab_pan.T.columns) - 1):
+        eltyp = tab_pan['element_type'][ind]
+        if eltyp.find('Drift') < 0:
+            elnam = tab_pan['name'][ind]
+            if ind < 1:
+                sin = '  0.0000'
+            else:
+                sin = f"{tab_pan['length'][ind-1]:8.4f}"
+            k1expr = pdr.element_refs[elnam].k1._expr
+            if k1expr == None:
+                k1expr = ' None'
+            else:
+                k1expr = str(k1expr)[5:-1]
+            print("  " + elnam.ljust(12) + eltyp.ljust(12)[:8] + f" {tab_pan['length'][ind]:7.4f} " +
+                  f"{tab_pan['s'][ind]:8.4f} {tab_pan['s'][ind+1]:8.4f} " + sin +
+                  f"{tab_pan['length'][ind+1]:8.4f} " + k1expr.ljust(9) +
+                  f"= {tab_pan['k1l'][ind]/max(tab_pan['length'][ind],1e-6):7.4f}  ")
+
     return axt
 
 

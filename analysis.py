@@ -22,10 +22,11 @@ import constants
 import my_functions as mf
 from matplotlib.backends.backend_pdf import PdfPages
 import tune_wp_scan as twps
+xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',2))
-config=int(os.environ.get('CONFIG',3))
+design=int(os.environ.get('DESIGN',1))
+config=int(os.environ.get('CONFIG',1))
 mode=os.environ.get('MODE','perfect')
 
 
@@ -44,13 +45,13 @@ if pdf_run is True:
     plt.savefig = _new_savefig
 
 # %%
-pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}.json")
+pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_120.json")
 
 ring=pdr.lines['ring']
 print(ring.element_names)
 period=pdr.lines['period']
 
-variable_name = f"WP_D{design}"
+variable_name = f"WP_D{design}_120"
 
 current_wp = getattr(constants, variable_name)
 
@@ -105,6 +106,75 @@ plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_closed_orbit_{mode}.png')
 ring_tw.plot()
 plt.tight_layout()
 plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_twiss_{mode}.png')
+
+
+# %% Straight-section zoom: optics and phase advances
+
+def straight_section_window(tw, pad=2.0, cluster_gap=20.0):
+    """s-range covering the first straight section, found from the
+    doublet/triplet quads that bound it, padded by `pad` metres.
+    cluster_gap: gap (m) between quad clusters above which a new
+    straight section is assumed to start."""
+    names = list(tw.name)
+    s_marks = [tw['s', nn] for nn in names
+               if nn.startswith(('QFDoub_', 'QDDoub_', 'QDTrip_', 'QFTripC_'))]
+    if len(s_marks) == 0:
+        raise ValueError("No doublet/triplet quads found -- check name prefixes")
+    s_marks = np.sort(np.asarray(s_marks))
+    breaks = np.where(np.diff(s_marks) > cluster_gap)[0]
+    end_first = s_marks[breaks[0]] if len(breaks) else s_marks[-1]
+    start_first = s_marks[0]
+    return start_first - pad, end_first + pad
+
+
+s_lo, s_hi = straight_section_window(ring_tw)
+mask = (ring_tw.s >= s_lo) & (ring_tw.s <= s_hi)
+
+# --- Plot 2: optics zoom in the straight section ---
+fig, ax1 = plt.subplots(figsize=(10, 5))
+ax1.plot(ring_tw.s[mask], ring_tw.betx[mask], color='red', label=r'$\beta_x$')
+ax1.plot(ring_tw.s[mask], ring_tw.bety[mask], color='blue', label=r'$\beta_y$')
+ax1.set_xlabel('s (m)')
+ax1.set_ylabel(r'$\beta_x$, $\beta_y$ [m]')
+ax1.grid(True, linestyle=':', alpha=0.6)
+ax1b = ax1.twinx()
+ax1b.plot(ring_tw.s[mask], ring_tw.dx[mask], 'k--', label='$D_x$')
+ax1b.set_ylabel('$D_x$ [m]')
+h1, l1 = ax1.get_legend_handles_labels()
+h2, l2 = ax1b.get_legend_handles_labels()
+ax1.legend(h1 + h2, l1 + l2, loc='best')
+ax1.set_xlim(s_lo, s_hi)
+ax1.set_title(f'Straight section optics ({mode})')
+plt.tight_layout()
+plt.savefig(f'Results/D{design}/C{config}/{mode}/straight_optics_{mode}.png')
+
+# --- Plot 3: same zoom, optics + phase advances on a shared s-axis ---
+mux0 = ring_tw.mux[mask][0]
+muy0 = ring_tw.muy[mask][0]
+
+fig, (axo, axm) = plt.subplots(2, 1, figsize=(10, 8), sharex=True,
+                                height_ratios=(3, 2))
+axo.plot(ring_tw.s[mask], ring_tw.betx[mask], color='red', label=r'$\beta_x$')
+axo.plot(ring_tw.s[mask], ring_tw.bety[mask], color='blue', label=r'$\beta_y$')
+axo.set_ylabel(r'$\beta_x$, $\beta_y$ [m]')
+axo.grid(True, linestyle=':', alpha=0.6)
+axob = axo.twinx()
+axob.plot(ring_tw.s[mask], ring_tw.dx[mask], 'k--', label='$D_x$')
+axob.set_ylabel('$D_x$ [m]')
+h1, l1 = axo.get_legend_handles_labels()
+h2, l2 = axob.get_legend_handles_labels()
+axo.legend(h1 + h2, l1 + l2, loc='best')
+axo.set_title(f'Straight section optics and phase advance ({mode})')
+
+axm.plot(ring_tw.s[mask], ring_tw.mux[mask] - mux0, color='red', label=r'$\mu_x$')
+axm.plot(ring_tw.s[mask], ring_tw.muy[mask] - muy0, color='blue', label=r'$\mu_y$')
+axm.set_xlabel('s (m)')
+axm.set_ylabel(r'$\Delta\mu$ from straight entrance [$2\pi$]')
+axm.grid(True, linestyle=':', alpha=0.6)
+axm.legend(loc='best')
+axo.set_xlim(s_lo, s_hi)
+plt.tight_layout()
+plt.savefig(f'Results/D{design}/C{config}/{mode}/straight_phase_advance_{mode}.png')
 
 
 def calc_damping_time_constant(m):
@@ -191,16 +261,44 @@ for (row, col), cell in table.get_celld().items():
 plt.savefig(f'Results/D{design}/C{config}/{mode}/table_{mode}.png')
 
 
+def dynamic_tune_ranges(qx_data, qy_data, pad_frac=0.15, min_span=0.02):
+    """
+    Compute (Qx_range, Qy_range) that encompass all plotted tune data.
+
+    qx_data / qy_data: scalars, lists, or arrays (mix is fine) -- everything
+    that will appear on the plot (WP, chromatic curve, footprint, ...).
+    pad_frac: fractional padding added on each side of the data span.
+    min_span: minimum half-window, so a single WP dot still gets a
+              readable neighborhood instead of a degenerate range.
+    """
+    qx_all = np.concatenate([np.atleast_1d(np.asarray(q, dtype=float)).ravel()
+                              for q in qx_data])
+    qy_all = np.concatenate([np.atleast_1d(np.asarray(q, dtype=float)).ravel()
+                              for q in qy_data])
+    qx_all = qx_all[np.isfinite(qx_all)]
+    qy_all = qy_all[np.isfinite(qy_all)]
+
+    def ranged(vals):
+        lo, hi = vals.min(), vals.max()
+        span = max(hi - lo, 2 * min_span)
+        pad = pad_frac * span
+        return (lo - pad, hi + pad)
+
+    return ranged(qx_all), ranged(qy_all)
+
+
 #Working point plot
 resonance_orders = (1,2,3,4)
-Qx_range = (15,16)
-Qy_range = (15,16)
+Qx_range, Qy_range = dynamic_tune_ranges([ring_tw.qx], [ring_tw.qy],
+                                          pad_frac=0.15, min_span=0.05)
 resonances = resonance_lines(Qx_range,Qy_range,resonance_orders,3)
 fig, ax = plt.subplots(1, figsize=(8,8), alpha=0.3)
 ax.plot(ring_tw.qx, ring_tw.qy,'o', 
                 color='green', label='Current working point', markersize=5)
 ax.legend()
 resonances.plot_resonance(fig)
+ax.set_xlim(Qx_range)
+ax.set_ylim(Qy_range)
 plt.tight_layout()
 plt.savefig(f'Results/D{design}/C{config}/{mode}/WP_{mode}.png')
 
@@ -231,7 +329,7 @@ for d in deltas:
         qy_s=ring_tw.qy+ring_tw.dqy*d
         qy_shift.append(qy_s)
         delta.append(d)
-    except:
+    except Exception:
         print('deltap of %1.2e not stable'%d)
 
 
@@ -239,8 +337,6 @@ nominal_tw = ring.twiss4d(delta0=0)
 
 plt.figure(figsize=(8,4))
 WP = (nominal_tw.qx,nominal_tw.qy)
-Qx_range = (np.floor(WP[0])-0.05,np.floor(WP[0])+0.55)
-Qy_range = (np.floor(WP[1])-0.05,np.floor(WP[1])+0.55)
 
  
 plt.plot(delta, qx-np.floor(WP[0]), label='$Q_x$ (twiss)', color='tab:blue')
@@ -261,6 +357,8 @@ plt.savefig(f'Results/D{design}/C{config}/{mode}/momentum_deviation{current_wp}_
 nominal_tw = ring.twiss4d(delta0=0)
 '''Qx_range = (nominal_tw.qx-0.005,tw.qx+0.005)
 Qy_range = (nominal_tw.qy-0.1,tw.qy+0.1)'''
+Qx_range, Qy_range = dynamic_tune_ranges(
+    [qx, nominal_tw.qx], [qy, nominal_tw.qy], pad_frac=0.15)
 resonances = resonance_lines(Qx_range,Qy_range,resonance_orders,3)
 fig, ax = plt.subplots(1, figsize=(8,8), alpha=0.3)
 
@@ -270,6 +368,8 @@ ax.plot(qx, qy, label='Chromatic Footprint', color='tab:blue')
 ax.plot(nominal_tw.qx,nominal_tw.qy, 'ro', label='Nominal ($\delta=0$)')
 ax.legend()
 resonances.plot_resonance(fig)
+ax.set_xlim(Qx_range)
+ax.set_ylim(Qy_range)
 plt.tight_layout()
 plt.savefig(f'Results/D{design}/C{config}/{mode}/momentum_dev_working_point{current_wp}_{mode}.png')
 
@@ -297,26 +397,35 @@ while r_max >= 1:
         r_max -= 1.0
 
 if fp0 is not None:
-    resonances = resonance_lines(Qx_range, Qy_range, resonance_orders, 3)
-    fig, ax = plt.subplots(figsize=(8,8))
-
     q_offset_x = np.floor(WP[0])
     q_offset_y = np.floor(WP[1])
 
+    # get_footprint returns fractional tunes -> shift to absolute.
     fp0.qx += q_offset_x
     fp0.qy += q_offset_y
 
+    # NOTE: qx/qy (from twiss4d) and nominal_tw.qx/qy are ALREADY absolute
+    # tunes -- do not add the integer offset to them again.
+    Qx_range, Qy_range = dynamic_tune_ranges(
+        [fp0.qx, qx, nominal_tw.qx],
+        [fp0.qy, qy, nominal_tw.qy],
+        pad_frac=0.15)
+    resonances = resonance_lines(Qx_range, Qy_range, resonance_orders, 3)
+    fig, ax = plt.subplots(figsize=(8,8))
+
     fp0.plot(ax=ax, color='orange', label=f'Amplitude Footprint ({r_max}σ)')
 
-    ax.plot(qx + q_offset_x, qy + q_offset_y, '.-', 
+    ax.plot(qx, qy, '.-', 
             label=f'Chromatic shift (δ: {min(delta):.1e} to {max(delta):.1e})', 
             color='g', lw=2)
 
-    ax.plot(nominal_tw.qx + q_offset_x, nominal_tw.qy + q_offset_y, 
+    ax.plot(nominal_tw.qx, nominal_tw.qy, 
             'ro', label='Nominal ($\delta=0$)', ms=9)
 
     resonances.plot_resonance(fig)
 
+    ax.set_xlim(Qx_range)
+    ax.set_ylim(Qy_range)
     ax.set_xlabel('$Q_x$')
     ax.set_ylabel('$Q_y$')
     ax.legend(loc='best')
@@ -756,7 +865,7 @@ plt.show()'''
 # %%
 '''context = xo.ContextCpu(omp_num_threads=None)
 
-# %% Simple test of tracking with synchrotron radiation - takes some time
+#  Simple test of tracking with synchrotron radiation - takes some time
 ring.configure_radiation(model='mean')
 ring_tw=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True)
 #ring_tw.plot()
@@ -827,5 +936,3 @@ print( [pdr['RFCav_1'].lag, pdr['RFCav_1'].voltage] )
 
 print( f' Particle survival: {int(((p2.state + 1)/2).sum()):5d} out of {npts:5d}' )
 plt.savefig(f'config_D{n}/Particle_survival_{n}.png')'''
-
-
