@@ -559,9 +559,17 @@ particles.sort(interleave_lost_particles=True)
 # my_xpf.coordinates_vs_turns (dic_particles_all['x_sigma'], dic_particles_all['px_sigma'], dic_particles_all['at_turn'], r'$x~[\sigma_x]$', r'$p_x~[\sigma_x]$', particle_id_list=dic_particles_all['particle_id_list'], full_init_cond=study_param['number_of_particles'])
 # my_xpf.MA_vs_turns(particles, grid_details['num_r_y_points'], grid_details['num_delta'], grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'])
 x_DA,y_DA,_,_=my_xpf.DA_vs_turns(particles, grid_details['num_r_y_points'], grid_details['num_theta_x_points'], grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'],delta_plots=True)
-plt.xlim(-16,16)
-plt.ylim(0,20)
-plt.savefig(f"Results/D{design}/C{config}/{mode}/DA_plot_{mode}_WP{current_wp}.png")
+
+ax = plt.gca()
+out = f"Results/D{design}/C{config}/{mode}"
+
+plt.savefig(f"{out}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+
+ax.relim(); ax.autoscale_view()          
+(x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+ax.set_xlim(x0 - 3, x1 + 3)
+ax.set_ylim(y0 - 3, y1 + 3)
+plt.savefig(f"{out}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
 #%matplotlib widget
@@ -701,8 +709,14 @@ particles.sort(interleave_lost_particles=True)
 
 # %%
 my_xpf.MA_vs_turns(particles, grid_details['num_r_y_points'], 51, grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'])
-plt.xlim(-5,5)
-plt.savefig(f"Results/D{design}/C{config}/{mode}/MA_plot_{mode}_WP{current_wp}.png")
+
+plt.savefig(f"{out}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+
+ax.relim(); ax.autoscale_view()          
+(x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+ax.set_xlim(x0 - 3, x1 + 3)
+ax.set_ylim(y0 - 3, y1 + 3)
+plt.savefig(f"{out}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
 

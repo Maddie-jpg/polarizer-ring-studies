@@ -17,7 +17,7 @@ from pathlib import Path
 
 #%%
 
-design=3
+design=1
 config=1
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
@@ -26,7 +26,7 @@ mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.two_fold_periodicity_3straight(fringe_fields=True)
+    pdr=lo.three_fold_periodicity_120_deg_many_sext(fringe_fields=True)
 
     #sextupole configuration
 

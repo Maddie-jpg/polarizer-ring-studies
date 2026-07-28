@@ -26,14 +26,8 @@ design=int(os.environ.get('DESIGN',1))
 config=int(os.environ.get('CONFIG',1))
 
 # %%
-# Always start from the PERFECT base lattice. Both the "misaligned" and
-# "corrected" branches below apply the SAME random misalignment seed to a
-# copy of this lattice -- one branch is left as-is, the other additionally
-# gets orbit_correction run on it. This guarantees the two branches are a
-# fair paired comparison (same misalignment pattern, with vs without
-# correction) rather than loading two separately-prepared JSON files that
-# might not even share the same misalignment realization.
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_120.json')
+
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9
 
@@ -44,12 +38,6 @@ else:
     mc.insert_BPMs_all_as_markers(pdr)
     mc.insert_correctors(pdr)
 
-# ===========================================================================
-# PART 1 — SCAN over many random misalignment seeds (1000-turn screening)
-# Each seed is run through BOTH the misaligned-only and corrected lattice,
-# using the identical misalignment seed for both, so P_eq can be compared
-# directly seed-by-seed.
-# ===========================================================================
 
 line=pdr.lines['ring']
 
@@ -61,6 +49,8 @@ num_seeds=20
 seeds = np.random.randint(0, max_seed_value, size=num_seeds)
 scan_turns=1000
 
+misalignment_val=0.25e-3
+
 base_line = line.copy()
 
 results_dir = f'Results/D{design}/C{config}/Comparison'
@@ -69,18 +59,12 @@ results_path = f'{results_dir}/SpinTrackingResults_MisalignedVsCorrected.dat'
 
 
 def prep_branch(seed, apply_correction):
-    """Build one branch (misaligned-only, or misaligned+corrected) for a seed.
-    Returns (particles, tw, seed_line) for this branch, raises on failure."""
+    
     seed_line = base_line.copy()
 
-    # Set radiation to 'mean' BEFORE building the tracker: twiss cannot run under
-    # the 'quantum' model, and the tracker captures the radiation mode at build
-    # time, so configure_radiation must precede build_tracker. Then build the
-    # tracker, then misalign onto the live tracker (element_refs), and never
-    # discard the tracker afterward (that would wipe the misalignments).
     seed_line.configure_radiation('mean')
     seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    seed_line = mc.misalignments(seed_line, 0.26e-3, seed=seed)
+    seed_line = mc.misalignments(seed_line, misalignment_val, seed=seed)
 
     tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
@@ -119,17 +103,13 @@ def prep_branch(seed, apply_correction):
     particles.spin_y = tw.spin_y[0]
     particles.spin_z = tw.spin_z[0]
 
-    # NOW switch to quantum radiation for tracking. configure_radiation acts on
-    # the already-built tracker and does NOT discard it or reset element_refs,
-    # so misalignments/correction remain in place. No twiss happens after this.
+  
     seed_line.configure_radiation(model='quantum')
 
     return particles, tw, seed_line
 
 
 def run_scan_pass(seed_list, apply_correction):
-    """Run the full 1000-turn screen for ONE branch (misaligned or corrected)
-    over seed_list, returning a DataFrame of results for just that branch."""
     branch_label = 'corrected' if apply_correction else 'misaligned'
 
     prepped_particles, prepped_twiss, prepped_lines = [], [], []
@@ -157,10 +137,7 @@ def run_scan_pass(seed_list, apply_correction):
     for seed, particles, tw, seed_line in zip(
             successful_seeds_local, prepped_particles, prepped_twiss, prepped_lines):
 
-        # NOTE: do NOT discard_tracker here -- that would wipe the element_refs
-        # misalignments (and correction) applied in prep_branch, reverting the
-        # line to a perfect lattice. The tracker was already built (serial
-        # context) with radiation set to 'quantum' inside prep_branch.
+        
         seed_line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
                 with_progress=10)
         mon = seed_line.record_last_track
@@ -423,7 +400,7 @@ plt.close()
 # always working from the scan that was JUST run, never a stale prior file.
 #%%
 
-long_scan_turns=10000
+long_scan_turns=20000
 
 # df_scan_full contains BOTH branches (misaligned and corrected). Deep-track
 # the best/worst seed of EACH branch separately, since the best/worst seed
@@ -456,7 +433,7 @@ def deep_track_branch(df_branch, apply_correction):
             # never discard afterward or the misalignments are lost.
             line.configure_radiation('mean')
             line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-            line = mc.misalignments(line, 0.2e-3, seed=seed_val)
+            line = mc.misalignments(line, misalignment_val, seed=seed_val)
 
             tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                             spin=True, polarization=True)
@@ -647,7 +624,7 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
     # n0_y=1.0 perfect-lattice plot).
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.2e-3, seed=seed_val)
+    line = mc.misalignments(line, misalignment_val, seed=seed_val)
 
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
