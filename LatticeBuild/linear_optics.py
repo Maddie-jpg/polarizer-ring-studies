@@ -10,6 +10,7 @@ import xtrack as xt
 import numpy as np
 import constants
 
+
 def get_natural_WP(cell_arc, arc1R, verbose=True):
     """Return (qx, qy) that the ring would have with the CURRENT knob
     values, i.e. 6x the phase advance of one sextant, using the arc-cell
@@ -26,113 +27,30 @@ def get_natural_WP(cell_arc, arc1R, verbose=True):
               f"(sextant phase advance: {tw.mux[-1]:.6f}, {tw.muy[-1]:.6f})")
     return qx_nat, qy_nat
 
-def matchingWP(qx_target, qy_target, cell_arc_opt, cell_arc, arc1R,
-                          n_steps_init=1, max_subdivisions=30,
-                          MakePlot=False, verbose=True):
-    """
-    Match arc1R to (qx_target, qy_target), stepping through intermediate
-    working points if the direct match fails.
 
-    Strategy: try the full jump first (n_steps_init=1). On failure, subdivide
-    the path from (qx_start, qy_start) to the target into more intermediate
-    WPs and walk them one by one, rematching at each. Each subdivision
-    doubles the number of steps, up to max_subdivisions.
-
-    qx_start/qy_start: the WP the current knob values correspond to.
-    If None, they must be supplied -- guessing them risks stepping from
-    a point the optics isn't actually at.
-    """
-    
-    qx_start, qy_start = get_natural_WP(cell_arc, arc1R, verbose=verbose)
-
-    def try_match_at(qx, qy):
-        """One matching attempt at a single WP. Returns (success, knobs)."""
-        cell_arc_opt.run_jacobian(10)
-        cell_arc_tw = cell_arc.twiss(method='4d')
-
-        knobs_to_vary = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
-                          'kQFDoub', 'kQDDoub', 'kQFtr', 'kQDtr']
-        saved = {k: arc1R.vars[k]._value for k in knobs_to_vary}
-
-        try:
-            opt = arc1R.match(method='4d', solve=True, verbose=False,
-                betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
-                bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
-                dx=cell_arc_tw.dx[0], dpx=cell_arc_tw.dpx[0],
-                vary=[xt.VaryList(knobs_to_vary[:2], step=1e-4),
-                      xt.VaryList(knobs_to_vary[2:4], step=1e-4),
-                      xt.VaryList(knobs_to_vary[4:6], step=1e-4),
-                      xt.VaryList(knobs_to_vary[6:], step=1e-4)],
-                targets=[xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1.0e-9),
-                         xt.TargetSet(mux=qx/6, muy=qy/6, at=xt.END,
-                                      tol=1.0e-9, weight=.1, tag='phase'),
-                         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1.0e-9),
-                         xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1',
-                                      tol=1.0e-9, weight=10.)])
-            opt.run_jacobian(50)
-
-            # Convergence check: did the targets actually land?
-            # match/solve can "finish" without meeting tolerances.
-            tw_check = arc1R.twiss(method='4d',
-                betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
-                bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
-                dx=cell_arc_tw.dx[0], dpx=cell_arc_tw.dpx[0])
-            mux_err = abs(tw_check.mux[-1] - qx/6)
-            muy_err = abs(tw_check.muy[-1] - qy/6)
-            ok = (mux_err < 1e-6) and (muy_err < 1e-6)
-        except Exception as e:
-            if verbose:
-                print(f"    match at ({qx:.4f},{qy:.4f}) raised {type(e).__name__}: {e}")
-            ok = False
-
-        if not ok:
-            # Restore knobs so the next attempt starts from the last GOOD WP,
-            # not from a half-broken intermediate state.
-            for k, v in saved.items():
-                arc1R.vars[k] = v
-            return False, None
-        return True, {k: arc1R.vars[k]._value for k in knobs_to_vary}
-
-    n_steps = n_steps_init
-    for attempt in range(max_subdivisions + 1):
-        if verbose:
-            print(f"Attempt {attempt+1}: path in {n_steps} step(s)")
-        qxs = np.linspace(qx_start, qx_target, n_steps + 1)[1:]
-        qys = np.linspace(qy_start, qy_target, n_steps + 1)[1:]
-
-        all_ok = True
-        knobs = None
-        reached_qx, reached_qy = qx_start, qy_start
-        for qx_i, qy_i in zip(qxs, qys):
-            if verbose:
-                print(f"  -> stepping to WP ({qx_i:.4f}, {qy_i:.4f})")
-            ok, knobs = try_match_at(qx_i, qy_i)
-            if not ok:
-                all_ok = False
-                if verbose:
-                    print(f"     failed; last good WP ({reached_qx:.4f}, {reached_qy:.4f})")
-                break
-            reached_qx, reached_qy = qx_i, qy_i
-
-        if all_ok:
-            if verbose:
-                print(f"Converged at target WP ({qx_target:.4f}, {qy_target:.4f})")
-            if MakePlot:
-                cell_arc_tw = cell_arc.twiss(method='4d')
-                arc1R.twiss(method='4d',
+def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R,MakePlot=False):
+    cell_arc_opt.run_jacobian(10)
+    cell_arc_tw = cell_arc.twiss( method='4d' )
+    arc1R_opttune = arc1R.match( method='4d', solve=False, verbose=False,
+                 betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
+                 bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
+                 dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0],
+            vary=[ xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
+                   xt.VaryList(['kQFDS', 'kQDDS'], step=1e-4),
+                   xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
+                   xt.VaryList(['kQFtr', 'kQDtr'], step=1e-4), ],
+            targets=[ xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1.0e-9),
+                      xt.TargetSet(mux=qx/6, muy=qy/6, at=xt.END, 
+                                   tol=1.0e-9, weight=.1, tag='phase'),
+                      xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1.0e-9),
+                      xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', 
+                                   tol=1.0e-9, weight=10.) ])
+    arc1R_opttune.run_jacobian(50)
+    if MakePlot:
+       arc1R.twiss( method='4d',
                     betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
                     bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
-                    dx=cell_arc_tw.dx[0], dpx=cell_arc_tw.dpx[0]).plot()
-            return knobs
-
-        # Path failed somewhere: restart the walk from wherever we actually
-        # got to, with double the resolution over the REMAINING distance.
-        qx_start, qy_start = reached_qx, reached_qy
-        n_steps = 2 * n_steps
-
-    raise RuntimeError(
-        f"Could not reach WP ({qx_target}, {qy_target}) after "
-        f"{max_subdivisions+1} attempts; got as far as ({qx_start:.4f}, {qy_start:.4f})")
+                    dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0],).plot() 
 
 # Matching sequence for sextant with beta at center of straights fixed
 def matchingBeta( betxS, betyS, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R, MakePlot=False ): #, **kwargs ):

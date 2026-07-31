@@ -9,7 +9,7 @@ parent_dir = os.path.abspath('..')
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-import linear_optics as lo
+import linear_optics_TME as lo
 import sextupole_configs as sc
 import misalignments_corrections as mc
 
@@ -17,7 +17,7 @@ from pathlib import Path
 
 #%%
 
-design=1
+design=3
 config=1
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
@@ -26,7 +26,7 @@ mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity_120_deg_many_sext(fringe_fields=True)
+    pdr=lo.two_fold_racetrack_3straight(fringe_fields=True, matched=True)
 
     #sextupole configuration
 
@@ -61,7 +61,7 @@ elif mode=='corrected':
 #%%
 #Save json file
 
-file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_120.json'
+file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}.json'
 
 output_file = Path(file_path_str)
 

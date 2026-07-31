@@ -27,7 +27,7 @@ config=int(os.environ.get('CONFIG',1))
 
 # %%
 
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_90.json')
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9
 
@@ -47,7 +47,7 @@ line.configure_spin('auto')
 max_seed_value = np.iinfo(np.uint32).max  
 num_seeds=20
 seeds = np.random.randint(0, max_seed_value, size=num_seeds)
-scan_turns=1000
+scan_turns=20000
 
 misalignment_val=0.25e-3
 
@@ -137,7 +137,7 @@ def run_scan_pass(seed_list, apply_correction):
     for seed, particles, tw, seed_line in zip(
             successful_seeds_local, prepped_particles, prepped_twiss, prepped_lines):
 
-        
+        seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
         seed_line.track(particles, num_turns=scan_turns, turn_by_turn_monitor=True,
                 with_progress=10)
         mon = seed_line.record_last_track
@@ -151,6 +151,8 @@ def run_scan_pass(seed_list, apply_correction):
 
         n_turns_rec = len(pol)
         turns = np.arange(n_turns_rec)
+
+        seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
 
         # Two-parameter exponential: free amplitude 'a' and decay rate 'tauinv'.
         def exp_decay(t, a, tauinv):

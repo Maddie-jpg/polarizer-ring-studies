@@ -51,7 +51,7 @@ ring=pdr.lines['ring']
 print(ring.element_names)
 period=pdr.lines['period']
 
-variable_name = f"WP_D{design}_120"
+variable_name = f"WP_D{design}"
 
 current_wp = getattr(constants, variable_name)
 
@@ -568,7 +568,7 @@ plt.savefig(f"{out}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inche
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
 ax.set_xlim(x0 - 3, x1 + 3)
-ax.set_ylim(y0 - 3, y1 + 3)
+ax.set_ylim(None, y1 + 3)
 plt.savefig(f"{out}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
@@ -715,7 +715,7 @@ plt.savefig(f"{out}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inche
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
 ax.set_xlim(x0 - 3, x1 + 3)
-ax.set_ylim(y0 - 3, y1 + 3)
+ax.set_ylim(None, y1 + 3)
 plt.savefig(f"{out}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
