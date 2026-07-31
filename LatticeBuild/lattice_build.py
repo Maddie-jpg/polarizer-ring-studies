@@ -17,8 +17,8 @@ from pathlib import Path
 
 #%%
 
-design=3
-config=1
+design=1
+config=0
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
 #%%
@@ -26,7 +26,7 @@ mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.two_fold_racetrack_3straight(fringe_fields=True, matched=True)
+    pdr=lo.three_fold_periodicity_120_deg(fringe_fields=True, matched=True)
 
     #sextupole configuration
 
@@ -61,7 +61,7 @@ elif mode=='corrected':
 #%%
 #Save json file
 
-file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}.json'
+file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_120.json'
 
 output_file = Path(file_path_str)
 
