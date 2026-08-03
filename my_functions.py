@@ -860,6 +860,7 @@ def spin_tune_resonance_scan(ring, nu_min=5.0, nu_max=6.0, n_points=60,
             nu_spin = tw.spin_tune_fractional + np.floor(nu_target)
             p_bks = tw.spin_polarization_inf_no_depol * 100
             qx, qy, qs = tw.qx % 1, tw.qy % 1, abs(tw.qs) % 1
+           
         except Exception as e:
             print(f"  nu_target={nu_target:.4f}: twiss/spin failed ({type(e).__name__}: {e})")
             nu_spin = p_bks = qx = qy = qs = np.nan
@@ -920,3 +921,4 @@ def plot_spin_resonance_scan(results, out_path=None):
     if out_path:
         plt.savefig(out_path, dpi=300)
     plt.show()
+

@@ -25,9 +25,10 @@ import tune_wp_scan as twps
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
+design=int(os.environ.get('DESIGN',3))
 config=int(os.environ.get('CONFIG',0))
 mode=os.environ.get('MODE','perfect')
+phase=int(os.environ.get('PHASE',120))
 
 
 # %%
@@ -45,7 +46,7 @@ if pdf_run is True:
     plt.savefig = _new_savefig
 
 # %%
-pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_120.json")
+pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
 
 ring=pdr.lines['ring']
 print(ring.element_names)
@@ -76,7 +77,7 @@ ring_tw=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=Tr
 # %%
 print(ring.element_names)
 
-new_results_folder=f'Results/D{design}/C{config}/{mode}'
+new_results_folder=f'Results/D{design}/C{config}/{phase}deg_PhaseAdvance/{mode}'
 
 if not os.path.exists(new_results_folder):
     os.makedirs(new_results_folder)
@@ -84,11 +85,11 @@ if not os.path.exists(new_results_folder):
 #%matplotlib widget
 if mode in ['perfect','misaligned']:
     ring.survey().plot()
-    plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_survey_{mode}.png')
+    plt.savefig(f'{new_results_folder}/ring_survey_{mode}.png')
 else:
     mf.survey_plot(ring)
     #plt.tight_layout()
-    plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_survey_{mode}.png')
+    plt.savefig(f'{new_results_folder}/ring_survey_{mode}.png')
 
 # %%
 print(ring.element_names)
@@ -98,14 +99,14 @@ print(ring.element_names)
 ring_tw.plot(f'delta (zeta+0.00504) x y-0.001')
 ring_tw.plot(f'x y-0.001')
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_closed_orbit_{mode}.png')
+plt.savefig(f'{new_results_folder}/ring_closed_orbit_{mode}.png')
 
 
 # %%
 
 ring_tw.plot()
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/ring_twiss_{mode}.png')
+plt.savefig(f'{new_results_folder}/ring_twiss_{mode}.png')
 
 
 # %% Straight-section zoom: optics and phase advances
@@ -146,7 +147,7 @@ ax1.legend(h1 + h2, l1 + l2, loc='best')
 ax1.set_xlim(s_lo, s_hi)
 ax1.set_title(f'Straight section optics ({mode})')
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/straight_optics_{mode}.png')
+plt.savefig(f'{new_results_folder}/straight_optics_{mode}.png')
 
 # --- Plot 3: same zoom, optics + phase advances on a shared s-axis ---
 mux0 = ring_tw.mux[mask][0]
@@ -174,7 +175,7 @@ axm.grid(True, linestyle=':', alpha=0.6)
 axm.legend(loc='best')
 axo.set_xlim(s_lo, s_hi)
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/straight_phase_advance_{mode}.png')
+plt.savefig(f'{new_results_folder}/straight_phase_advance_{mode}.png')
 
 
 def calc_damping_time_constant(m):
@@ -258,7 +259,7 @@ for (row, col), cell in table.get_celld().items():
     if row == 0:
         cell.set_text_props(weight='bold')
 
-plt.savefig(f'Results/D{design}/C{config}/{mode}/table_{mode}.png')
+plt.savefig(f'{new_results_folder}/table_{mode}.png')
 
 
 def dynamic_tune_ranges(qx_data, qy_data, pad_frac=0.15, min_span=0.02):
@@ -300,7 +301,7 @@ resonances.plot_resonance(fig)
 ax.set_xlim(Qx_range)
 ax.set_ylim(Qy_range)
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/WP_{mode}.png')
+plt.savefig(f'{new_results_folder}/WP_{mode}.png')
 
 print('2nd order chrom x', ring_tw.ddqx)
 print('2nd order chrom y', ring_tw.ddqy)
@@ -371,7 +372,7 @@ resonances.plot_resonance(fig)
 ax.set_xlim(Qx_range)
 ax.set_ylim(Qy_range)
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/momentum_dev_working_point{current_wp}_{mode}.png')
+plt.savefig(f'{new_results_folder}/momentum_dev_working_point{current_wp}_{mode}.png')
 
 
 
@@ -431,7 +432,7 @@ if fp0 is not None:
     ax.legend(loc='best')
     ax.grid(alpha=0.3)
 
-    plt.savefig(f'Results/D{design}/C{config}/{mode}/momentum_dev_working_point_{mode}.png')
+    plt.savefig(f'{new_results_folder}/momentum_dev_working_point_{mode}.png')
     plt.show()
 else:
     print("Could not generate a stable footprint even at 1 sigma.")
@@ -461,7 +462,7 @@ except NameError:
 
 
 twps.plot_dangerous_resonances(ring, ring_tw.qx, ring_tw.qy, max_order=(1,2,3,4,5), tune_range=0.1)
-plt.savefig(f'Results/D{design}/C{config}/{mode}/dangerous_resonances_{mode}.png')
+plt.savefig(f'{new_results_folder}/dangerous_resonances_{mode}.png')
 
 # %%
 
@@ -561,15 +562,15 @@ particles.sort(interleave_lost_particles=True)
 x_DA,y_DA,_,_=my_xpf.DA_vs_turns(particles, grid_details['num_r_y_points'], grid_details['num_theta_x_points'], grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'],delta_plots=True)
 
 ax = plt.gca()
-out = f"Results/D{design}/C{config}/{mode}"
 
-plt.savefig(f"{out}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+
+plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
 
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
 ax.set_xlim(x0 - 3, x1 + 3)
 ax.set_ylim(None, y1 + 3)
-plt.savefig(f"{out}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
 #%matplotlib widget
@@ -710,13 +711,13 @@ particles.sort(interleave_lost_particles=True)
 # %%
 my_xpf.MA_vs_turns(particles, grid_details['num_r_y_points'], 51, grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'])
 
-plt.savefig(f"{out}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
 
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
 ax.set_xlim(x0 - 3, x1 + 3)
 ax.set_ylim(None, y1 + 3)
-plt.savefig(f"{out}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
 

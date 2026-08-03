@@ -29,29 +29,44 @@ def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
     return qx, qy
 
 
-def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R,MakePlot=False):
+def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6, MakePlot=False):
     cell_arc_opt.run_jacobian(10)
-    cell_arc_tw = cell_arc.twiss( method='4d' )
-    arc1R_opttune = arc1R.match( method='4d', solve=False, verbose=False,
-                 betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
-                 bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
-                 dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0],
-            vary=[ xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
-                   xt.VaryList(['kQFDS', 'kQDDS'], step=1e-4),
-                   xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
-                   xt.VaryList(['kQFtr', 'kQDtr'], step=1e-4), ],
-            targets=[ xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1.0e-9),
-                      xt.TargetSet(mux=qx/6, muy=qy/6, at=xt.END, 
-                                   tol=1.0e-9, weight=.1, tag='phase'),
-                      xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1.0e-9),
-                      xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', 
-                                   tol=1.0e-9, weight=10.) ])
-    arc1R_opttune.run_jacobian(50)
+    cell_arc_tw = cell_arc.twiss(method='4d')
+    bc = dict(betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
+              bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
+              dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0])
+
+    mux0 = arc1R.twiss(method='4d', **bc).mux[-1]      # current phase = start
+    muy0 = arc1R.twiss(method='4d', **bc).muy[-1]
+
+    opt = arc1R.match(
+        method='4d', solve=False, verbose=False, **bc,
+        vary=[
+            xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4, limits=(-10, 10)),
+            xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
+            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
+            xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
+        ],
+        targets=[
+            xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
+            xt.TargetSet(mux=mux0, muy=muy0, at=xt.END, tol=1e-9, tag='phase'),
+            xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
+            xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', tol=1e-9, weight=10.),
+        ])
+    pt = [t for t in opt.targets if t.tag == 'phase']
+
+    import numpy as np
+    for frac in np.linspace(1/8, 1, 8):          # walk phase in, don't jump
+        pt[0].value = mux0 + frac * (qx/n_periods - mux0)
+        pt[1].value = muy0 + frac * (qy/n_periods - muy0)
+        try:
+            opt.solve(n_steps=40)
+        except Exception:
+            opt.step(30, broyden=True, rcond=1e-3)
+
     if MakePlot:
-       arc1R.twiss( method='4d',
-                    betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
-                    bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
-                    dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0],).plot() 
+        arc1R.twiss(method='4d', **bc).plot()
+    return opt
 
 
 def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
@@ -64,7 +79,7 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     cell_tr_opt.run_jacobian(10)
     tw_tr = cell_tr.twiss(method='4d')
     opt = arc1R.match(
-        method='4d', solve=False, assert_within_tol=False,
+        method='4d', solve=True, assert_within_tol=False,
         betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
         bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
         dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0],
@@ -203,24 +218,28 @@ def _sliced(line):
 
 
 def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
-    cell_arc_opt = cell_arc.match(
-        method='4d', solve=True, verbose=False,
-        vary=[xt.VaryList(['kQFarc', 'kQDarc', 'kQFarcM'], step=1e-4)],
-        targets=[xt.TargetSet(qx=mu_cell, qy=mu_cell, tol=1e-6, tag='end'),
-                 xt.TargetSet(mux=mu_cell, muy=mu_cell, at=xt.END, tol=1e-6)])
-    cell_tr_opt = cell_tr.match(
-        method='4d', solve=True,
-        vary=[xt.Vary('kQFtr', step=1e-4), xt.Vary('kQDtr', step=1e-4)],
-        targets=[xt.TargetSet(betx=2.5, bety=2.5, at='Mkr_cell_tr',
-                               tol=1e-6, tag='betas')])
+    cell_arc_opt = cell_arc.match( method='4d', solve=True, verbose=False,
+        vary=[
+            xt.VaryList(['kQFarc', 'kQDarc', 'kQFarcM'], step=1e-4),    ],
+        targets=[
+            xt.TargetSet(qx=mu_cell, qy=mu_cell, tol=1.0e-6, tag='end'), # just twice the same 
+            xt.TargetSet(mux=mu_cell, muy=mu_cell, at=xt.END, tol=1.0e-6)]  )
+
+    # Triplet cell to chosen betatron functions
+    cell_tr_opt = cell_tr.match( method='4d', solve=True,
+        vary=[ # use individual Vary commands instead of List for arc cell
+            xt.Vary('kQFtr', step=1e-4 ),
+            xt.Vary('kQDtr', step=1e-4),    ],
+        targets=[
+            xt.TargetSet(betx=2.50, bety=2.50, at='Mkr_cell_tr', tol=1.0e-6, tag='betas')] )
     return cell_arc_opt, cell_tr_opt
 
 def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                            arc1R, wp_constants):
+                            arc1R, wp_constants, n_periods=6):
     kQFtr_saved = arc1R.vars['kQFtr']._value
     kQDtr_saved = arc1R.vars['kQDtr']._value
 
-    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R)
+    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
 
     # Check what we actually got
     tw_cell = cell_arc.twiss(method='4d')
@@ -233,12 +252,12 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
           f'(target {wp_constants[0]/6:.6f})')
     print(f'  muy at END = {tw_check.muy[-1]:.6f}  '
           f'(target {wp_constants[1]/6:.6f})')
-    print(f'  qx_ring = {6*tw_check.mux[-1]:.6f}  (target {wp_constants[0]:.6f})')
-    print(f'  qy_ring = {6*tw_check.muy[-1]:.6f}  (target {wp_constants[1]:.6f})')
+    print(f'  qx_ring = {n_periods*tw_check.mux[-1]:.6f}  (target {wp_constants[0]:.6f})')
+    print(f'  qy_ring = {n_periods*tw_check.muy[-1]:.6f}  (target {wp_constants[1]:.6f})')
 
-    arc1R.vars['kQFtr'] = kQFtr_saved
+    '''arc1R.vars['kQFtr'] = kQFtr_saved
     arc1R.vars['kQDtr'] = kQDtr_saved
-    cell_tr_opt.run_jacobian(20)
+    cell_tr_opt.run_jacobian(20)'''
 
     tw_tr = cell_tr.twiss(method='4d')
     mid   = len(tw_tr.betx) // 2
@@ -818,25 +837,25 @@ def three_fold_periodicity_120_deg(fringe_fields=True, matched=True):
             makesextant('2R', 'right') + makesextant('3L', 'left') +
             makesextant('3R', 'right') + makesextant('1L', 'left'))
 
-    if not matched:
+    if matched==False:
         _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
         return pdr
+    else:
+        cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
+                                                        mu_cell=1/3)
+        _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+                            arc1R, constants.WP_D1_120)
 
-    cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
-                                                    mu_cell=1/3)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, constants.WP_D1_120)
-
-    _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
-    _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
-    return pdr
+        _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
+        _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
+        return pdr
 
 
 # =============================================================================
 # Two-fold racetrack with 3 mid-arc straight sections per arc
 # =============================================================================
 
-def two_fold_racetrack_3straight(fringe_fields=True, matched=True):
+def two_fold_racetrack_3straight(fringe_fields=True, matched=True, phase_advance=0.25):
     """
     Two-fold racetrack based directly on two_fold_periodicity_90_deg,
     with the single end-of-sextant triplet replaced by 3 back-to-back
@@ -1006,9 +1025,9 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True):
         return pdr
 
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
-                                                    mu_cell=0.25)
+                                                    mu_cell=phase_advance)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, constants.WP_D3)
+                           arc1R, constants.WP_D3, n_periods=4)
 
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R_2')
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)

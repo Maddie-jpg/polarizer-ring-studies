@@ -17,27 +17,28 @@ from pathlib import Path
 
 #%%
 
-design=1
+design=3
 config=0
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
+phase=120
 
 #%%
 
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity_120_deg(fringe_fields=True, matched=True)
+    pdr=lo.two_fold_racetrack_3straight(fringe_fields=True, matched=True, phase_advance=1/3)
 
     #sextupole configuration
 
 #Misalignments
 elif mode == 'misaligned':
-    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect.json')
+    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
     ring=pdr.lines['ring']
     mc.misalignments(ring, 0.25e-3)
 
 elif mode=='corrected':
-    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect.json')
+    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
     ring=pdr.lines['ring']
 
     mc.insert_BPMs_all_as_markers(pdr)
@@ -61,7 +62,7 @@ elif mode=='corrected':
 #%%
 #Save json file
 
-file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_120.json'
+file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json'
 
 output_file = Path(file_path_str)
 

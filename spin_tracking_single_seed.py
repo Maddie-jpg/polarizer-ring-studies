@@ -23,16 +23,17 @@ import random
 #%%
 
 SEED = random.randint(0,int(1e6))
+SEED = 977123
 
-
-design = int(os.environ.get('DESIGN', 2))
-config = int(os.environ.get('CONFIG', 3))
+design = int(os.environ.get('DESIGN', 1))
+config = int(os.environ.get('CONFIG', 1))
+phase=int(os.environ.get('PHASE',90))
 
 long_scan_turns = 20000  
 
 # %%
 
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect.json')
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
 energy=2.86e9
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0 = energy
@@ -285,15 +286,7 @@ def plot_seed_with_textbox(data, title_prefix, out_path):
     print(f"  Saved to {out_path}")
 
 
-data_misaligned = deep_track_single(SEED, apply_correction=False)
-data_corrected = deep_track_single(SEED, apply_correction=True)
 
-plot_seed_with_textbox(
-    data_misaligned, 'Misaligned',
-    f'{results_dir}/Polarization_Misaligned.png')
-plot_seed_with_textbox(
-    data_corrected, 'Corrected',
-    f'{results_dir}/Polarization_Corrected.png')
 
 
 #%%
@@ -352,8 +345,7 @@ def plot_invariant_spin_vector(seed_val, apply_correction):
     print(f"  Saved to {out_path}")
 
 
-plot_invariant_spin_vector(SEED, apply_correction=False)
-plot_invariant_spin_vector(SEED, apply_correction=True)
+
 
 #%%
 
@@ -422,6 +414,105 @@ def track_single_particle_nx1(seed_val, apply_correction):
     print(f"  Saved to {out_path}")
 
 
+
+# %%
+
+
+def n0_vs_spin_tune_scan(seed_val, nu_min, nu_max, n_points=60,apply_correction=True, at_element=None):
+
+    line = base_line.copy()
+    
+    line.configure_radiation('mean')
+    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+    line = mc.misalignments(line, 0.26e-3, seed=seed_val)
+    
+    tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
+                        spin=True, polarization=True)
+    
+    if apply_correction:
+            try:
+                mc.orbit_correction(line, tw, threading=False)
+            except Exception as e:
+                print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
+                      f"{type(e).__name__}: {e} -- retrying with threading=True")
+                mc.orbit_correction(line, tw, threading=True)
+            # Orbit correction changes the closed orbit/optics, so re-twiss to get
+            # the n0 vector consistent with the corrected lattice.
+            tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
+                            spin=True, polarization=True)
+    ring0 = line
+    a_gyro = ring0.particle_ref.anomalous_magnetic_moment[0]
+    mass0 = ring0.particle_ref.mass0  # eV
+
+    nu_targets = np.linspace(nu_min, nu_max, n_points)
+    gammas = nu_targets / a_gyro
+    energies = gammas * mass0
+
+    nu_spin, n0x, n0y, n0z = [], [], [], []
+
+    for nu_target, energy in zip(nu_targets, energies):
+        line = ring0.copy()
+        line.particle_ref.kinetic_energy0 = energy - mass0
+        line.configure_spin('auto')
+        try:
+            tw = line.twiss(method='6d', radiation_integrals=True,
+                            eneloss_and_damping=True, spin=True, polarization=True)
+            idx = 0 if at_element is None else tw.rows.indices[at_element]
+            nu_spin.append(tw.spin_tune_fractional + np.floor(nu_target))
+            n0x.append(tw.spin_x[idx])
+            n0y.append(tw.spin_y[idx])
+            n0z.append(tw.spin_z[idx])
+        except Exception as e:
+            print(f"  nu_target={nu_target:.4f}: failed ({type(e).__name__}: {e})")
+            nu_spin.append(np.nan); n0x.append(np.nan)
+            n0y.append(np.nan);     n0z.append(np.nan)
+
+    return {k: np.array(v) for k, v in
+            dict(nu_spin=nu_spin, n0x=n0x, n0y=n0y, n0z=n0z).items()}
+
+
+def plot_n0_vs_spin_tune(results, out_path=None):
+    nu = results['nu_spin']
+    order = np.argsort(nu)  # spin tune isn't monotonic in nu_target near a
+                            # resonance crossing, so sort by the x-axis itself
+    nu = nu[order]
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    ax.plot(nu, results['n0x'][order], 'o-', ms=4, label='$n_{0,x}$', color='tab:blue')
+    ax.plot(nu, results['n0y'][order], 'o-', ms=4, label='$n_{0,y}$', color='tab:green')
+    ax.plot(nu, results['n0z'][order], 'o-', ms=4, label='$n_{0,z}$', color='tab:red')
+
+    ax.set_xlabel(r'Spin tune $\nu_{spin}$')
+    ax.set_ylabel(r'Invariant spin vector $n_0$ component')
+    ax.set_title(r'Invariant spin vector vs spin tune')
+    ax.grid(True, linestyle=':', alpha=0.6)
+    ax.legend()
+    plt.tight_layout()
+    if out_path:
+        plt.savefig(out_path, dpi=300)
+    return fig, ax
+
+#%%
+plot_invariant_spin_vector(SEED, apply_correction=False)
+plot_invariant_spin_vector(SEED, apply_correction=True)
+
 track_single_particle_nx1(SEED, apply_correction=False)
 track_single_particle_nx1(SEED, apply_correction=True)
-# %%
+
+results = n0_vs_spin_tune_scan(SEED, nu_min=5.5, nu_max=7.5,
+                                 n_points=80, apply_correction=False)
+plot_n0_vs_spin_tune(results, out_path=f'{results_dir}/n0_vs_spin_tune_misaligned.png')
+
+results = n0_vs_spin_tune_scan(SEED, nu_min=5.5, nu_max=7.5,
+                                 n_points=80, apply_correction=True)
+plot_n0_vs_spin_tune(results, out_path=f'{results_dir}/n0_vs_spin_tune_corrected.png')
+
+data_misaligned = deep_track_single(SEED, apply_correction=False)
+data_corrected = deep_track_single(SEED, apply_correction=True)
+
+plot_seed_with_textbox(
+    data_misaligned, 'Misaligned',
+    f'{results_dir}/Polarization_Misaligned.png')
+plot_seed_with_textbox(
+    data_corrected, 'Corrected',
+    f'{results_dir}/Polarization_Corrected.png')

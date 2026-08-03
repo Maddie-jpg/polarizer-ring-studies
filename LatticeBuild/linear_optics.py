@@ -11,7 +11,7 @@ import numpy as np
 import constants
 
 
-def get_natural_WP(cell_arc, arc1R, verbose=True):
+def get_natural_WP(cell_arc, arc1R, n_segments,verbose=True):
     """Return (qx, qy) that the ring would have with the CURRENT knob
     values, i.e. 6x the phase advance of one sextant, using the arc-cell
     periodic optics as boundary conditions."""
@@ -20,15 +20,15 @@ def get_natural_WP(cell_arc, arc1R, verbose=True):
         betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
         bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
         dx=cell_arc_tw.dx[0], dpx=cell_arc_tw.dpx[0])
-    qx_nat = 6 * tw.mux[-1]
-    qy_nat = 6 * tw.muy[-1]
+    qx_nat = n_segments * tw.mux[-1]
+    qy_nat = n_segments * tw.muy[-1]
     if verbose:
         print(f"Natural WP (current knobs): qx = {qx_nat:.6f}, qy = {qy_nat:.6f} "
               f"(sextant phase advance: {tw.mux[-1]:.6f}, {tw.muy[-1]:.6f})")
     return qx_nat, qy_nat
 
 
-def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R,MakePlot=False):
+def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R,n_segments,MakePlot=False):
     cell_arc_opt.run_jacobian(10)
     cell_arc_tw = cell_arc.twiss( method='4d' )
     arc1R_opttune = arc1R.match( method='4d', solve=False, verbose=False,
@@ -40,7 +40,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R,MakePlot=False):
                    xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
                    xt.VaryList(['kQFtr', 'kQDtr'], step=1e-4), ],
             targets=[ xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1.0e-9),
-                      xt.TargetSet(mux=qx/6, muy=qy/6, at=xt.END, 
+                      xt.TargetSet(mux=qx/n_segments, muy=qy/n_segments, at=xt.END, 
                                    tol=1.0e-9, weight=.1, tag='phase'),
                       xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1.0e-9),
                       xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', 
