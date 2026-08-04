@@ -492,7 +492,247 @@ def plot_n0_vs_spin_tune(results, out_path=None):
         plt.savefig(out_path, dpi=300)
     return fig, ax
 
+
+
+def check_qy_spin_coupling(line, dqy=1e-3, qy_knobs=('kQFarc', 'kQDarc'),
+                           max_order=5, verbose=True):
+
+
+    tw0 = line.twiss(method='6d', radiation_integrals=True,
+                     eneloss_and_damping=True, spin=True, polarization=True)
+    Qx0, Qy0 = tw0.qx, tw0.qy
+    nu0 = tw0.spin_tune_fractional
+    n0_vec0 = np.array([tw0.spin_x[0], tw0.spin_y[0], tw0.spin_z[0]])
+
+    n_center = int(round(nu0))
+    candidates = []
+    for n in range(n_center - max_order, n_center + max_order + 1):
+        for sign in (+1, -1):
+            res = (n + sign * Qy0)
+            candidates.append((abs(res - nu0), n, sign, res))
+    candidates.sort(key=lambda c: c[0])
+    dist, n_near, sign_near, res_near = candidates[0]
+
+    if verbose:
+        sign_str = '+' if sign_near > 0 else '-'
+        print(f"[coupling] Qx={Qx0:.5f}  Qy={Qy0:.5f}  nu_spin={nu0:.5f}")
+        print(f"[coupling] nearest vertical intrinsic resonance: "
+              f"nu = {n_near} {sign_str} Qy = {res_near:.5f}  "
+              f"(distance {dist:.5f})")
+
+    line2 = line.copy()
+    k0 = {kn: line2.vars[kn]._value for kn in qy_knobs}
+    limits = {kn: (v - 0.05 * abs(v) - 1e-6, v + 0.05 * abs(v) + 1e-6)
+             for kn, v in k0.items()}
+    try:
+        opt = line2.match(
+            method='6d', solve=False, verbose=False,
+            vary=[xt.Vary(kn, step=1e-6, limits=limits[kn]) for kn in qy_knobs],
+            targets=[
+                xt.Target('qx', Qx0, tol=1e-7),
+                xt.Target('qy', Qy0 + dqy, tol=1e-7),
+            ],
+        )
+        try:
+            opt.solve(n_steps=20)
+        except (RuntimeError, np.linalg.LinAlgError):
+            for kn in qy_knobs:
+                line2.vars[kn] = k0[kn]
+            opt.step(20, broyden=True, rcond=1e-3)
+        tw1 = line2.twiss(method='6d', radiation_integrals=True,
+                          eneloss_and_damping=True, spin=True, polarization=True)
+        Qx1, Qy1 = tw1.qx, tw1.qy
+        nu1 = tw1.spin_tune_fractional
+        n0_vec1 = np.array([tw1.spin_x[0], tw1.spin_y[0], tw1.spin_z[0]])
+
+        dQy_actual = Qy1 - Qy0
+        dQx_actual = Qx1 - Qx0
+        dnu = nu1 - nu0
+        dn0 = np.linalg.norm(n0_vec1 - n0_vec0)
+
+        dnu_dQy = dnu / dQy_actual if abs(dQy_actual) > 1e-12 else np.nan
+        dn0_dQy = dn0 / abs(dQy_actual) if abs(dQy_actual) > 1e-12 else np.nan
+
+        if verbose:
+            print(f"[coupling] Qy nudged by {dQy_actual:+.2e} "
+                  f"(Qx held to within {dQx_actual:+.2e})")
+            print(f"[coupling] d(nu_spin)/d(Qy) ~= {dnu_dQy:.4f}")
+            print(f"[coupling] |d(n0)|/d(Qy)    ~= {dn0_dQy:.4f}  "
+                  f"(tilt of invariant spin axis per unit Qy)")
+    except Exception as e:
+        print(f"[coupling] could not isolate Qy via {qy_knobs} "
+              f"({type(e).__name__}: {e}); reporting resonance proximity only")
+        dnu_dQy = dn0_dQy = np.nan
+
+    return dict(Qx=Qx0, Qy=Qy0, nu_spin=nu0,
+                nearest_resonance=res_near, nearest_order=n_near,
+                nearest_sign=sign_near, distance_to_resonance=dist,
+                dnu_dQy=dnu_dQy, dn0_dQy=dn0_dQy)
+
+
+def compare_qy_spin_coupling_across_branches(base_line, seed_val,
+                                             misalign_sigma=0.25e-3,
+                                             dqy=1e-3, qy_knobs=('kQFarc', 'kQDarc'),
+                                             max_order=5, results_dir=results_dir):
+    rows = {}
+
+    line_perfect = base_line.copy()
+    print("=== Coupling check: PERFECT lattice ===")
+    rows['perfect'] = check_qy_spin_coupling(
+        line_perfect, dqy=dqy, qy_knobs=qy_knobs, max_order=max_order)
+
+    line_mis = base_line.copy()
+    line_mis.configure_radiation('mean')
+    line_mis.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+    line_mis = mc.misalignments(line_mis, misalign_sigma, seed=seed_val)
+    print(f"\n=== Coupling check: MISALIGNED lattice (seed {seed_val}) ===")
+    rows['misaligned'] = check_qy_spin_coupling(
+        line_mis, dqy=dqy, qy_knobs=qy_knobs, max_order=max_order)
+
+    line_cor = base_line.copy()
+    line_cor.configure_radiation('mean')
+    line_cor.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+    line_cor = mc.misalignments(line_cor, misalign_sigma, seed=seed_val)
+    tw_cor = line_cor.twiss(method='6d', radiation_integrals=True,
+                            eneloss_and_damping=True, spin=True, polarization=True)
+    try:
+        mc.orbit_correction(line_cor, tw_cor, threading=False)
+    except Exception as e:
+        print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
+              f"{type(e).__name__}: {e} -- retrying with threading=True")
+        mc.orbit_correction(line_cor, tw_cor, threading=True)
+    print(f"\n=== Coupling check: CORRECTED lattice (seed {seed_val}) ===")
+    rows['corrected'] = check_qy_spin_coupling(
+        line_cor, dqy=dqy, qy_knobs=qy_knobs, max_order=max_order)
+
+    print("\n=== Summary: Qy / nu_spin across branches ===")
+    header = f"{'branch':<12}{'Qy':>12}{'nu_spin':>12}{'dist_to_res':>14}{'dnu_dQy':>12}{'dn0_dQy':>12}"
+    print(header)
+    for branch, r in rows.items():
+        print(f"{branch:<12}{r['Qy']:>12.6f}{r['nu_spin']:>12.6f}"
+              f"{r['distance_to_resonance']:>14.6f}{r['dnu_dQy']:>12.4f}{r['dn0_dQy']:>12.4f}")
+
+    dQy_mis = rows['misaligned']['Qy'] - rows['perfect']['Qy']
+    dnu_mis = rows['misaligned']['nu_spin'] - rows['perfect']['nu_spin']
+    dQy_cor = rows['corrected']['Qy'] - rows['perfect']['Qy']
+    dnu_cor = rows['corrected']['nu_spin'] - rows['perfect']['nu_spin']
+    print(f"\nMisalignment shift:  dQy = {dQy_mis:+.2e}   d(nu_spin) = {dnu_mis:+.2e}")
+    print(f"Residual after correction: dQy = {dQy_cor:+.2e}   d(nu_spin) = {dnu_cor:+.2e}")
+
+    if results_dir is not None:
+        import csv
+        out_path = f'{results_dir}/qy_spin_coupling_seed{seed_val}.csv'
+        with open(out_path, 'w', newline='') as f:
+            w = csv.writer(f)
+            w.writerow(['branch', 'Qx', 'Qy', 'nu_spin', 'nearest_resonance',
+                       'distance_to_resonance', 'dnu_dQy', 'dn0_dQy'])
+            for branch, r in rows.items():
+                w.writerow([branch, r['Qx'], r['Qy'], r['nu_spin'],
+                           r['nearest_resonance'], r['distance_to_resonance'],
+                           r['dnu_dQy'], r['dn0_dQy']])
+        print(f"\nSaved summary to {out_path}")
+
+    return rows
+
+
+
+def assess_seed_resonance_excitation(seed_val, apply_correction, deep_track_single_fn,
+                                     check_qy_spin_coupling_fn, base_line,
+                                     misalign_sigma=0.26e-3, p_eq_suppression_flag=0.9,
+                                     results_dir=None):
+    branch_label = 'corrected' if apply_correction else 'misaligned'
+
+    line = base_line.copy()
+    line.configure_radiation('mean')
+    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+    line = mc.misalignments(line, misalign_sigma, seed=seed_val)
+
+    if apply_correction:
+        tw = line.twiss(method='6d', radiation_integrals=True,
+                        eneloss_and_damping=True, spin=True, polarization=True)
+        try:
+            mc.orbit_correction(line, tw, threading=False)
+        except Exception as e:
+            print(f"orbit_correction(threading=False) raised: {type(e).__name__}: {e}"
+                  f" -- retrying with threading=True")
+            mc.orbit_correction(line, tw, threading=True)
+
+    coupling = check_qy_spin_coupling_fn(line)
+
+    track_result = deep_track_single_fn(seed_val, apply_correction)
+
+    p_bks = track_result['p_bks']
+    p_eq_long = track_result['p_eq_long']
+    t_dep_turns = track_result['t_dep_turns_long']
+    fit_reliable = track_result['fit_reliable']
+
+    suppression_ratio = p_eq_long / p_bks if p_bks > 0 else np.nan
+    excited = bool(np.isfinite(suppression_ratio) and
+                  suppression_ratio < p_eq_suppression_flag)
+
+    print(f"\n=== Resonance excitation assessment: seed {seed_val} ({branch_label}) ===")
+    print(f"Qx={coupling['Qx']:.5f}  Qy={coupling['Qy']:.5f}  "
+          f"nu_spin={coupling['nu_spin_full']:.5f}")
+    print(f"nearest resonance: nu = {coupling['nearest_order']} "
+          f"{'+' if coupling['nearest_sign']>0 else '-'} Qy = {coupling['nearest_resonance']:.5f}  "
+          f"(distance {coupling['distance_to_resonance']:.5f})")
+    print(f"tau_depol = {t_dep_turns:.1f} turns (fit_reliable={fit_reliable})")
+    print(f"p_bks = {p_bks:.2f}%   p_eq_long = {p_eq_long:.2f}%   "
+          f"suppression_ratio = {suppression_ratio:.3f}")
+    print(f"excited (p_eq_long < {p_eq_suppression_flag} * p_bks): {excited}")
+
+    row = dict(seed=seed_val, branch=branch_label, Qx=coupling['Qx'], Qy=coupling['Qy'],
+              nu_spin_full=coupling['nu_spin_full'],
+              nearest_order=coupling['nearest_order'],
+              nearest_sign=coupling['nearest_sign'],
+              nearest_resonance=coupling['nearest_resonance'],
+              distance_to_resonance=coupling['distance_to_resonance'],
+              t_dep_turns=t_dep_turns, fit_reliable=fit_reliable,
+              p_bks=p_bks, p_eq_long=p_eq_long,
+              suppression_ratio=suppression_ratio, excited=excited)
+
+    if results_dir is not None:
+        out_path = f'{results_dir}/resonance_excitation_seed{seed_val}_{branch_label}.csv'
+        with open(out_path, 'w', newline='') as f:
+            w = csv.DictWriter(f, fieldnames=list(row.keys()))
+            w.writeheader()
+            w.writerow(row)
+        print(f"Saved to {out_path}")
+
+    return row
+
+
+def assess_resonance_excitation_multi_seed(seed_list, apply_correction, deep_track_single_fn,
+                                           check_qy_spin_coupling_fn, base_line,
+                                           misalign_sigma=0.26e-3, p_eq_suppression_flag=0.9,
+                                           results_dir=None, out_name='resonance_excitation_summary.csv'):
+    rows = []
+    for seed_val in seed_list:
+        row = assess_seed_resonance_excitation(
+            seed_val, apply_correction, deep_track_single_fn, check_qy_spin_coupling_fn,
+            base_line, mc, xo, misalign_sigma=misalign_sigma,
+            p_eq_suppression_flag=p_eq_suppression_flag, results_dir=None)
+        rows.append(row)
+
+    if results_dir is not None:
+        out_path = f'{results_dir}/{out_name}'
+        with open(out_path, 'w', newline='') as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
+        print(f"\nSaved summary of {len(rows)} seeds to {out_path}")
+
+    n_excited = sum(r['excited'] for r in rows)
+    print(f"\n{n_excited}/{len(rows)} seeds show resonance excitation "
+          f"(suppression_ratio < {p_eq_suppression_flag})")
+
+    return rows
+
 #%%
+
+row=assess_seed_resonance_excitation(SEED, True, deep_track_single,
+                                     check_qy_spin_coupling, base_line)
+print(row)
 plot_invariant_spin_vector(SEED, apply_correction=False)
 plot_invariant_spin_vector(SEED, apply_correction=True)
 
@@ -507,8 +747,13 @@ results = n0_vs_spin_tune_scan(SEED, nu_min=5.5, nu_max=7.5,
                                  n_points=80, apply_correction=True)
 plot_n0_vs_spin_tune(results, out_path=f'{results_dir}/n0_vs_spin_tune_corrected.png')
 
+coupling = compare_qy_spin_coupling_across_branches(line, SEED)
+print(coupling)
+
 data_misaligned = deep_track_single(SEED, apply_correction=False)
 data_corrected = deep_track_single(SEED, apply_correction=True)
+
+
 
 plot_seed_with_textbox(
     data_misaligned, 'Misaligned',

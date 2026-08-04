@@ -675,6 +675,7 @@ def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
 
 
 
+
 df_mis_full = df_scan_full[df_scan_full['Mode'] == 'misaligned']
 df_cor_full = df_scan_full[df_scan_full['Mode'] == 'corrected']
 
