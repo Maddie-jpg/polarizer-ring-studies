@@ -25,8 +25,8 @@ import tune_wp_scan as twps
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',3))
-config=int(os.environ.get('CONFIG',0))
+design=int(os.environ.get('DESIGN',1))
+config=int(os.environ.get('CONFIG',1))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 
@@ -46,7 +46,7 @@ if pdf_run is True:
     plt.savefig = _new_savefig
 
 # %%
-pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
+pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_DSchange.json")
 
 ring=pdr.lines['ring']
 print(ring.element_names)
@@ -308,7 +308,7 @@ print('2nd order chrom y', ring_tw.ddqy)
 
 # %%
 
-mf.SpuckParsAus( ring, period_sliced.twiss(method='4d'), period,(0., 38.), (0., 12.), (0., 1.), .08,pdr, f"Results/D{design}/C{config}/{mode}/Standard.png" )
+mf.SpuckParsAus( ring, period_sliced.twiss(method='4d'), period,(0., 38.), (0., 12.), (0., 1.), .08,pdr, f"{new_results_folder}/Standard.png" )
 
 # %%
 max_dp = 4e-2
@@ -351,7 +351,7 @@ plt.ylabel('Fractional tune')
 plt.legend()
 plt.grid(True)
 plt.xlim(-max_dp*1.05,max_dp*1.05)
-plt.savefig(f'Results/D{design}/C{config}/{mode}/momentum_deviation{current_wp}_{mode}.png')
+plt.savefig(f'{new_results_folder}/momentum_deviation{current_wp}_{mode}.png')
 
 
 

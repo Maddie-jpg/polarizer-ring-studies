@@ -18,6 +18,7 @@ import pandas as pd
 import LatticeBuild.misalignments_corrections as mc
 import my_functions as mf
 import random
+import csv
 
 
 #%%
@@ -236,9 +237,13 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
 
     p_bks = tw.spin_polarization_inf_no_depol
     t_bks = tw.spin_t_pol_component_s
-    t_pol = t_bks   # polarization buildup time in seconds
+    t_pol = t_bks
     t_pol_turns = t_bks / tw.T_rev0
-    p_eq_long = (p_bks * 1 / (1 + t_pol_turns / t_dep_turns_long)) * 100
+
+    t_dep_analytic_s = tw.spin_t_depol_component_s          # NEW — analytic, from dn/ddelta
+    t_dep_turns_analytic = t_dep_analytic_s / tw.T_rev0      # NEW — same units as your tracked one
+
+    p_eq_analytic = (p_bks / (1 + t_pol_turns / t_dep_turns_analytic)) * 100
 
     return {
         'seed': seed_val,
@@ -248,7 +253,7 @@ def deep_track_single(seed_val, apply_correction, transient_turns=8000):
         'fit_all': fit_curve_all,
         'amp': amp_cut,
         'icTrns': icTrns,
-        'p_eq_long': p_eq_long,
+        'p_eq_long': p_eq_analytic,
         'p_bks': p_bks * 100,
         't_pol': t_pol,
         't_dep_turns_long': t_dep_turns_long,

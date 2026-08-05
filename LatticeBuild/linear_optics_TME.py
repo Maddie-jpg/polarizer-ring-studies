@@ -293,14 +293,24 @@ def three_fold_periodicity_90_deg(fringe_fields=True, matched=True):
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
 
-    pdr.vars({
+    '''pdr.vars({
         'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.55,
         'dl_noben': 0.25,   'l_quad':   0.30,
         'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
         'dl_drift': -0.1,   'dl_trans': 0.00,
         'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
         'l_sext':   0.20,
-    })
+    })'''
+    pdr.vars({
+            'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4,
+            'dl_noben': 0.85,   'l_quad':   0.30,
+            'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
+            'dl_drift': -0.0,   'dl_trans': 0.20,
+            'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
+            'l_sext':   0.20,
+        })
+
+
     pdr.vars({
         'N_cells_S': 8,
         'hBarc': '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
@@ -389,13 +399,22 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True):
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
 
-    pdr.vars({
+    '''pdr.vars({
         'l_cell':   3.5,    'l_bend':   0.40,   'l_bendDS': 0.55,
         'dl_noben': 0.25,   'l_quad':   0.30,
         'l_drift':  0.525,  'dl_drift': -0.15,  'dl_trans': 0.00,
         'l_doub':   0.25,   'l_tripl':  3.0,    'l_trips':  0.40,
         'l_sext':   0.10,
     })
+'''
+    pdr.vars({
+                'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4,
+                'dl_noben': 0.85,   'l_quad':   0.30,
+                'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
+                'dl_drift': -0.0,   'dl_trans': 0.20,
+                'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
+                'l_sext':   0.20,
+            })
     pdr.vars({
         'N_cells_S': 8,
         'hBarc': '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
