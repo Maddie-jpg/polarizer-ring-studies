@@ -240,7 +240,7 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
     kQDtr_saved = arc1R.vars['kQDtr']._value
 
     matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
-
+    
     # Check what we actually got
     tw_cell = cell_arc.twiss(method='4d')
     tw_check = arc1R.twiss(method='4d',
@@ -261,8 +261,10 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
 
     tw_tr = cell_tr.twiss(method='4d')
     mid   = len(tw_tr.betx) // 2
+
     matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
                  cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R)
+    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
 
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
     """Register all lines in pdr.lines — same keys for all lattice functions."""

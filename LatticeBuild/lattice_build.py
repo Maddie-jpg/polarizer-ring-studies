@@ -20,16 +20,17 @@ from pathlib import Path
 design=3
 config=0
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
-phase=120
+phase=90
 
 #%%
 
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.two_fold_racetrack_3straight(fringe_fields=True, matched=True, phase_advance=1/3)
+    #pdr=lo.three_fold_periodicity_120_deg(fringe_fields=True, matched=True)
+    pdr=lo.two_fold_racetrack_3straight(fringe_fields=True, matched=True)
+    
 
-    #sextupole configuration
 
 #Misalignments
 elif mode == 'misaligned':

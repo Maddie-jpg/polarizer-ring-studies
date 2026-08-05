@@ -1,0 +1,2 @@
+seed,branch,Qx,Qy,nu_spin,nearest_order,nearest_sign,nearest_resonance,distance_to_resonance,t_dep_turns,fit_reliable,p_bks,p_eq_long,suppression_ratio,excited
+1687758877,corrected,15.471217105539452,15.458042080537549,0.47192012302181147,-5,1,10.458042080537549,9.986121957515737,116794.281840221,True,92.37527758850126,0.010056302278416081,0.00010886356762264144,True

@@ -28,7 +28,7 @@ xo.context_cpu.allow_no_prebuilt_kernel = True
 design=int(os.environ.get('DESIGN',3))
 config=int(os.environ.get('CONFIG',0))
 mode=os.environ.get('MODE','perfect')
-phase=int(os.environ.get('PHASE',120))
+phase=int(os.environ.get('PHASE',90))
 
 
 # %%
