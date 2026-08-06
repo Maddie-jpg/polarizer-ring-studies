@@ -18,8 +18,8 @@ from pathlib import Path
 #%%
 
 design=1
-config=10
-mode='perfect' # 'perfect', 'misaligned', or 'corrected'
+config=9
+mode='corrected' # 'perfect', 'misaligned', or 'corrected'
 phase=90
 
 #%%
@@ -28,18 +28,18 @@ phase=90
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
     pdr=lo.three_fold_periodicity_90_deg(fringe_fields=True, matched=True)
-    sc.config_D1_C10(pdr)
+    sc.config_D1_C9(pdr)
     
 
 
 #Misalignments
 elif mode == 'misaligned':
-    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
+    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}_DSchange.json')
     ring=pdr.lines['ring']
     mc.misalignments(ring, 0.25e-3)
 
 elif mode=='corrected':
-    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
+    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}_DSchange.json')
     ring=pdr.lines['ring']
 
     mc.insert_BPMs_all_as_markers(pdr)
