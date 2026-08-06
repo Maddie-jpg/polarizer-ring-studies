@@ -19,6 +19,7 @@ import os
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 import LatticeBuild.misalignments_corrections as mc
+import my_functions as mf
 
 
 # %%
@@ -244,26 +245,11 @@ def run_scan_pass(seed_list, apply_correction):
     }
     return pd.DataFrame(branch_results)
 
-
-# ---------------------------------------------------------------------------
-# PASS 1 — misaligned-only scan, run first and saved to disk on its own.
-# ---------------------------------------------------------------------------
 #%%
-
 df_misaligned = run_scan_pass(seeds, apply_correction=False)
 df_misaligned.to_csv(results_path)
 print(f"Pass 1 (misaligned) complete. Saved {len(df_misaligned)} rows to {results_path}")
-
 #%%
-
-# ---------------------------------------------------------------------------
-# PASS 2 — corrected scan, using the EXACT seeds read back from the file
-# Pass 1 just wrote (not the in-memory `seeds` array), so the seed list this
-# pass uses is guaranteed to come from disk rather than from whatever is
-# still sitting in memory -- this is the actual point of writing to disk
-# in between passes rather than just reusing `seeds` directly.
-# ---------------------------------------------------------------------------
-
 df_misaligned_from_disk = pd.read_csv(results_path, index_col=0)
 seeds_from_file = df_misaligned_from_disk['Seed'].to_numpy()
 
@@ -277,7 +263,6 @@ print(f"Pass 2 (corrected) complete. {results_path} now holds "
       f"{len(df_scan_full)} rows ({len(df_misaligned_from_disk)} misaligned + "
       f"{len(df_corrected)} corrected).")
 
-# df used by the legacy plotting cells below
 df = df_scan_full.copy()
 
 #%%
@@ -295,14 +280,6 @@ if pdf_run is True:
     plt.savefig = _new_savefig'''
 # %%
 
-
-#%%
-
-# Polarization vs depol time, split by branch mode so misaligned and
-# corrected points are visually distinguishable on the same axes.
-# t_depol = t_pol / (P_BKS/P_eq - 1), the inverse of P_eq = P_BKS/(1 + t_pol/t_depol).
-# This is now correct because t_pol holds the real buildup time in SECONDS
-# (previously it was the collapsed ~T_rev0 value, making this ~1e9x too small).
 df['t_depol_fitted_seconds'] = df['t_pol'] / ((df['P_BKS'] / df['P_eq']) - 1)
 
 fig, ax = plt.subplots()
@@ -339,11 +316,6 @@ plt.savefig(f'{results_dir}/EqPolDist.png')
 
 
 #%%
-
-# ---------------------------------------------------------------------------
-# Paired misaligned-vs-corrected P_eq comparison (same misalignment seed for
-# both branches, so each point is a fair before/after-correction pair).
-# ---------------------------------------------------------------------------
 
 df_mis = df_scan_full[df_scan_full['Mode'] == 'misaligned'].set_index('Seed')
 df_cor = df_scan_full[df_scan_full['Mode'] == 'corrected'].set_index('Seed')
@@ -393,290 +365,11 @@ plt.savefig(f'{results_dir}/PEq_Misaligned_vs_Corrected_Histograms.png', dpi=300
 plt.close()
 
 # %%
-
-
-# ===========================================================================
 # PART 2 — DEEP TRACK on the single best and single worst seed from the scan
-# ===========================================================================
-# Uses df_scan_full (in memory from Part 1) instead of re-reading
-# SpinTrackingResults.dat from disk -- this guarantees the deep track is
-# always working from the scan that was JUST run, never a stale prior file.
-#%%
 
 long_scan_turns=20000
 
-# df_scan_full contains BOTH branches (misaligned and corrected). Deep-track
-# the best/worst seed of EACH branch separately, since the best/worst seed
-# under correction isn't necessarily the same seed as best/worst uncorrected.
-df_corrected_only = df_scan_full[df_scan_full['Mode'] == 'corrected']
-df_misaligned_only = df_scan_full[df_scan_full['Mode'] == 'misaligned']
-
-# base_line already exists from Part 1 -- reuse it as the clean reference so
 # each deep-track seed starts from the same untouched lattice.
-
-def deep_track_branch(df_branch, apply_correction):
-    """Deep-track the best (top_1) and worst (bottom_1) seed within df_branch.
-    Returns a dict {'top_1': [...], 'bottom_1': [...]} matching the original
-    plot_data structure, scoped to just this one branch."""
-    top_1 = df_branch.nlargest(1, 'P_eq')
-    bottom_1 = df_branch.nsmallest(1, 'P_eq')
-    branch_plot_data = {'top_1': [], 'bottom_1': []}
-
-    for group_name, df_group in [('top_1', top_1), ('bottom_1', bottom_1)]:
-        for idx, row in df_group.iterrows():
-            seed_val = int(row['Seed'])
-            p_eq_scan = row['P_eq']
-            print(f"Running deep track for {group_name} - Seed {seed_val} "
-                  f"({'corrected' if apply_correction else 'misaligned'})...")
-
-            line = base_line.copy()
-            # Set mean radiation before building the tracker (twiss can't run
-            # under quantum; base_line may carry quantum state from a prior copy).
-            # Build tracker, then misalign onto the live tracker (element_refs);
-            # never discard afterward or the misalignments are lost.
-            line.configure_radiation('mean')
-            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-            line = mc.misalignments(line, misalignment_val, seed=seed_val)
-
-            tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                            spin=True, polarization=True)
-
-            if apply_correction:
-                try:
-                    mc.orbit_correction(line, tw, threading=False)
-                except Exception as e:
-                    print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
-                          f"{type(e).__name__}: {e} -- retrying with threading=True")
-                    mc.orbit_correction(line, tw, threading=True)
-                # Re-twiss after correction so tw reflects the corrected lattice.
-                tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                                spin=True, polarization=True)
-
-            particles = xp.generate_matched_gaussian_bunch(
-                line=line,
-                nemitt_x=tw.eq_nemitt_x,
-                nemitt_y=tw.eq_nemitt_y,
-                sigma_z=np.sqrt(tw.eq_gemitt_zeta * tw.bets0),
-                num_particles=300)
-
-            particles.zeta += tw.zeta[0]
-            particles.delta += tw.delta[0]
-            particles.spin_x = tw.spin_x[0]
-            particles.spin_y = tw.spin_y[0]
-            particles.spin_z = tw.spin_z[0]
-
-            # Switch to quantum radiation for tracking WITHOUT discarding the
-            # tracker (which would wipe misalignments + correction).
-            line.configure_radiation('quantum')
-
-            line.build_tracker(_context=xo.ContextCpu(omp_num_threads='auto'))
-            # Track for full long duration
-            line.track(particles, num_turns=long_scan_turns, turn_by_turn_monitor=True, with_progress=10)
-            mon = line.record_last_track
-
-            # Compute full polarization curve
-            mask_alive = mon.state > 0
-            pol_x = mon.spin_x.sum(axis=0) / mask_alive.sum(axis=0)
-            pol_y = mon.spin_y.sum(axis=0) / mask_alive.sum(axis=0)
-            pol_z = mon.spin_z.sum(axis=0) / mask_alive.sum(axis=0)
-            pol = np.sqrt(pol_x**2 + pol_y**2 + pol_z**2)
-
-            n_turns_rec = len(pol)
-            turns = np.arange(n_turns_rec)
-            
-            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-            # Two-parameter exponential: free amplitude 'a' and decay rate 'tauinv'.
-            def exp_decay(t, a, tauinv):
-                return a * np.exp(-tauinv * t)
-
-            # Two-step fit: lstsq gives robust starting values, curve_fit refines.
-            def two_step_exp_fit(t, p):
-                t = np.asarray(t, dtype=float)
-                p = np.asarray(p, dtype=float)
-                A = np.vstack([t, np.ones_like(t)]).T
-                lin_slope, intercept = np.linalg.lstsq(A, p, rcond=None)[0]
-                p0 = [intercept, -lin_slope / intercept]
-                popt, pcov = curve_fit(exp_decay, t, p, p0=p0, maxfev=10000)
-                return popt, pcov
-
-            icTrns = int(np.clip(long_scan_turns // 5, 0, n_turns_rec - 2))
-
-            try:
-                popt_all, _ = two_step_exp_fit(turns, pol)
-                popt_cut, _ = two_step_exp_fit(turns[icTrns:], pol[icTrns:])
-                amp_all, tauinv_all = popt_all
-                amp_cut, tauinv_cut = popt_cut
-                t_dep_turns_all  = 1.0 / tauinv_all if tauinv_all > 0 else np.nan
-                t_dep_turns_long = 1.0 / tauinv_cut if tauinv_cut > 0 else np.nan
-                fit_curve     = exp_decay(turns, amp_cut, tauinv_cut)
-                fit_curve_all = exp_decay(turns, amp_all, tauinv_all)
-                fit_ok = True
-            except (RuntimeError, ValueError) as e:
-                print(f"  Exponential fit failed for seed {seed_val}: {e}")
-                t_dep_turns_all = np.nan
-                t_dep_turns_long = np.nan
-                fit_curve = np.full_like(pol, np.nan)
-                fit_curve_all = np.full_like(pol, np.nan)
-                fit_ok = False
-
-            n_over_tau = n_turns_rec / t_dep_turns_long if fit_ok and t_dep_turns_long > 0 else np.nan
-            print(f"  Seed {seed_val}: tau_fit(all) = {t_dep_turns_all:.1f} turns, "
-                  f"tau_fit(cut@{icTrns}) = {t_dep_turns_long:.1f} turns, "
-                  f"N/tau = {n_over_tau:.2f}")
-
-            p_bks=tw.spin_polarization_inf_no_depol
-            t_bks=tw.spin_t_pol_component_s
-            p_dkm=tw.spin_polarization_eq
-            t_dkm=tw.spin_t_pol_buildup_s
-            t_depol=tw.spin_t_depol_component_s
-            t_pol=t_bks   # polarization buildup time in seconds (see Part 1 note on the old broken formula)
-
-            t_pol_turns = t_bks/tw.T_rev0
-            p_eq = p_bks * 1 / (1 + t_pol_turns/t_dep_turns_long)
-
-            # Calculate the revised equilibrium polarization from the deep track fit
-            p_eq_long = (p_bks * 1 / (1 + t_pol_turns / t_dep_turns_long)) * 100
-
-            branch_plot_data[group_name].append({
-                'seed': seed_val,
-                'turns': turns,
-                'pol': pol,
-                'fit': fit_curve,
-                'fit_all': fit_curve_all,
-                'icTrns': icTrns,
-                'p_eq_long': p_eq_long,
-                'p_bks': p_bks * 100,
-                't_pol': t_pol,
-                't_dep_turns_long': t_dep_turns_long,
-                't_dep_turns_all': t_dep_turns_all,
-            })
-
-    return branch_plot_data
-
-
-plot_data_corrected = deep_track_branch(df_corrected_only, apply_correction=True)
-plot_data_misaligned = deep_track_branch(df_misaligned_only, apply_correction=False)
-
-
-def plot_seed_with_textbox(data, title_prefix, out_path):
-    fig, ax = plt.subplots(figsize=(8, 7))
-    fig.suptitle(f"{title_prefix} - Seed {data['seed']}", fontsize=14, fontweight='bold')
-
-    ax.plot(data['turns'], data['pol'], label='Tracking Data', color='blue', alpha=0.7)
-    ax.plot(data['turns'], data['fit'], color='red', linestyle='--')
-    if 'fit_all' in data:
-        ax.plot(data['turns'], data['fit_all'], color='orange', linestyle=':',
-                label='Exp. fit')
-   
-    ax.set_ylabel('$P(t)$')
-    ax.set_xlabel('Turns')
-    ax.grid(True, linestyle=':', alpha=0.6)
-    ax.legend()
-
-    info_text = (
-        f"$P_{{BKS}}$ = {data['p_bks']:.2f}%   "
-        f"$P_{{eq}}$ (long track) = {data['p_eq_long']:.2f}%\n"
-        f"$\\tau_{{depol}}$ (all turns) = {data['t_dep_turns_all']:.1f} turns   "
-        f"$\\tau_{{depol}}$ (transient removed) = {data['t_dep_turns_long']:.1f} turns\n"
-        f"$t_{{pol}}$ = {data['t_pol']:.4e} s\n"
-    )
-    fig.text(0.5, 0.02, info_text, ha='center', va='bottom', fontsize=10,
-              bbox=dict(boxstyle='round', facecolor='whitesmoke', edgecolor='gray', alpha=0.9))
-
-    plt.tight_layout(rect=[0, 0.12, 1, 1])
-    plt.savefig(out_path, dpi=300)
-    plt.close()
-
-
-plot_seed_with_textbox(
-    plot_data_corrected['top_1'][0], 'Best Seed (Corrected)',
-    f'{results_dir}/TopSeed_Polarization_Corrected.png'
-)
-
-plot_seed_with_textbox(
-    plot_data_corrected['bottom_1'][0], 'Worst Seed (Corrected)',
-    f'{results_dir}/BottomSeed_Polarization_Corrected.png'
-)
-
-plot_seed_with_textbox(
-    plot_data_misaligned['top_1'][0], 'Best Seed (Misaligned)',
-    f'{results_dir}/TopSeed_Polarization_Misaligned.png'
-)
-
-plot_seed_with_textbox(
-    plot_data_misaligned['bottom_1'][0], 'Worst Seed (Misaligned)',
-    f'{results_dir}/BottomSeed_Polarization_Misaligned.png'
-)
-
-
-
-# ===========================================================================
-# PART 3 — INVARIANT SPIN VECTOR along the ring, for the same best/worst seeds
-# ===========================================================================
-# Reuses df_scan_full (Part 1) for seed selection again -- no disk read needed.
-#%%
-
-def plot_invariant_spin_vector(seed_val, seed_label, apply_correction):
-    print(f"Plotting invariant spin vector for {seed_label} (Seed {seed_val}, "
-          f"{'corrected' if apply_correction else 'misaligned'})...")
-
-    line = base_line.copy()
-    # Set mean radiation before building the tracker (twiss can't run under
-    # quantum). Build tracker, then misalign onto the live tracker; do not
-    # discard afterward (that wiped the misalignments and produced the flat
-    # n0_y=1.0 perfect-lattice plot).
-    line.configure_radiation('mean')
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, misalignment_val, seed=seed_val)
-
-    tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                    spin=True, polarization=True)
-
-    if apply_correction:
-        try:
-            mc.orbit_correction(line, tw, threading=False)
-        except Exception as e:
-            print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
-                  f"{type(e).__name__}: {e} -- retrying with threading=True")
-            mc.orbit_correction(line, tw, threading=True)
-        # Orbit correction changes the closed orbit/optics, so re-twiss to get
-        # the n0 vector consistent with the corrected lattice.
-        tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                        spin=True, polarization=True)
-
-    s = tw.s
-    sx = tw.spin_x
-    sy = tw.spin_y
-    sz = tw.spin_z
-
-    # Sanity check: |n0| should be 1 everywhere (it's a unit vector by construction).
-    n0_mag = np.sqrt(sx**2 + sy**2 + sz**2)
-    print(f"  |n0| range: [{n0_mag.min():.6f}, {n0_mag.max():.6f}] (should be ~1.0)")
-    print(f"  spin tune = {tw.spin_tune_fractional:.6f}")
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(s, sx*100, label='$100(n_{0,x})$', color='tab:blue')
-    ax.plot(s, sy, label='$n_{0,y}$', color='tab:green')
-    ax.plot(s, sz*100 +0.2, label='$100(n_{0,z})+0.2$', color='tab:red')
-
-    ax.set_xlabel('s (m)')
-    ax.set_ylabel('Invariant spin vector $n_0$ component')
-    ax.set_title(f'Invariant Spin Vector Along the Ring — {seed_label} (Seed {seed_val})')
-    ax.grid(True, linestyle=':', alpha=0.6)
-    ax.legend()
-
-    plt.tight_layout()
-    branch_tag = 'Corrected' if apply_correction else 'Misaligned'
-    out_path = (f'{results_dir}/'
-                f'InvariantSpinVector_{seed_label.replace(" ", "")}_{branch_tag}.png')
-    plt.savefig(out_path, dpi=300)
-    plt.close()
-
-    print(f"  Saved to {out_path}")
-
-
-
-
 df_mis_full = df_scan_full[df_scan_full['Mode'] == 'misaligned']
 df_cor_full = df_scan_full[df_scan_full['Mode'] == 'corrected']
 
@@ -685,8 +378,40 @@ bottom_row_mis = df_mis_full.nsmallest(1, 'P_eq').iloc[0]
 top_row_cor = df_cor_full.nlargest(1, 'P_eq').iloc[0]
 bottom_row_cor = df_cor_full.nsmallest(1, 'P_eq').iloc[0]
 
-plot_invariant_spin_vector(int(top_row_mis['Seed']), 'Best Seed', apply_correction=False)
-plot_invariant_spin_vector(int(bottom_row_mis['Seed']), 'Worst Seed', apply_correction=False)
-plot_invariant_spin_vector(int(top_row_cor['Seed']), 'Best Seed', apply_correction=True)
-plot_invariant_spin_vector(int(bottom_row_cor['Seed']), 'Worst Seed', apply_correction=True)
-# %%
+
+plot_data_misaligned_top=mf.deep_track_single(base_line, top_row_mis['Seed'],long_scan_turns, apply_correction=False)
+plot_data_misaligned_bottom=mf.deep_track_single(base_line, bottom_row_mis['Seed'],long_scan_turns, apply_correction=False)
+plot_data_corrected_top=mf.deep_track_single(base_line, top_row_cor['Seed'],long_scan_turns, apply_correction=True)
+plot_data_corrected_bottom=mf.deep_track_single(base_line, bottom_row_cor['Seed'],long_scan_turns, apply_correction=True)
+
+
+
+mf.plot_seed_with_textbox(
+    plot_data_corrected_top, 'Best Seed (Corrected)',
+    f'{results_dir}/TopSeed_Polarization_Corrected.png'
+)
+
+mf.plot_seed_with_textbox(
+    plot_data_corrected_bottom, 'Worst Seed (Corrected)',
+    f'{results_dir}/BottomSeed_Polarization_Corrected.png'
+)
+
+mf.plot_seed_with_textbox(
+    plot_data_misaligned_top, 'Best Seed (Misaligned)',
+    f'{results_dir}/TopSeed_Polarization_Misaligned.png'
+)
+
+mf.plot_seed_with_textbox(
+    plot_data_misaligned_bottom, 'Worst Seed (Misaligned)',
+    f'{results_dir}/BottomSeed_Polarization_Misaligned.png'
+)
+
+
+
+#%%
+# INVARIANT SPIN VECTOR along the ring, for the same best/worst seeds
+
+mf.plot_invariant_spin_vector(base_line,int(top_row_mis['Seed']), apply_correction=False, out_path=f'{results_dir}/InvariantSpinVector_BestSeed_Misaligned.png')
+mf.plot_invariant_spin_vector(base_line,int(bottom_row_mis['Seed']), 'Worst Seed', apply_correction=False, out_path=f'{results_dir}/InvariantSpinVector_WorstSeed_Misaligned.png')
+mf.plot_invariant_spin_vector(base_line,int(top_row_cor['Seed']), 'Best Seed', apply_correction=True, out_path=f'{results_dir}/InvariantSpinVector_BestSeed_Corrected.png')
+mf.plot_invariant_spin_vector(base_line,int(bottom_row_cor['Seed']), 'Worst Seed', apply_correction=True, out_path=f'{results_dir}/InvariantSpinVector_WorstSeed_Corrected.png')
