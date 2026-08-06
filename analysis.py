@@ -568,8 +568,8 @@ plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=
 
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
-ax.set_xlim(x0 - 3, x1 + 3)
-ax.set_ylim(None, y1 + 3)
+ax.set_xlim(-15,15)
+ax.set_ylim(None, 12)
 plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
@@ -715,8 +715,8 @@ plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=
 
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
-ax.set_xlim(x0 - 3, x1 + 3)
-ax.set_ylim(None, y1 + 3)
+ax.set_xlim(-7, 7)
+ax.set_ylim(None, 12)
 plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
