@@ -3,8 +3,17 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import os
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
+from xutil_DA_CC.xsuite_plot_functions import DA_vs_turns
 
 pdr=xt.Environment()
+
+#-----------------------------------
+# FUNCTIONS FOR analysis.py SCRIPT
+#-----------------------------------
 
 def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     # Added a 4th row for Chromatic Functions (axw)
@@ -159,43 +168,6 @@ def SpuckParsAus(line, acc_tw, acc, lims, limy1, limy2, scK1, pdr, grname='NoGra
     return axt
 
 
-
-
-def misalignments(line, seed=None):
-   sigma=0.3e-3
-
-   rng=np.random.default_rng(seed)
-
-   actual_seed = rng.bit_generator.seed_seq.entropy
-   print(f"Applying misalignments with seed: {actual_seed}")
-
-   tab=line.get_table()
-   #Quad and sextupole misalignments
-   quads = list(tab.rows[tab.element_type == 'Quadrupole'].name)
-   sexts = list(tab.rows[tab.element_type == 'Sextupole'].name)
-   bends = list(tab.rows[tab.element_type == 'Bend'].name)
-
-   for name in quads + sexts + bends:
-        # Access the element via the reference manager
-        ref = line.element_refs[name]
-        
-        # Apply translations
-        ref.shift_x = rng.normal(0, sigma)
-        ref.shift_y = rng.normal(0, sigma)
-        ref.shift_s = rng.normal(0, sigma)
-        
-        # Apply rotations (in radians)
-        ref.rot_s_rad = rng.normal(0, sigma)
-        ref.rot_x_rad = rng.normal(0, sigma)
-        ref.rot_y_rad = rng.normal(0, sigma)
-
-        relative_error = 1 + rng.normal(0, 1e-3)
-        ref.knl *= relative_error
-        ref.ksl *= relative_error
-
-   return line
-
-
 def survey_plot(ring):
     fig, ax = plt.subplots(figsize=(12, 12))
     sv = ring.survey()
@@ -257,575 +229,310 @@ def survey_plot(ring):
     ax.set_aspect('equal')
 
 
-import pandas as pd
-def survey_plot_with_strength(ring, scale_height=5.0):
-    # 1. Get the survey data
-    sv = ring.survey()
-    df = sv.to_pandas()
 
-    # 2. Extract strengths from the ring environment
-    def get_element_strength(name):
-        el = ring.element_dict.get(name)
-        if el is None or isinstance(el, xt.Drift): 
-            return None
-        
-        s = 0.0
-        # 1. Check Multipoles (Dipoles, Quads, Sextupoles, Kickers)
-        if hasattr(el, 'knl'):
-            # Sum up all normal components (k0l, k1l, k2l...)
-            # and skew components (ksl)
-            s += np.sum(el.knl) + np.sum(el.ksl)
-        
-        # 2. Check Thick Magnets (if knl is empty)
-        if s == 0:
-            if hasattr(el, 'k1'): s += el.k1 * el.length
-            if hasattr(el, 'k2'): s += el.k2 * el.length
-            # Dipole bending strength for thick elements
-            if hasattr(el, 'k0'): s += el.k0 * el.length 
-            # Kickers often use 'hkick' or 'vkick'
-            if hasattr(el, 'hkick'): s += el.hkick
-            if hasattr(el, 'vkick'): s += el.vkick
-
-        return s
-
-    # Append the strength column to our dataframe
-    df['strength'] = df['name'].apply(get_element_strength)
-    
-    # 3. Setup Plot
-    fig, ax = plt.subplots(figsize=(12, 12))
-    ax.plot(df['Z'], df['X'], color='gray', lw=1, alpha=0.3) # Baseline
-    
-    bpm_offset = 3.0  
-    k_height = 2.0    
-    max_s = df['strength'].abs().max() if df['strength'].abs().max() != 0 else 1.0
-
-    # 4. Iterate through the updated DataFrame
-    for _, row in df.iterrows():
-        name = row['name']
-        z0, x0 = row['Z'], row['X']
-        theta = row['theta']
-        el_len = row['length']
-        strength = row['strength']
-
-        # --- STRENGTH BLOCKS ---
-        if strength != 0:
-            norm_val = strength / max_s
-            draw_len = el_len if el_len > 0 else 0.5
-            
-            perp_angle = theta + np.pi/2
-            h = norm_val * scale_height
-            
-            cos_t, sin_t = np.cos(theta), np.sin(theta)
-            cos_p, sin_p = np.cos(perp_angle), np.sin(perp_angle)
-            
-            # Corner coordinates using your ColView geometry
-            c1 = [z0 - draw_len*cos_t,             x0 - draw_len*sin_t]
-            c2 = [z0,                              x0]
-            c3 = [z0 + h*cos_p,                    x0 + h*sin_p]
-            c4 = [z0 - draw_len*cos_t + h*cos_p,   x0 - draw_len*sin_t + h*sin_p]
-            
-            color = 'red' if strength > 0 else 'blue'
-            ax.add_patch(patches.Polygon([c1, c2, c3, c4], color=color, alpha=0.6, zorder=5))
-
-        # --- KICKERS ---
-        elif name.startswith(('Mx', 'My')):
-            color = 'hotpink' if name.startswith('Mx') else 'cyan'
-            # Centered rectangle for kickers
-            rect = patches.Rectangle(
-                (z0 - el_len, x0 - k_height/2), 
-                el_len if el_len > 0 else 0.5, k_height, 
-                angle=np.degrees(theta), rotation_point='center',
-                color=color, zorder=10
-            )
-            ax.add_patch(rect)
-
-        # --- BPMs ---
-        elif name.startswith(('BPMx', 'BPMy')):
-            direction = theta + np.pi/2
-            ax.scatter(z0 + bpm_offset * np.cos(direction), 
-                       x0 + bpm_offset * np.sin(direction), 
-                       color='hotpink' if 'BPMx' in name else 'cyan', 
-                       s=20, zorder=11)
-
-    # 5. UI Elements (+/- guide and labels)
-    # Use a point near the 5% mark of the ring to show the polarity guide
-    guide = df.iloc[len(df)//20]
-    g_theta = guide['theta'] + np.pi/2
-    for sign, color, side in [("+", "red", 1.5), ("-", "blue", -1.5)]:
-        ax.text(guide['Z'] + (scale_height*side)*np.cos(g_theta), 
-                guide['X'] + (scale_height*side)*np.sin(g_theta), 
-                sign, fontsize=30, color=color, weight='bold', ha='center')
-
-    ax.set_aspect('equal')
-    ax.set_title("Ring Survey: Position + Strength Envelope")
-    plt.xlabel("Z [m]")
-    plt.ylabel("X [m]")
-    plt.show()
-    
-    return df # Returning the dataframe so you can inspect the 'strength' column
-
-def geometric_acceptance_plot(
-    x_norm,
-    y_norm,
-    num_r_steps,
-    num_theta_steps,
-    x_aperture,
-    y_aperture
-):
-
-
-    x2d = x_norm.reshape(num_r_steps, num_theta_steps)
-    y2d = y_norm.reshape(num_r_steps, num_theta_steps)
-
-
-    accepted = (
-        (x2d / x_aperture)**2 +
-        (y2d / y_aperture)**2
-    ) <= 1
-
-    accepted = accepted.astype(float)
-
-    x_GA = np.full(num_theta_steps, np.nan)
-    y_GA = np.full(num_theta_steps, np.nan)
-
-    for jj in range(num_theta_steps):
-
-        for ii in range(num_r_steps):
-
-            if not accepted[ii, jj]:
-
-                x_GA[jj] = x2d[ii, jj]
-                y_GA[jj] = y2d[ii, jj]
-                break
-
-
-    GA_radius = np.sqrt(x_GA**2 + y_GA**2)
-
-    min_GA = np.nanmin(np.round(GA_radius, 1))
-
-    where_min_GA = np.where(
-        np.round(GA_radius, 1) == min_GA
-    )[0]
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-
-    mesh = ax.pcolormesh(
-        x2d,
-        y2d,
-        accepted,
-        shading='gouraud'
-    )
-
-    ax.plot(
-        x_GA,
-        y_GA,
-        color='red',
-        linewidth=2,
-        label='Geometric Acceptance'
-    )
-
-    ax.plot(
-        x_GA[where_min_GA],
-        y_GA[where_min_GA],
-        'o',
-        color='red',
-        markersize=7,
-        label=f'GA$_{{min}}$ = {min_GA:.1f}$\\sigma$'
-    )
-
-    ax.set_xlabel(
-        r'$\hat{x}\ [\sqrt{\varepsilon_x}]$'
-    )
-
-    ax.set_ylabel(
-        r'$\hat{y}\ [\sqrt{\varepsilon_y}]$'
-    )
-
-    cb = plt.colorbar(mesh)
-    cb.set_label('Accepted')
-
-    ax.legend(fontsize='small')
-
-    plt.tight_layout()
-
-    return x_GA, y_GA
-
-
-def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
-
-   offset=0.0
-
-   bpm = xt.BeamPositionMonitor(
-    start_at_turn=start_at_turn, 
-    stop_at_turn=stop_at_turn, 
-    frev=fRev
-   )
-    
-   ring=pdr.lines['ring']
-     # Defocusing (QDA)
-   for elem in ([ [el, '-'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7'] ] +
-                 [ [el, '+'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7'] ]):
-
-        ring.insert( 'BPMy_'+elem[0], bpm, 
-                        at=elem[1] + str(offset), from_='QDA_' + elem[0], from_anchor='start' )
-        
-   for elem in ([[el, '-'] for el in ['1R8','2R8','3R8']]+
-                 [[el, '+'] for el in ['1L8','2L8','3L8']]):
-        ring.insert( 'BPMy_'+elem[0],bpm,  
-                        at=elem[1] + str(offset), from_='QDA_M' + elem[0] , from_anchor='start')
-        
-   for elem in ([[el, '+'] for el in ['1R','2R','3R']] +
-        [[el, '-'] for el in ['1L','2L','3L']]):
-
-        ring.insert( 'BPMy_'+elem[0],bpm,
-                        at=elem[1] + str(offset), from_='QDDoub_' + elem[0], from_anchor='start' )
-        
-   for elem in ([ [el, '-'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1RC','2R1','2R2','2R3','2R4','2R5','2R6','2RC','3R1','3R2','3R3','3R4','3R5','3R6','3RC'] ] +
-                 [ [el, '+'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6'] ]):
-
-        ring.insert( 'BPMx_'+elem[0],bpm,
-                        at=elem[1] + str(offset), from_='QFA_' + elem[0], from_anchor='start' )
-        
-   for elem in ([[el, '+'] for el in ['1R','2R','3R']] +
-        [[el, '-'] for el in ['1L','2L','3L']]):
-
-        ring.insert( 'BPMx_'+elem[0],bpm,
-                        at=elem[1] + str(offset), from_='QFDoub_' + elem[0], from_anchor='start' )
-
-
-
-    # Matching quads
-   for elem in [['1R7','-'], ['2R7','-'], ['3R7','-'],['1L7','+'], ['2L7','+'], ['3L7','+']]:
-        ring.insert( 'BPMx_'+elem[0],bpm, 
-                        at=elem[1] + str(offset), from_='QFA_M' + elem[0] , from_anchor='start')
-
-   period=pdr.lines['period']
-    
-   for elem in [['PR1','-'], ['PR2','-'],['PR3','-'], ['PR4','-'],['PR5','-'], ['PR6','-'],['PR7','-'], ['PL1','+'], ['PL2','+'], ['PL3','+'], ['PL4','+'], ['PL5','+'], ['PL6','+'], ['PL7','+']]:
-            period.insert( 'BPMy_'+elem[0],  bpm,
-                        at=elem[1] + str(offset), from_='QDA_' + elem[0] , from_anchor='start')
-            
-   for elem in ([[el, '+'] for el in ['PR8']]+
-                 [[el, '-'] for el in ['PL8']]):
-        period.insert(  'BPMy_'+elem[0], bpm,
-                        at=elem[1] + str(offset), from_='QDA_M' + elem[0] , from_anchor='start')
-   
-   for elem in [['PR','-'],['PL','+']]:
-            period.insert( 'BPMy_'+elem[0],bpm,
-                        at=elem[1] + str(offset), from_='QDDoub_' + elem[0], from_anchor='start' )
-    
-
-    # Focusing
-   for elem in [['PR1','-'], ['PR2','-'],['PR3','-'], ['PR4','-'],['PR5','-'], ['PR6','-'],['PRCH','-'], ['PL1','+'], ['PL2','+'], ['PL3','+'], ['PL4','+'], ['PL5','+'], ['PL6','+'], ['PLCH','+']]:
-            period.insert( 'BPMx_'+elem[0],bpm,
-                        at=elem[1] + str(offset), from_='QFA_' + elem[0], from_anchor='start' )
-    
-   for elem in [['PR','-'],['PL','+']]:
-            period.insert( 'BPMx_'+elem[0],bpm,
-                        at=elem[1] + str(offset), from_='QFDoub_' + elem[0], from_anchor='start' )
-            
-    # Matching
-   for elem in [['PR7','-'],['PL7','+']]:
-            period.insert( 'BPMx_'+elem[0],bpm,
-                        at=elem[1] + str(offset), from_='QFA_M' + elem[0] , from_anchor='start')  
-
-   return pdr
-
-
-
-def insert_correctors(pdr):
-    offset =(pdr['l_quad']+pdr['l_drift'])/2
-    pdr['l_kick']=0.1
-    ring = pdr.lines['ring']
-    drift_map = {
-        'QDA_':    'l_drift',
-        'QFA_':    'l_drift',
-        'QDA_M':   'l_drift',
-        'QFA_M':   'l_drift',
-        'QDDS_':   'l_drift + dl_drift', # Using the 'DrarcS' logic
-        'QFDS_':   'l_drift + dl_drift',
-        'QDDoub_': 'l_doub',             # Doublet drift
-        'QFDoub_': 'l_doub',
-        'QDTrip_': 'l_tripl',            # Triplet drift
-    }
-
-    #vertical correctors
-    qy_ring_list = (
-        [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
-        [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
-        [[el, '-', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
-        [[el, '+', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
-        [[el, '-', 'QDDoub_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
-        [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
-    )
-
-    for elem, sign, prefix in qy_ring_list:
-        current_drift = drift_map.get(prefix, 'l_drift')
-        dynamic_offset = f'({current_drift}+l_quad) / 2'
-        v_name = f'vk_ring_{elem}'
-        pdr[v_name] = 0.0  # Unique vertical kick variable
-        ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
-                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
-
-    # horizontal correctors
-    qx_ring_list = (
-        [[el, '-', 'QFA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','2R1','2R2','2R3','2R4','2R5','2R6','3R1','3R2','3R3','3R4','3R5','3R6']] +
-        [[el, '+', 'QFA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','2L1','2L2','2L3','2L4','2L5','2L6','3L1','3L2','3L3','3L4','3L5','3L6','1RC','2RC','3RC']] +
-        [[el, '-', 'QFA_M'] for el in ['1R7','2R7','3R7']] +
-        [[el, '+', 'QFA_M'] for el in ['1L7','2L7','3L7']] +
-        [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
-        [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +
-        [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] +
-        [[el, '+', 'QFTripC_'] for el in ['1L2','2L2','3L2']]
-    )
-
-    for elem, sign, prefix in qx_ring_list:
-        current_drift = drift_map.get(prefix, 'l_drift')
-        dynamic_offset = f'({current_drift}+l_quad) / 2'
-        h_name = f'hk_ring_{elem}'
-        pdr[h_name] = 0.0  # Unique horizontal kick variable
-        ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
-                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
-        
-    return pdr
-
-def orbit_correction(pdr, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2):   
-    ring = pdr.lines['ring']
-    period = pdr.lines['period']
-    
-    tt = ring.get_table()
-    bpm_names_x = tt.rows['BPMx.*'].name
-    bpm_names_y = tt.rows['BPMy.*'].name
-    corr_x_names = tt.rows['Mx.*'].name
-    corr_y_names = tt.rows['My.*'].name
-
-    ring.steering_monitors_x = bpm_names_x
-    ring.steering_monitors_y = bpm_names_y
-    ring.steering_correctors_x = corr_x_names
-    ring.steering_correctors_y = corr_y_names
-
-    if threading is False:
-        corr_handler = ring.correct_trajectory(twiss_table=twiss, run=False)
-        corr_handler.x_correction.rcond = rcond_x
-        corr_handler.y_correction.rcond = rcond_y
-        corr_handler.correct()
-    else:
-        tw0 = twiss
-        corr_handler = ring.correct_trajectory(twiss_table=tw0, run=False)
-        corr_handler.thread(ds_thread=10., rcond_long=1e-2)
-
-        tw1 = ring.twiss(method='6d')
-        corr_handler_final = ring.correct_trajectory(twiss_table=tw1, run=False)
-        corr_handler_final.x_correction.rcond = rcond_x
-        corr_handler_final.y_correction.rcond = rcond_y
-        corr_handler_final.correct()
-
-    return pdr
-
-def insert_BPMs_all(pdr, start_at_turn, stop_at_turn, fRev):
-   
-   ring=pdr.lines['ring']
-
-   bpm = xt.BeamPositionMonitor(
-    start_at_turn=start_at_turn, 
-    stop_at_turn=stop_at_turn, 
-    frev=fRev
-   )
-
-   tab_r=ring.get_table()
-   
-   quads_ring = tab_r.rows[tab_r.element_type == 'Quadrupole'].name
-
-   for elem_name in quads_ring:
-        element = ring[elem_name]
-        
-        if element.k1 > 0:
-            ring.insert(
-                'BPMx_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-        
-        if element.k1 < 0:
-            ring.insert(
-                'BPMy_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-
-   period=pdr.lines['period']
-   tab_p=period.get_table()
-   quads_period = tab_p.rows[tab_p.element_type == 'Quadrupole'].name
-
-   for elem_name in quads_period:
-        element = period[elem_name]
-        
-        if element.k1 > 0:
-            period.insert(
-                'BPMx_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-        
-        if element.k1 < 0:
-            period.insert(
-                'BPMy_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-
-def insert_correctors_var2(pdr):
-
-    offset =(pdr['l_quad']+pdr['l_drift'])/2
-    pdr['l_kick']=0.1
-    ring = pdr.lines['ring']
-    drift_map = {
-        'QDA_':    'l_drift',
-        'QFA_':    'l_drift',
-        'QDA_M':   'l_drift',
-        'QFA_M':   'l_drift',
-        'QDDS_':   'l_drift + dl_drift', # Using the 'DrarcS' logic
-        'QFDS_':   'l_drift + dl_drift',
-        'QDDoub_': 'l_doub',             # Doublet drift
-        'QFDoub_': 'l_doub',
-        'QDTrip_': 'l_tripl',            # Triplet drift
-        'QFA_1RC': 'l_drift-l_sext',
-        'QFA_2RC': 'l_drift-l_sext',
-        'QFA_3RC': 'l_drift-l_sext',
-    }
-
-    #vertical correctors
-    qy_ring_list = (
-    # Standard Arc Defocusing Quads (R1-R7 and L1-L7)
-    [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
-    [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
-    # Matching and DS Quads
-    [[el, '-', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
-    [[el, '+', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
-    [[el, '-', 'QDDoub_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
-    [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
-    # Interaction Region Triplets (Adding missing R side)
-    [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
-    [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
-)
-
-    for elem, sign, prefix in qy_ring_list:
-        current_drift = drift_map.get(prefix, 'l_drift')
-        dynamic_offset = f'({current_drift}+l_quad) / 2'
-        v_name = f'vk_ring_{elem}'
-        pdr[v_name] = 0.0  # Unique vertical kick variable
-        ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
-                    at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
-
-    # horizontal correctors
-    qx_ring_list = (
-    # QFA Arc body (Added R0/L0 and R1-R5)
-    [[el, '-', 'QFA_'] for el in ['1R0','2R0','3R0', '1R1','1R2','1R3','1R4','1R5','2R1','2R2','2R3','2R4','2R5','3R1','3R2','3R3','3R4','3R5']] +
-    [[el, '+', 'QFA_'] for el in ['1L0','2L0','3L0', '1L1','1L2','1L3','1L4','1L5','2L1','2L2','2L3','2L4','2L5','3L1','3L2','3L3','3L4','3L5']] +
-    # QFA Center Quads (Added R side and corrected L side with 'H' suffix to match ring names)
-    [[el, '+', 'QFA_'] for el in ['1RC','2RC','3RC']] +
-    #[[el, '+', 'QFA_'] for el in ['1LCH','2LCH','3LCH']] +
-    # Matching and DS Quads
-    [[el, '-', 'QFA_M'] for el in ['1R8','2R8','3R8']] +
-    [[el, '+', 'QFA_M'] for el in ['1L8','2L8','3L8']] +
-    [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
-    [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] +
-    #[[el, '-', 'QFTripC_'] for el in ['1R2','2R2','3R2']] +
-    [[el, '+', 'QFTripC_'] for el in ['1L2','2L2','3L2']]
-)
-    
-    for elem, sign, prefix in qx_ring_list:
-            full_name=prefix+elem
-            if full_name in ['QFA_1RC','QFA_2RC','QFA_3RC']:
-                dynamic_offset='(((l_drift/2)+l_quad)/2)-l_sext'
-                h_name = f'hk_ring_{elem}'
-                pdr[h_name] = 0.0  # Unique horizontal kick variable
-                ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
-                            at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
+def plot_resonance_grid_red_blue(ax, qx_range, qy_range, orders, periodicity,
+                                 alpha=0.6, lw_systematic=2.2, lw_nonsystematic=1.1,
+                                 label_legend=True):
+    """
+    Classic systematic/non-systematic resonance grid: red = systematic
+    (res_sum % periodicity == 0), blue = non-systematic, dashed = skew
+    (odd ny). Same logic as TuneDiagram.resonance_lines.plot_resonance,
+    reimplemented here so it (a) draws onto a specific `ax` instead of
+    global pyplot state, and (b) exposes alpha/linewidth -- the library
+    version hardcodes alpha=0.3 with no way to make it more visible.
+    """
+    res = resonance_lines(qx_range, qy_range, orders, periodicity)
+    qmin_x, qmax_x = min(qx_range), max(qx_range)
+    qmin_y, qmax_y = min(qy_range), max(qy_range)
+
+    seen_systematic = seen_nonsystematic = False
+    for nx_val, ny_val, res_sums in res.resonance_list:
+        for res_sum in res_sums:
+            if ny_val:
+                x_pts = [qmin_x, qmax_x]
+                y_pts = [(res_sum - nx_val * qmin_x) / ny_val,
+                        (res_sum - nx_val * qmax_x) / ny_val]
             else:
-                current_drift = drift_map.get(prefix, 'l_drift')
-                dynamic_offset = f'({current_drift}+l_quad) / 2'
-                h_name = f'hk_ring_{elem}'
-                pdr[h_name] = 0.0  # Unique horizontal kick variable
-                ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'),# edge_entry_active=True, edge_exit_active=True), 
-                            at=sign + dynamic_offset, from_=prefix + elem, from_anchor='center')
-        
-    return pdr
+                x_pts = [float(res_sum) / nx_val, float(res_sum) / nx_val]
+                y_pts = [qmin_y, qmax_y]
 
-def insert_BPMs_all_as_markers(pdr):
-   
-   ring=pdr.lines['ring']
+            is_systematic = (res_sum % periodicity == 0)
+            color = 'r' if is_systematic else 'b'
+            lw = lw_systematic if is_systematic else lw_nonsystematic
+            linestyle = '--' if (ny_val % 2) else '-'
 
-   bpm = xt.Marker()
+            ax.plot(x_pts, y_pts, color=color, linewidth=lw,
+                   linestyle=linestyle, alpha=alpha, zorder=1)
+            if is_systematic:
+                seen_systematic = True
+            else:
+                seen_nonsystematic = True
+
+    if label_legend:
+        extra = []
+        if seen_systematic:
+            extra.append(Line2D([0], [0], color='r', linewidth=lw_systematic,
+                                label='Systematic resonance'))
+        if seen_nonsystematic:
+            extra.append(Line2D([0], [0], color='b', linewidth=lw_nonsystematic,
+                                label='Non-systematic resonance'))
+        existing_handles, _ = ax.get_legend_handles_labels()
+        ax.legend(handles=existing_handles + extra, loc='best',
+                 fontsize=9, framealpha=0.9)
+
+    return ax
 
 
-   tab_r=ring.get_table()
-   
-   quads_ring = tab_r.rows[tab_r.element_type == 'Quadrupole'].name
+def analyse_verdier_resonances_from_line(line, max_order=5, tune_tolerance=0.02):
+    
 
-   for elem_name in quads_ring:
-        element = ring[elem_name]
-        
-        if element.k1 > 0:
-            ring.insert(
-                'BPMx_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-        
-        if element.k1 < 0:
-            ring.insert(
-                'BPMy_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
+    # twiss from line
+    try:
+        twiss = line.twiss()
+        qx = twiss.qx
+        qy = twiss.qy
+        print(f"Current Operating Tunes -> Qx: {qx:.4f}, Qy: {qy:.4f}")
+    except Exception as e:
+        print(
+            f"Could not compute line.twiss(). Please make sure the line is built and closed. Error: {e}"
+        )
+        return None
 
-   period=pdr.lines['period']
-   tab_p=period.get_table()
-   quads_period = tab_p.rows[tab_p.element_type == 'Quadrupole'].name
+    # superperiodicity (N_c) from element names
 
-   for elem_name in quads_period:
-        element = period[elem_name]
-        
-        if element.k1 > 0:
-            period.insert(
-                'BPMx_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-        
-        if element.k1 < 0:
-            period.insert(
-                'BPMy_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-   return pdr
+    element_names = line.element_names
+    sectors = set()
+    for name in element_names:
+        # Looking for structural segment identifiers e.g. '_1R', '_2R', '_3L'
+        if "_" in name:
+            parts = name.split("_")[-1]
+            if len(parts) >= 2 and parts[0].isdigit() and parts[1] in ["R", "L"]:
+                sectors.add(parts[0])
+
+    N_c = len(sectors) if len(sectors) > 0 else 1
+    # Fallback default if your specific layout operates on a hardcoded sector configuration:
+    if N_c == 1:
+        N_c = 3  
+
+    print(f"Identified Structural Superperiodicity (N_c): {N_c}")
+
+    # Phase advances per structural superperiod
+    mu_x_fraction = (qx / N_c) % 1.0
+    mu_y_fraction = (qy / N_c) % 1.0
+
+    #Check resonance driving terms up to max_order
+    dangerous_resonances = []
+
+    for order in range(1, max_order + 1):
+        for m in range(-order, order + 1):
+            remaining = order - abs(m)
+            for n in [remaining, -remaining] if remaining != 0 else [0]:
+                if m == 0 and n == 0:
+                    continue
+
+                # m * (mu_x / 2pi) + n * (mu_y / 2pi) is close to an integer
+                phase_sum = m * mu_x_fraction + n * mu_y_fraction
+                distance_to_structural = abs(phase_sum - round(phase_sum))
+
+                #calculate distance to total physical global resonance line:
+                global_phase_sum = m * qx + n * qy
+                distance_to_global = abs(
+                    global_phase_sum - round(global_phase_sum)
+                )
+
+                # Flag if the working tune point is dangerously close to a driven structural harmonic
+                if distance_to_global < tune_tolerance:
+                    # Check if this global resonance is structurally driven or systematically suppressed
+                    # If it's a multiple of N_c, it is structurally driven
+                    is_structural = (round(global_phase_sum) % N_c) == 0
+
+                    status = (
+                        "Dangerous (Structural)"
+                        if is_structural
+                        else "Suppressed (Non-Structural)"
+                    )
+
+                    dangerous_resonances.append(
+                        {
+                            "Order": order,
+                            "m": m,
+                            "n": n,
+                            "Global Harmonic (k)": int(
+                                round(global_phase_sum)
+                            ),
+                            "Distance to Resonance": f"{distance_to_global:.4f}",
+                            "Verdier Status": status,
+                            "Resonance Condition": f"{m}*Qx + {n}*Qy = {int(round(global_phase_sum))}",
+                        }
+                    )
+
+    # Convert to Dataframe for visualization
+    df = pd.DataFrame(dangerous_resonances)
+    if not df.empty:
+        df = df.drop_duplicates(subset=["m", "n"]).reset_index(drop=True)
+        # Sort so that the closest dangerous resonances bubble up to the top
+        df = df.sort_values(by="Distance to Resonance").reset_index(drop=True)
+
+    return df
+
+
+
+
+def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5),
+                              tune_range=0.1, ax=None, qx_range=None,
+                              qy_range=None, show_legend=True,
+                              legend_tiers=(1, 2, 3, 4), tier_colors=None,
+                              draw_background_grid=True):
+    """
+    Danger levels (Tier 1 to 4):
+    1. Structural / Systematic resonances very close to the Working Point.
+    2. Non-Structural / Error-driven resonances close to the Working Point.
+    3. Resonances that are within the tune box but have lower immediate threat.
+    4. Safe background lattice grid (drawn faintly in gray).
+
+    Pass an existing `ax` (and optionally `qx_range`/`qy_range`, e.g. from a
+    footprint plot) to overlay the tiered resonance lines on that axis instead
+    of creating a new standalone figure. `tune_range` is only used to build
+    the default range when `qx_range`/`qy_range` are not supplied.
+
+    `legend_tiers` controls which tier entries get added to the legend --
+    e.g. pass (1, 2) when overlaying on a busy combined plot to keep Tier
+    3/4 drawn (for context) but out of the legend, since they rarely change
+    the actionable read of the plot and just add clutter.
+
+    `tier_colors` optionally overrides the default tier 1/2/3 colors, e.g.
+    {1: 'black', 2: 'dimgray'} -- useful when overlaying on a plot that
+    already uses red for something else (e.g. a systematic-resonance grid),
+    so "close to WP" doesn't collide with a different red-based convention.
+
+    `draw_background_grid` set False skips this function's own faint gray
+    background line for every resonance -- turn off when overlaying on a
+    plot that already draws its own background/context grid, to avoid a
+    redundant, doubled-up faint layer.
+    """
+    if isinstance(max_order, (int, float)):
+        orders_to_check = tuple(range(1, int(max_order) + 1))
+    else:
+        orders_to_check = tuple(sorted(max_order))
+
+    default_tier_colors = {1: "red", 2: "darkorange", 3: "gold"}
+    if tier_colors:
+        default_tier_colors.update(tier_colors)
+    tier_colors = default_tier_colors
+
+    element_names = line.element_names
+    sectors = set()
+    for name in element_names:
+        if "_" in name:
+            parts = name.split("_")[-1]
+            if len(parts) >= 2 and parts[0].isdigit() and parts[1] in ["R", "L"]:
+                sectors.add(parts[0])
+
+    N_c = len(sectors) if len(sectors) > 0 else 3  
+    print(f"Detected Superperiodicity N_c = {N_c}")
+    print(f"Analyzing explicit resonance orders: {orders_to_check}")
+
+    if qx_range is None:
+        qx_range = (qx - tune_range, qx + tune_range)
+    if qy_range is None:
+        qy_range = (qy - tune_range, qy + tune_range)
+    qmin_x, qmax_x = qx_range
+    qmin_y, qmax_y = qy_range
+
+    made_own_fig = ax is None
+    if made_own_fig:
+        fig, ax = plt.subplots(figsize=(8.5, 7.5))
+    else:
+        fig = ax.figure
+    
+    diagram_object = resonance_lines(qx_range, qy_range, orders_to_check, N_c)
+
+    if made_own_fig:
+        ax.set_xlim(qmin_x, qmax_x)
+        ax.set_ylim(qmin_y, qmax_y)
+
+    for resonance in diagram_object.resonance_list:
+        nx_val = resonance[0]
+        ny_val = resonance[1]
+        for res_sum in resonance[2]:
+            # Plot the standard full faint template background layout first
+            if ny_val != 0:
+                x_pts = np.array([qmin_x, qmax_x])
+                y_pts = (res_sum - nx_val * x_pts) / ny_val
+            else:
+                x_pts = np.array([float(res_sum) / nx_val, float(res_sum) / nx_val])
+                y_pts = np.array([qmin_y, qmax_y])
+                
+            if draw_background_grid:
+                ax.plot(x_pts, y_pts, color="lightgray", linestyle=":", linewidth=1.0, zorder=1, alpha=0.6)
+
+            # Calculate perpendicular distance from working point (qx, qy) to line: nx*x + ny*y = res_sum
+            distance = abs(nx_val * qx + ny_val * qy - res_sum) / np.sqrt(nx_val**2 + ny_val**2)
+            
+            is_structural = (res_sum % N_c == 0)
+
+            if distance <= 0.015:
+                if is_structural:
+                    
+                    color = tier_colors[1]
+                    linewidth = 2.5
+                    zorder = 4
+                else:
+                  
+                    color = tier_colors[2]
+                    linewidth = 2.0
+                    zorder = 3
+            elif distance <= 0.035:
+                color = tier_colors[3]
+                linewidth = 1.5
+                zorder = 2
+            else:
+                continue  
+
+            # Plot the colored highlighted overlay on top
+            ax.plot(x_pts, y_pts, color=color, linewidth=linewidth, linestyle="-", zorder=zorder)
+
+    # 7. Mark the nominal Active Working Point (skip when overlaying -- the
+    #    host plot, e.g. the footprint one, already marks the nominal WP)
+    if made_own_fig:
+        ax.plot(qx, qy, marker="o", color="black", markersize=10, linestyle="", zorder=5)
+
+    # 8. Axis labeling and Threat Assessment Legend
+    ax.set_xlabel(r"$Q_x$", fontsize=12)
+    ax.set_ylabel(r"$Q_y$", fontsize=12)
+    if made_own_fig:
+        ax.set_title(f"Dangerous resonances", fontsize=13)
+
+    tier_legend_specs = {
+        1: dict(color=tier_colors[1], linewidth=2.5, label="Tier 1: Most Dangerous (Structural near WP)"),
+        2: dict(color=tier_colors[2], linewidth=2.0, label="Tier 2: Medium Danger (Non-Structural near WP)"),
+        3: dict(color=tier_colors[3], linewidth=1.5, label="Tier 3: Low Danger (Wider tune tolerance)"),
+        4: dict(color="lightgray", linestyle=":", linewidth=1, label="Tier 4: Safe / Faint Background Grid"),
+    }
+    resonance_legend_elements = [
+        Line2D([0], [0], **tier_legend_specs[t]) for t in legend_tiers if t in tier_legend_specs
+    ]
+    if made_own_fig:
+        resonance_legend_elements.append(
+            Line2D([0], [0], marker="o", color="black", linestyle="",
+                   markersize=10, label=f"Current Operating WP: {qx:.2f},{qy:.2f}"))
+
+    if show_legend:
+        if made_own_fig:
+            ax.legend(handles=resonance_legend_elements)
+        else:
+            # merge with whatever handles the host axis already has
+            existing_handles, existing_labels = ax.get_legend_handles_labels()
+            ax.legend(handles=existing_handles + resonance_legend_elements,
+                      loc='best')
+
+    if made_own_fig:
+        return fig, ax
+    return ax
+
+#---------------------------------------
+# FUNCTIONS FOR spin_tracking.py SCRIPT
+#---------------------------------------
 
 import LatticeBuild.misalignments_corrections as mc
 import xobjects as xo
@@ -921,4 +628,3 @@ def plot_spin_resonance_scan(results, out_path=None):
     if out_path:
         plt.savefig(out_path, dpi=300)
     plt.show()
-

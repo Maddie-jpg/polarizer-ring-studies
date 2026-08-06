@@ -2,36 +2,109 @@ import xtrack as xt
 import numpy as np
 
 def get_safe_insertion(ring, prefix, elem, sign, default_offset):
+    """
+    default_offset is kept for backward compatibility (existing callers
+    still pass it) but is no longer used to compute the placement -- see
+    below for why.
+
+    Why: default_offset is built by the caller from a generic drift_map
+    (e.g. prefix -> 'l_tripl'), which assumes a specific nominal drift
+    length for that quad TYPE. That assumption can be wrong at specific
+    locations -- e.g. triplet quads that sit at an IP/symmetry boundary,
+    where the 'L1' quad of one sextant and the 'R1' quad of a DIFFERENT
+    sextant share a much shorter drift than the generic 'l_tripl' value
+    implies. When that happens, is_open_drift correctly identifies a real
+    Drift-class neighbor, but centering using the caller's oversized
+    assumed offset overshoots straight through that drift and into
+    whatever quad sits beyond it -- with no exception raised (see
+    insert_correctors' safe_insert docstring). This showed up as
+    corrector insertions for one triplet quad silently damaging an
+    unrelated triplet quad elsewhere in the ring.
+
+    Fix: measure the actual neighboring element's length directly and use
+    that to compute the centering offset, and explicitly check the kicker
+    (length l_kick) actually fits inside it before treating that side as
+    usable. If it doesn't fit, this falls through exactly like the
+    already-existing "neither side is a plain open drift" case.
+    """
     ref_element = prefix + elem
     names = ring.element_names
 
     if ref_element not in names:
-        return ref_element, 'center', sign + default_offset
+        # This should not legitimately happen: callers only ever pass
+        # ref_element values discovered by scanning ring.element_names in
+        # the first place (see elems_for_prefix / qy_ring_list etc). If
+        # we get here, ref_element existed when that scan ran but is gone
+        # NOW -- almost certainly because an earlier insertion in the same
+        # call silently sliced through and removed it. Line.insert() does
+        # this with no exception of its own (see cut_at_s + the
+        # remove-overlap logic), so failing silently here would surface as
+        # a confusing deep ValueError from xtrack several frames down,
+        # pointing at the wrong place. Fail loudly here instead, at the
+        # actual missing element.
+        try:
+            l_kick_val = ring.vars['l_kick']._value
+        except Exception:
+            l_kick_val = '?'
+        raise RuntimeError(
+            f"get_safe_insertion: '{ref_element}' is not in ring.element_names "
+            f"anymore. It was presumably present when the target list was "
+            f"built, so this most likely means an EARLIER corrector "
+            f"insertion in this same call silently sliced through and "
+            f"removed it. Run snapshot_quad_strengths()/"
+            f"check_quad_strength_conserved() around each insertion in "
+            f"this loop to find which one did it, and check whether "
+            f"'{prefix}' quads are spaced closely enough that l_kick="
+            f"{l_kick_val} doesn't fit."
+        )
 
     idx = names.index(ref_element)
+    ref_length = getattr(ring.element_dict[ref_element], 'length', 0.0)
 
-    def is_open_drift(i):
+    try:
+        l_kick = ring.vars['l_kick']._value
+    except Exception:
+        l_kick = 0.1  # matches the default set in insert_correctors
+
+    def neighbor(i):
         if not (0 <= i < len(names)):
-            return False
-        cls = ring.element_dict[names[i]].__class__.__name__  # adjust if your API differs
-        return cls == 'Drift'   # a full, un-split drift -- safe to center in
+            return None, 0.0
+        el = ring.element_dict[names[i]]
+        return el.__class__.__name__, getattr(el, 'length', 0.0)
 
-    prev_open = is_open_drift(idx - 1)
-    next_open = is_open_drift(idx + 1)
+    prev_cls, prev_len = neighbor(idx - 1)
+    next_cls, next_len = neighbor(idx + 1)
+
+    margin = 1e-6  # small clearance beyond the kicker's own length
+
+    def usable(cls, length):
+        # a plain, un-split Drift AND actually long enough to hold the
+        # kicker with a little room to spare -- being class=='Drift' alone
+        # isn't sufficient, as the IR-triplet case above showed.
+        return cls == 'Drift' and length > l_kick + margin
+
+    def centered_offset(length):
+        # distance from ref_element's center to the center of a neighbor
+        # of this REAL, measured length -- not the caller's guess.
+        return (length + ref_length) / 2
+
+    prev_usable = usable(prev_cls, prev_len)
+    next_usable = usable(next_cls, next_len)
     want_prev = (sign == '-')
 
-    if want_prev and prev_open:
-        return ref_element, 'center', sign + default_offset
-    if (not want_prev) and next_open:
-        return ref_element, 'center', sign + default_offset
+    if want_prev and prev_usable:
+        return ref_element, 'center', f'-({centered_offset(prev_len)})'
+    if (not want_prev) and next_usable:
+        return ref_element, 'center', f'+({centered_offset(next_len)})'
 
-    # Preferred side wasn't actually open -- use whichever side is
-    if prev_open:
-        return ref_element, 'center', '-' + default_offset
-    if next_open:
-        return ref_element, 'center', '+' + default_offset
+    # Preferred side wasn't actually usable -- use whichever side is
+    if prev_usable:
+        return ref_element, 'center', f'-({centered_offset(prev_len)})'
+    if next_usable:
+        return ref_element, 'center', f'+({centered_offset(next_len)})'
 
-    # Neither side is a plain open drift -> hug the quad edge
+    # Neither side is a plain, long-enough-to-fit open drift -> hug the
+    # quad's own edge instead (small, fixed offset, cannot overshoot).
     if sign == '-':
         return ref_element, 'start', '-l_kick/2'
     else:
@@ -121,10 +194,27 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 
 import re
 
-def insert_correctors(pdr):
+def insert_correctors(pdr, debug_check=False):
+    """
+    debug_check=True wraps EVERY single corrector insertion with a
+    snapshot_quad_strengths()/check_quad_strength_conserved() pair, so if
+    an insertion silently slices/removes part of some OTHER quad (the
+    failure mode get_safe_insertion can't detect ahead of time, since it
+    only knows about the target quad's immediate neighbors), you get an
+    immediate, per-insertion warning naming exactly which quad it damaged
+    and which corrector insertion did it -- instead of finding out several
+    iterations later as a confusing 'element not found' error when
+    something ELSE tries to reference the now-missing quad.
+
+    This is slower (one extra get_table() call per insertion) so it's off
+    by default; turn it on when chasing exactly this kind of bug.
+    """
     offset = (pdr['l_quad'] + pdr['l_drift']) / 2
     pdr['l_kick'] = 0.1
     ring = pdr.lines['ring']
+
+    if debug_check:
+        all_quad_snapshot = snapshot_quad_strengths(ring)
 
     drift_map = {
         'QDA_':     'l_drift',
@@ -165,24 +255,46 @@ def insert_correctors(pdr):
             dynamic_offset = f'({current_drift}+l_quad) / 2'
         return sign, dynamic_offset
 
-    def safe_insert(new_element, ref_element, sign, default_offset):
-        """Try to center the corrector in the open drift next to
-        ref_element. If xtrack can't resolve that position (occupied,
-        already sliced, whatever the reason), fall back to hugging
-        the quad's edge on the requested side instead of crashing."""
-        try:
-            ring.insert(new_element, at=sign + default_offset,
-                        from_=ref_element, from_anchor='center')
-            return
-        except (ValueError, AssertionError):
-            pass
+    def safe_insert(new_element, prefix, elem, sign, default_offset):
+        """
+        Uses the module-level get_safe_insertion() pre-check (same one
+        insert_correctors_var2 is meant to use) instead of trying an
+        insertion and catching exceptions.
 
-        if sign == '-':
-            ring.insert(new_element, at='-l_kick/2',
-                        from_=ref_element, from_anchor='start')
-        else:
-            ring.insert(new_element, at='+l_kick/2',
-                        from_=ref_element, from_anchor='end')
+        This changed from an earlier version that wrapped ring.insert() in
+        a try/except (ValueError, AssertionError) and fell back only if
+        that raised. xtrack's Line.insert() does NOT raise in the failure
+        case that matters here: it calls cut_at_s() to slice the line at
+        the insertion boundaries -- which slices straight through a thick
+        element like a quad if the target position lands inside one -- and
+        then silently removes whatever ends up fully inside the insertion
+        span. No exception is raised. So the old except-branch fallback
+        could never actually trigger for the case it was written for, and
+        a corrector landing inside a quad's span would silently delete
+        part of that quad with no warning. get_safe_insertion looks at the
+        real neighboring element types before choosing where to insert, so
+        it doesn't depend on an exception that doesn't happen.
+
+        NOTE: get_safe_insertion only checks the TARGET quad's own
+        immediate neighbors. It has no way to know that inserting THIS
+        corrector might reach far enough to damage some OTHER, unrelated
+        quad elsewhere named later in the loop -- that's what debug_check
+        is for.
+        """
+        if debug_check:
+            before = snapshot_quad_strengths(ring, quad_prefixes=list(all_quad_snapshot.keys()))
+
+        from_elem, anchor, final_offset = get_safe_insertion(
+            ring, prefix, elem, sign, default_offset)
+        ring.insert(new_element, at=final_offset,
+                    from_=from_elem, from_anchor=anchor)
+
+        if debug_check:
+            flagged = check_quad_strength_conserved(ring, before, verbose=False)
+            if flagged:
+                print(f"[insert_correctors] inserting corrector for "
+                      f"'{prefix}{elem}' damaged: "
+                      f"{[f[0] for f in flagged]}")
 
     # ---- vertical correctors on QD-type quads ----
     for prefix in ['QDA_', 'QDA_M', 'QDDoub_', 'QDDS_', 'QDTrip_']:
@@ -194,7 +306,7 @@ def insert_correctors(pdr):
 
             new_element = pdr.new('My_' + ref_element, xt.Multipole,
                                    ksl=[pdr.ref[v_name]], length='l_kick')
-            safe_insert(new_element, ref_element, sign, dynamic_offset)
+            safe_insert(new_element, prefix, elem, sign, dynamic_offset)
 
     # ---- horizontal correctors on QF-type quads ----
     for prefix in ['QFA_', 'QFA_M', 'QFDoub_', 'QFDS_', 'QFTripC_']:
@@ -206,9 +318,40 @@ def insert_correctors(pdr):
 
             new_element = pdr.new('Mx_' + ref_element, xt.Multipole,
                                    knl=[pdr.ref[h_name]], length='l_kick')
-            safe_insert(new_element, ref_element, sign, dynamic_offset)
+            safe_insert(new_element, prefix, elem, sign, dynamic_offset)
 
     return pdr
+
+def report_eigenvector_counts(ring, twiss, rcond_x=1e-4, rcond_y=1e-2):
+    """
+    Report, for each plane:
+      - n_available: total singular values = min(n_monitors, n_correctors)
+      - n_kept_by_rcond: how many actually survive the CURRENT rcond cutoff
+        (S_inv[S < rcond * S[0]] = 0 inside xtrack's correction code -- this
+        is what orbit_correction() uses whenever n_eig_x/n_eig_y is None,
+        i.e. right now unless you've explicitly set them)
+
+    Call this with the same rcond_x/rcond_y you're passing (or plan to
+    pass) to orbit_correction(), so the "currently kept" number matches
+    what that call would actually do.
+    """
+    corr_handler = ring.correct_trajectory(twiss_table=twiss, run=False)
+
+    S_x = corr_handler.x_correction.singular_values
+    S_y = corr_handler.y_correction.singular_values
+
+    n_kept_x = int(np.sum(S_x >= rcond_x * S_x[0])) if len(S_x) else 0
+    n_kept_y = int(np.sum(S_y >= rcond_y * S_y[0])) if len(S_y) else 0
+
+    print(f"x-plane: {len(S_x)} singular values available, "
+          f"{n_kept_x} kept at rcond_x={rcond_x}")
+    print(f"y-plane: {len(S_y)} singular values available, "
+          f"{n_kept_y} kept at rcond_y={rcond_y}")
+
+    return dict(n_available_x=len(S_x), n_kept_x=n_kept_x,
+               n_available_y=len(S_y), n_kept_y=n_kept_y,
+               singular_values_x=S_x, singular_values_y=S_y)
+
 
 def orbit_correction(ring, twiss, threading=False,
                       rcond_x=1e-4, rcond_y=1e-2,
@@ -359,8 +502,15 @@ def insert_correctors_var2(pdr):
         # Check layout to prevent slicing an RF Cavity
         from_elem, anchor, final_offset = get_safe_insertion(ring,prefix, elem, sign, dynamic_offset)
         
+        # NOTE: previously this always used from_anchor='center', discarding
+        # the `anchor` value get_safe_insertion returns. That silently broke
+        # the one case get_safe_insertion exists to handle -- when neither
+        # neighbor is a plain open drift, it returns anchor='start'/'end'
+        # with an edge-hugging offset (e.g. '-l_kick/2'), which only means
+        # what it's supposed to mean when interpreted from that anchor, not
+        # from 'center'. Now passes the returned anchor through.
         ring.insert(pdr.new('My_'+prefix+elem, xt.Multipole, ksl=[pdr.ref[v_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
-                    at=final_offset, from_=prefix + elem, from_anchor='center')
+                    at=final_offset, from_=from_elem, from_anchor=anchor)
 
 
     # horizontal correctors
@@ -395,8 +545,10 @@ def insert_correctors_var2(pdr):
             
         from_elem, anchor, final_offset = get_safe_insertion(ring,prefix, elem, sign, dynamic_offset)
 
+        # See note above -- respect the returned anchor rather than
+        # hardcoding 'center'.
         ring.insert(pdr.new('Mx_'+prefix+elem, xt.Multipole, knl=[pdr.ref[h_name]], length='l_kick'), #edge_entry_active=True, edge_exit_active=True), 
-                    at=final_offset, from_=prefix + elem, from_anchor='center')
+                    at=final_offset, from_=from_elem, from_anchor=anchor)
 
         
     return pdr
@@ -491,3 +643,71 @@ def misalignments(line, sigma, seed=None, cut=2.5):
         ref.ksl *= relative_error
 
     return line
+
+
+def snapshot_quad_strengths(ring, quad_prefixes=None):
+    """
+    Record each quad's integrated strength (sum of k1*length across all
+    current element(s) matching its name) before an insertion step, for
+    later comparison via check_quad_strength_conserved().
+
+    Grouping is done by name PREFIX rather than exact name, so this is
+    robust to however xtrack names pieces if it ends up slicing a quad
+    during a later insert() call (e.g. 'QFA_1R1' and any 'QFA_1R1'-prefixed
+    slice fragments all roll up into the same 'QFA_1R1' total).
+
+    quad_prefixes: optional list of base quad names to track (e.g. from
+    ring.get_table().rows[...].name at the time of the snapshot). If None,
+    every current Quadrupole element is tracked under its own full name.
+    """
+    tab = ring.get_table()
+    quad_rows = tab.rows[tab.element_type == 'Quadrupole']
+
+    if quad_prefixes is None:
+        quad_prefixes = list(quad_rows.name)
+
+    totals = {p: 0.0 for p in quad_prefixes}
+    for name in quad_rows.name:
+        for p in quad_prefixes:
+            if name == p or name.startswith(p + '.') or name.startswith(p + '_'):
+                elem = ring[name]
+                k1 = getattr(elem, 'k1', 0.0)
+                length = getattr(elem, 'length', 0.0)
+                totals[p] += k1 * length
+                break
+    return totals
+
+
+def check_quad_strength_conserved(ring, snapshot_before, tol=1e-9, verbose=True):
+    """
+    Compare each quad's integrated strength against a snapshot taken with
+    snapshot_quad_strengths() before an insertion step. Flags any quad
+    whose total k1*length changed by more than `tol` -- the signature of
+    an insertion having sliced through (and possibly removed part of) a
+    quad rather than landing cleanly in an adjacent drift, since
+    Line.insert() does this silently with no exception raised.
+
+    Returns a list of (name, before, after, delta) tuples for anything
+    flagged; empty list means nothing detected.
+    """
+    after = snapshot_quad_strengths(ring, quad_prefixes=list(snapshot_before.keys()))
+
+    flagged = []
+    for name, before_val in snapshot_before.items():
+        after_val = after.get(name, 0.0)
+        delta = after_val - before_val
+        if abs(delta) > tol:
+            flagged.append((name, before_val, after_val, delta))
+
+    if verbose:
+        if flagged:
+            print(f"WARNING: {len(flagged)} quad(s) show a changed integrated "
+                  f"strength after insertion -- likely silently sliced/altered:")
+            for name, before_val, after_val, delta in flagged:
+                print(f"  {name}: before={before_val:.6e}  after={after_val:.6e}  "
+                      f"delta={delta:+.3e}")
+        else:
+            print(f"OK: all {len(snapshot_before)} tracked quads have unchanged "
+                  f"integrated strength after insertion.")
+
+    return flagged

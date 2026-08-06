@@ -21,12 +21,11 @@ import xutil_DA_CC.xsuite_utilities as xutil
 import constants
 import my_functions as mf
 from matplotlib.backends.backend_pdf import PdfPages
-import tune_wp_scan as twps
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
 design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
+config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 
@@ -377,19 +376,31 @@ plt.savefig(f'{new_results_folder}/momentum_dev_working_point{current_wp}_{mode}
 
 
 # %%
-r_max = 16.0
+# r_max is capped well below the retry loop's old 16 sigma: at that large an
+# amplitude, particles are plausibly crossing real resonance lines (visible
+# on this same plot) and undergoing genuine chaotic tune jumps, or the FFT
+# peak-picking in get_footprint is just noisy once the motion is chaotic.
+# Either way that's not representative of the actual beam and it dominates
+# the plot's scale, squeezing out the near-WP detail that's actually
+# actionable. 6 sigma is a more standard footprint range.
+r_max = 8.0
 fp0 = None
 nemitt_x = 1.3e-3
 nemitt_y = 1.2e-3 
 
 while r_max >= 1:
     try:
-        n_r = int(r_max)
+        n_r = int(r_max * 2)  # denser radial sampling than r_max alone gave
         fp0 = ring.get_footprint(
             nemitt_x=nemitt_x, 
             nemitt_y=nemitt_y, 
             r_range=(0.1, r_max), 
-            n_r=n_r
+            n_r=n_r,
+            n_theta=20,  # default is 10 -- too coarse, produces a jagged,
+                        # self-crossing connect-the-dots look rather than a
+                        # smooth fan when Footprint.plot() draws the grid
+            freeze_longitudinal=True,   # avoid synchrotron-motion smearing the
+                                        # FFT tune peaks -- RF+radiation are on
         )
         print(f"Successfully generated footprint for r_max = {r_max}")
         break 
@@ -401,38 +412,82 @@ if fp0 is not None:
     q_offset_x = np.floor(WP[0])
     q_offset_y = np.floor(WP[1])
 
+    # get_footprint's internal FFT uses rfftfreq, which only resolves
+    # frequencies in [0, 0.5] (real-signal Nyquist limit) -- if the true
+    # fractional tune is above 0.5 it aliases and this offset reconstruction
+    # would silently be wrong. Guard against that rather than fail silently.
+    frac_x_max, frac_y_max = np.nanmax(fp0.qx), np.nanmax(fp0.qy)
+    if frac_x_max > 0.5 or frac_y_max > 0.5:
+        print(f"WARNING: footprint fractional tune near/above 0.5 "
+              f"(max frac Qx={frac_x_max:.3f}, Qy={frac_y_max:.3f}) -- "
+              f"FFT peak detection may be aliased; treat this footprint "
+              f"with caution.")
+
     # get_footprint returns fractional tunes -> shift to absolute.
     fp0.qx += q_offset_x
     fp0.qy += q_offset_y
 
     # NOTE: qx/qy (from twiss4d) and nominal_tw.qx/qy are ALREADY absolute
     # tunes -- do not add the integer offset to them again.
+    # min_span widened from the default 0.02 -- with a tight 6-sigma
+    # footprint and a narrow chromatic sweep, the data-driven window alone
+    # was too small to show any resonance context (previous plot had only
+    # one or two lines barely clipping the edge).
     Qx_range, Qy_range = dynamic_tune_ranges(
         [fp0.qx, qx, nominal_tw.qx],
         [fp0.qy, qy, nominal_tw.qy],
-        pad_frac=0.15)
-    resonances = resonance_lines(Qx_range, Qy_range, resonance_orders, 3)
-    fig, ax = plt.subplots(figsize=(8,8))
+        pad_frac=0.15, min_span=0.06)
 
-    fp0.plot(ax=ax, color='orange', label=f'Amplitude Footprint ({r_max}σ)')
+    fig, ax = plt.subplots(figsize=(9, 9))
 
-    ax.plot(qx, qy, '.-', 
-            label=f'Chromatic shift (δ: {min(delta):.1e} to {max(delta):.1e})', 
-            color='g', lw=2)
+    # Layer 1 (back): the classic systematic (red) / non-systematic (blue)
+    # resonance grid -- same scheme used elsewhere in this file via
+    # resonance_lines().plot_resonance(), but reimplemented with tunable
+    # alpha/linewidth so it's actually visible here rather than the
+    # library's fixed alpha=0.3.
+    mf.plot_resonance_grid_red_blue(
+        ax, Qx_range, Qy_range, resonance_orders, 3,
+        alpha=0.6, lw_systematic=2.2, lw_nonsystematic=1.1)
 
-    ax.plot(nominal_tw.qx, nominal_tw.qy, 
-            'ro', label='Nominal ($\delta=0$)', ms=9)
+    # Layer 1b: proximity-to-WP danger tiers, back on top of the classic
+    # grid -- recolored (black/gray) so "close to WP" doesn't collide with
+    # "systematic" (red) from the layer above; those are two different
+    # pieces of information (structural type vs. distance to WP) and
+    # deserve visually distinct colors.
+    mf.plot_dangerous_resonances(
+        ring, ring_tw.qx, ring_tw.qy, max_order=(1, 2, 3, 4, 5),
+        ax=ax, qx_range=Qx_range, qy_range=Qy_range,
+        legend_tiers=(1, 2), tier_colors={1: 'black', 2: 'dimgray'},
+        draw_background_grid=False)
 
-    resonances.plot_resonance(fig)
+    # Layer 2 (middle): amplitude footprint -- the widest-reaching data on
+    # the plot, so give it a muted, translucent color that reads as a
+    # "region" rather than competing with the resonance lines for attention.
+    fp0.plot(ax=ax, color='tab:purple', alpha=0.55,
+             label=f'Amplitude Footprint ({r_max}$\\sigma$)')
+
+    # Layer 3 (front): chromatic footprint -- a single clean curve, the
+    # most important "how far do we move" indicator, drawn last so it
+    # stays visually on top.
+    ax.plot(qx, qy, '.-', lw=2, color='tab:green', ms=4,
+            label=f'Chromatic shift ($\\delta$: {min(delta):.1e} to {max(delta):.1e})')
+
+    # Nominal WP marker -- distinct from the Tier-1 red resonance lines,
+    # so use a black star rather than red.
+    ax.plot(nominal_tw.qx, nominal_tw.qy, marker='o', color='black',
+            markersize=16, linestyle='', zorder=6,
+            label='Nominal ($\\delta=0$)')
 
     ax.set_xlim(Qx_range)
     ax.set_ylim(Qy_range)
     ax.set_xlabel('$Q_x$')
     ax.set_ylabel('$Q_y$')
-    ax.legend(loc='best')
-    ax.grid(alpha=0.3)
+    ax.set_title(f'Working point overview for {mode} lattice')
+    ax.legend(loc='best', fontsize=9, framealpha=0.9)
+    ax.grid(alpha=0.2)
 
-    plt.savefig(f'{new_results_folder}/momentum_dev_working_point_{mode}.png')
+    plt.tight_layout()
+    plt.savefig(f'{new_results_folder}/momentum_dev_working_point_{mode}.png', dpi=200)
     plt.show()
 else:
     print("Could not generate a stable footprint even at 1 sigma.")
@@ -446,7 +501,7 @@ print(tt)
 
 try:
    
-    res_df = twps.analyse_verdier_resonances_from_line(
+    res_df = mf.analyse_verdier_resonances_from_line(
         ring, max_order=5, tune_tolerance=0.02
     )
 
@@ -461,7 +516,7 @@ except NameError:
     )
 
 
-twps.plot_dangerous_resonances(ring, ring_tw.qx, ring_tw.qy, max_order=(1,2,3,4,5), tune_range=0.1)
+mf.plot_dangerous_resonances(ring, ring_tw.qx, ring_tw.qy, max_order=(1,2,3,4,5), tune_range=0.1)
 plt.savefig(f'{new_results_folder}/dangerous_resonances_{mode}.png')
 
 # %%
@@ -568,7 +623,7 @@ plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=
 
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
-ax.set_xlim(-15,15)
+ax.set_xlim(-15, 15)
 ax.set_ylim(None, 12)
 plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
@@ -710,6 +765,8 @@ particles.sort(interleave_lost_particles=True)
 
 # %%
 my_xpf.MA_vs_turns(particles, grid_details['num_r_y_points'], 51, grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'])
+
+ax = plt.gca()
 
 plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
 

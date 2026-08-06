@@ -5,6 +5,59 @@ from matplotlib.lines import Line2D
 from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 from xutil_DA_CC.xsuite_plot_functions import DA_vs_turns
 
+def plot_resonance_grid_red_blue(ax, qx_range, qy_range, orders, periodicity,
+                                 alpha=0.6, lw_systematic=2.2, lw_nonsystematic=1.1,
+                                 label_legend=True):
+    """
+    Classic systematic/non-systematic resonance grid: red = systematic
+    (res_sum % periodicity == 0), blue = non-systematic, dashed = skew
+    (odd ny). Same logic as TuneDiagram.resonance_lines.plot_resonance,
+    reimplemented here so it (a) draws onto a specific `ax` instead of
+    global pyplot state, and (b) exposes alpha/linewidth -- the library
+    version hardcodes alpha=0.3 with no way to make it more visible.
+    """
+    res = resonance_lines(qx_range, qy_range, orders, periodicity)
+    qmin_x, qmax_x = min(qx_range), max(qx_range)
+    qmin_y, qmax_y = min(qy_range), max(qy_range)
+
+    seen_systematic = seen_nonsystematic = False
+    for nx_val, ny_val, res_sums in res.resonance_list:
+        for res_sum in res_sums:
+            if ny_val:
+                x_pts = [qmin_x, qmax_x]
+                y_pts = [(res_sum - nx_val * qmin_x) / ny_val,
+                        (res_sum - nx_val * qmax_x) / ny_val]
+            else:
+                x_pts = [float(res_sum) / nx_val, float(res_sum) / nx_val]
+                y_pts = [qmin_y, qmax_y]
+
+            is_systematic = (res_sum % periodicity == 0)
+            color = 'r' if is_systematic else 'b'
+            lw = lw_systematic if is_systematic else lw_nonsystematic
+            linestyle = '--' if (ny_val % 2) else '-'
+
+            ax.plot(x_pts, y_pts, color=color, linewidth=lw,
+                   linestyle=linestyle, alpha=alpha, zorder=1)
+            if is_systematic:
+                seen_systematic = True
+            else:
+                seen_nonsystematic = True
+
+    if label_legend:
+        extra = []
+        if seen_systematic:
+            extra.append(Line2D([0], [0], color='r', linewidth=lw_systematic,
+                                label='Systematic resonance'))
+        if seen_nonsystematic:
+            extra.append(Line2D([0], [0], color='b', linewidth=lw_nonsystematic,
+                                label='Non-systematic resonance'))
+        existing_handles, _ = ax.get_legend_handles_labels()
+        ax.legend(handles=existing_handles + extra, loc='best',
+                 fontsize=9, framealpha=0.9)
+
+    return ax
+
+
 def analyse_verdier_resonances_from_line(line, max_order=5, tune_tolerance=0.02):
     
 
@@ -100,18 +153,47 @@ def analyse_verdier_resonances_from_line(line, max_order=5, tune_tolerance=0.02)
 
 
 
-def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5), tune_range=0.1):
+def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5),
+                              tune_range=0.1, ax=None, qx_range=None,
+                              qy_range=None, show_legend=True,
+                              legend_tiers=(1, 2, 3, 4), tier_colors=None,
+                              draw_background_grid=True):
     """
     Danger levels (Tier 1 to 4):
     1. Structural / Systematic resonances very close to the Working Point.
     2. Non-Structural / Error-driven resonances close to the Working Point.
     3. Resonances that are within the tune box but have lower immediate threat.
     4. Safe background lattice grid (drawn faintly in gray).
+
+    Pass an existing `ax` (and optionally `qx_range`/`qy_range`, e.g. from a
+    footprint plot) to overlay the tiered resonance lines on that axis instead
+    of creating a new standalone figure. `tune_range` is only used to build
+    the default range when `qx_range`/`qy_range` are not supplied.
+
+    `legend_tiers` controls which tier entries get added to the legend --
+    e.g. pass (1, 2) when overlaying on a busy combined plot to keep Tier
+    3/4 drawn (for context) but out of the legend, since they rarely change
+    the actionable read of the plot and just add clutter.
+
+    `tier_colors` optionally overrides the default tier 1/2/3 colors, e.g.
+    {1: 'black', 2: 'dimgray'} -- useful when overlaying on a plot that
+    already uses red for something else (e.g. a systematic-resonance grid),
+    so "close to WP" doesn't collide with a different red-based convention.
+
+    `draw_background_grid` set False skips this function's own faint gray
+    background line for every resonance -- turn off when overlaying on a
+    plot that already draws its own background/context grid, to avoid a
+    redundant, doubled-up faint layer.
     """
     if isinstance(max_order, (int, float)):
         orders_to_check = tuple(range(1, int(max_order) + 1))
     else:
         orders_to_check = tuple(sorted(max_order))
+
+    default_tier_colors = {1: "red", 2: "darkorange", 3: "gold"}
+    if tier_colors:
+        default_tier_colors.update(tier_colors)
+    tier_colors = default_tier_colors
 
     element_names = line.element_names
     sectors = set()
@@ -125,18 +207,24 @@ def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5), tune_rang
     print(f"Detected Superperiodicity N_c = {N_c}")
     print(f"Analyzing explicit resonance orders: {orders_to_check}")
 
-    qmin_x, qmax_x = qx - tune_range, qx + tune_range
-    qmin_y, qmax_y = qy - tune_range, qy + tune_range
+    if qx_range is None:
+        qx_range = (qx - tune_range, qx + tune_range)
+    if qy_range is None:
+        qy_range = (qy - tune_range, qy + tune_range)
+    qmin_x, qmax_x = qx_range
+    qmin_y, qmax_y = qy_range
 
-    fig, ax = plt.subplots(figsize=(8.5, 7.5))
-
-    qx_range = (qmin_x, qmax_x)
-    qy_range = (qmin_y, qmax_y)
+    made_own_fig = ax is None
+    if made_own_fig:
+        fig, ax = plt.subplots(figsize=(8.5, 7.5))
+    else:
+        fig = ax.figure
     
     diagram_object = resonance_lines(qx_range, qy_range, orders_to_check, N_c)
-    
-    ax.set_xlim(qmin_x, qmax_x)
-    ax.set_ylim(qmin_y, qmax_y)
+
+    if made_own_fig:
+        ax.set_xlim(qmin_x, qmax_x)
+        ax.set_ylim(qmin_y, qmax_y)
 
     for resonance in diagram_object.resonance_list:
         nx_val = resonance[0]
@@ -150,7 +238,8 @@ def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5), tune_rang
                 x_pts = np.array([float(res_sum) / nx_val, float(res_sum) / nx_val])
                 y_pts = np.array([qmin_y, qmax_y])
                 
-            ax.plot(x_pts, y_pts, color="lightgray", linestyle=":", linewidth=1.0, zorder=1, alpha=0.6)
+            if draw_background_grid:
+                ax.plot(x_pts, y_pts, color="lightgray", linestyle=":", linewidth=1.0, zorder=1, alpha=0.6)
 
             # Calculate perpendicular distance from working point (qx, qy) to line: nx*x + ny*y = res_sum
             distance = abs(nx_val * qx + ny_val * qy - res_sum) / np.sqrt(nx_val**2 + ny_val**2)
@@ -160,16 +249,16 @@ def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5), tune_rang
             if distance <= 0.015:
                 if is_structural:
                     
-                    color = "red"
+                    color = tier_colors[1]
                     linewidth = 2.5
                     zorder = 4
                 else:
                   
-                    color = "darkorange"
+                    color = tier_colors[2]
                     linewidth = 2.0
                     zorder = 3
             elif distance <= 0.035:
-                color = "gold"
+                color = tier_colors[3]
                 linewidth = 1.5
                 zorder = 2
             else:
@@ -178,25 +267,43 @@ def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5), tune_rang
             # Plot the colored highlighted overlay on top
             ax.plot(x_pts, y_pts, color=color, linewidth=linewidth, linestyle="-", zorder=zorder)
 
-    # 7. Mark the nominal Active Working Point
-    ax.plot(qx, qy, marker="o", color="black", markersize=10, linestyle="", zorder=5)
+    # 7. Mark the nominal Active Working Point (skip when overlaying -- the
+    #    host plot, e.g. the footprint one, already marks the nominal WP)
+    if made_own_fig:
+        ax.plot(qx, qy, marker="o", color="black", markersize=10, linestyle="", zorder=5)
 
     # 8. Axis labeling and Threat Assessment Legend
     ax.set_xlabel(r"$Q_x$", fontsize=12)
     ax.set_ylabel(r"$Q_y$", fontsize=12)
-    ax.set_title(f"Dangerous resonances", fontsize=13)
+    if made_own_fig:
+        ax.set_title(f"Dangerous resonances", fontsize=13)
 
-    legend_elements = [
-        Line2D([0], [0], color="red", linewidth=2.5, label="Tier 1: Most Dangerous (Structural near WP)"),
-        Line2D([0], [0], color="darkorange", linewidth=2.0, label="Tier 2: Medium Danger (Non-Structural near WP)"),
-        Line2D([0], [0], color="gold", linewidth=1.5, label="Tier 3: Low Danger (Wider tune tolerance)"),
-        Line2D([0], [0], color="lightgray", linestyle=":", linewidth=1, label="Tier 4: Safe / Faint Background Grid"),
-        Line2D([0], [0], marker="o", color="black", linestyle="", markersize=10, label=f"Current Operating WP: {qx:.2f},{qy:.2f}")
+    tier_legend_specs = {
+        1: dict(color=tier_colors[1], linewidth=2.5, label="Tier 1: Most Dangerous (Structural near WP)"),
+        2: dict(color=tier_colors[2], linewidth=2.0, label="Tier 2: Medium Danger (Non-Structural near WP)"),
+        3: dict(color=tier_colors[3], linewidth=1.5, label="Tier 3: Low Danger (Wider tune tolerance)"),
+        4: dict(color="lightgray", linestyle=":", linewidth=1, label="Tier 4: Safe / Faint Background Grid"),
+    }
+    resonance_legend_elements = [
+        Line2D([0], [0], **tier_legend_specs[t]) for t in legend_tiers if t in tier_legend_specs
     ]
-    ax.legend(handles=legend_elements)
-    
-    
-    return fig, ax
+    if made_own_fig:
+        resonance_legend_elements.append(
+            Line2D([0], [0], marker="o", color="black", linestyle="",
+                   markersize=10, label=f"Current Operating WP: {qx:.2f},{qy:.2f}"))
+
+    if show_legend:
+        if made_own_fig:
+            ax.legend(handles=resonance_legend_elements)
+        else:
+            # merge with whatever handles the host axis already has
+            existing_handles, existing_labels = ax.get_legend_handles_labels()
+            ax.legend(handles=existing_handles + resonance_legend_elements,
+                      loc='best')
+
+    if made_own_fig:
+        return fig, ax
+    return ax
 
 
 def plot_DA_tune_scan(qx_range, qy_range, particles, num_r_steps, num_theta_steps, x_norm, y_norm, delta_initial):

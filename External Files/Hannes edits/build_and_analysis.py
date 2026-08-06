@@ -18,8 +18,8 @@ import xpart as xp
 import xobjects as xo
 from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 from prettytable import PrettyTable
-# import xutil_DA_CC.xsuite_plot_functions as my_xpf
-# import xutil_DA_CC.xsuite_utilities as xutil
+import xutil_DA_CC.xsuite_plot_functions as my_xpf
+import xutil_DA_CC.xsuite_utilities as xutil
 import constants as constants
 import sextupole_configs as sc
 import my_functions as mf

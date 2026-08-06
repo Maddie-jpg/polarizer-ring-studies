@@ -18,7 +18,7 @@ from pathlib import Path
 #%%
 
 design=1
-config=1
+config=10
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 phase=90
 
@@ -28,7 +28,7 @@ phase=90
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
     pdr=lo.three_fold_periodicity_90_deg(fringe_fields=True, matched=True)
-    sc.config_D1_C1(pdr)
+    sc.config_D1_C10(pdr)
     
 
 

@@ -21,13 +21,14 @@ from matplotlib.backends.backend_pdf import PdfPages
 import LatticeBuild.misalignments_corrections as mc
 
 
-#%%
+# %%
 design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
+config=int(os.environ.get('CONFIG',9))
+phase=int(os.environ.get('PHASE',90))
 
 # %%
 
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_90.json')
+pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_{phase}_DSchange.json')
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9
 
@@ -36,7 +37,7 @@ if design == 1 and config == 1:
     mc.insert_correctors_var2(pdr)
 else:
     mc.insert_BPMs_all_as_markers(pdr)
-    mc.insert_correctors(pdr)
+    mc.insert_correctors(pdr,debug_check=True)
 
 
 line=pdr.lines['ring']
