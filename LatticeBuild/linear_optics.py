@@ -10,9 +10,9 @@ import numpy as np
 import constants
 
 
-# =============================================================================
+# ----------------------
 # Module-level helpers
-# =============================================================================
+# =---------------------
 
 def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
     """Return (qx, qy) implied by current knobs: n_periods × sextant phase advance."""
@@ -101,9 +101,9 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
                     dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0]).plot()
 
 
-# =============================================================================
-# Shared private builders
-# =============================================================================
+# ----------------
+# Shared Builders
+# ----------------
 
 def _make_env(fringe_fields):
     pdr = xt.Environment()
@@ -275,21 +275,12 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
     pdr.lines['ring']     = ring
 
 
-# =============================================================================
-# Three-fold, 90-degree arc cells, no sextupoles
-# =============================================================================
+# ---------------------------------------------------------------------------
+# Design 1 (more variations as this was created before pipeline optimisation)
+# ---------------------------------------------------------------------------
 
 def three_fold_periodicity_90_deg(fringe_fields=True, matched=True):
-    """
-    Three-fold symmetric ring with 90-degree FODO arc cells, no sextupoles.
-
-    Parameters
-    ----------
-    fringe_fields : bool
-    matched : bool
-        If True (default), run WP and beta matching before returning.
-        If False, return the unmatched lattice immediately after building.
-    """
+    
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
 
@@ -381,21 +372,10 @@ def three_fold_periodicity_90_deg(fringe_fields=True, matched=True):
     return pdr
 
 
-# =============================================================================
-# Three-fold, 90-degree arc cells, sextupoles (3 pairs per arc)
-# =============================================================================
+
 
 def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True):
-    """
-    Three-fold symmetric ring with 90-degree FODO arc cells and sextupoles.
-
-    Parameters
-    ----------
-    fringe_fields : bool
-    matched : bool
-        If True (default), run WP and beta matching before returning.
-        If False, return the unmatched lattice immediately after building.
-    """
+   
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
 
@@ -406,7 +386,7 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True):
         'l_doub':   0.25,   'l_tripl':  3.0,    'l_trips':  0.40,
         'l_sext':   0.10,
     })
-'''
+    '''
     pdr.vars({
                 'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4,
                 'dl_noben': 0.85,   'l_quad':   0.30,
@@ -533,28 +513,10 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True):
     return pdr
 
 
-# =============================================================================
-# Three-fold, 120-degree arc cells, sextupoles (3 pairs per arc)
-# =============================================================================
+
 
 def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True):
-    """
-    Three-fold symmetric ring with 120-degree FODO arc cells.
-    6 focusing and 6 defocusing sextupoles per arc (12 total per sextant),
-    placed in the first 6 of 8 cells.  The last regular cell and the
-    matching cell have no sextupoles.
-
-    Sextupole placement per cell:
-      SF immediately after QF (between QF and bend1)
-      SD immediately before QD (between bend1 and QD)
-
-    Parameters
-    ----------
-    fringe_fields : bool
-    matched : bool
-        If True (default), run WP and beta matching before returning.
-        If False, return the unmatched lattice immediately after building.
-    """
+  
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
 
@@ -587,15 +549,7 @@ def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True):
     pdr.new('SDDS',   xt.Sextupole, length='l_sext', k2='kSD',
             edge_entry_active=quad_edge, edge_exit_active=quad_edge)
 
-    # ------------------------------------------------------------------
-    # Reference arc cell (half-quad boundary convention).
-    # SF placed after QF (between QFarcH and bend1).
-    # SD placed before QD (between bend1 and QD).
-    # Cell layout:
-    #   QFarcH - Drarc2 - SF - Drarc2 - Bend1
-    #          - Drarc2 - SD - Drarc2 - QDarc
-    #          - Drarc   - Bend2 - Drarc - QFarcH
-    # ------------------------------------------------------------------
+
     cell_arc = pdr.new_line(components=[
         pdr.new('QF_cell_arcH1',  'QFarcH'),  pdr.place('Drarc2'),
         pdr.new('SF_cell_arc1',   'SFDS'),     pdr.place('Drarc2'),
@@ -619,20 +573,7 @@ def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True):
                 at='2*l_trips + 2.75*l_quad + 1.0*l_tripl'),
     ])
 
-    # ------------------------------------------------------------------
-    # makesextant
-    #
-    # n_sext=6: first 6 of 7 regular cells get SF+SD, last regular cell
-    # and the matching cell get plain drifts.
-    # Total per sextant: 6 SF + 6 SD.
-    #
-    # Cell with sextupoles:
-    #   Drarc2 - SF - Drarc2 - Bend1 - Drarc2 - SD - Drarc2 - QD
-    #   - Drarc - Bend2 - Drarc - QF
-    #
-    # Cell without sextupoles (length-preserving plain drifts):
-    #   Drarc - Bend1 - Drarc - QD - Drarc - Bend2 - Drarc - QF
-    # ------------------------------------------------------------------
+ 
     def makesextant(name, fall):
         n      = int(pdr['N_cells_S'])
         n_sext = 6
@@ -735,19 +676,7 @@ def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True):
     return pdr
 
 def three_fold_periodicity_120_deg(fringe_fields=True, matched=True):
-    """
-    Three-fold symmetric ring with 120-degree FODO arc cells, no sextupoles.
 
-    This is the base linear optics function. Add sextupoles afterwards
-    by calling config_D1_C7(pdr) from sextupole_configs.py.
-
-    Parameters
-    ----------
-    fringe_fields : bool
-    matched : bool
-        If True (default), run WP and beta matching before returning.
-        If False, return the unmatched lattice immediately after building.
-    """
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
 
@@ -772,17 +701,8 @@ def three_fold_periodicity_120_deg(fringe_fields=True, matched=True):
 
     _make_base_elements(pdr, quad_edge, bend_edge)
 
-    # ------------------------------------------------------------------
-    # Reference cells — plain FODO, no sextupoles
-    # ------------------------------------------------------------------
     cell_arc, cell_tr = _make_reference_cells(pdr)
 
-    # ------------------------------------------------------------------
-    # makesextant — identical topology to three_fold_periodicity_90_deg
-    # but with 120-degree hBarc and N_cells_S=8.
-    # Element names follow the same QFA_{name}{ind} / QDA_{name}{ind}
-    # convention so config_D1_C7 can insert sextupoles by name.
-    # ------------------------------------------------------------------
     def makesextant(name, fall):
         n     = int(pdr['N_cells_S'])
         comps = []
@@ -871,10 +791,166 @@ def three_fold_periodicity_120_deg(fringe_fields=True, matched=True):
         _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
         return pdr
 
+    
+#------------------
+# Design 2
+#------------------
 
-# =============================================================================
-# Two-fold racetrack with 3 mid-arc straight sections per arc
-# =============================================================================
+def two_fold_1straight(fringe_fields=True, matched=True, phase_advance=0.25):
+
+    pdr, quad_edge, bend_edge = _make_env(fringe_fields)
+    E0 = constants.E0            # use the shared constants (16 MV RF), see note
+    VRF = constants.VRF
+ 
+    pdr.vars({
+        'l_cell':   3.0,    'l_bend':   0.40,   'l_bendDS': 0.55,
+        'dl_noben': 0.25,   'l_quad':   0.30,
+        'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
+        'dl_drift': -0.1,   'dl_trans': 0.00,
+        'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
+        'l_sext':   0.20,
+    })
+    pdr.vars({
+        'N_cells_S': 10,
+        # One BendDS per sextant only (two-fold: factor 4).
+        'hBarc': '6.283185307/(4*(2*N_cells_S*l_bend + l_bendDS))',
+        # Starting values inherited from two_fold_periodicity_90_deg.
+        'kQFarc':  2.9478,  'kQDarc':  -2.9231,
+        'kQFarcM': 2.8846,  'kQDarcM': -2.7567,
+        'kQFDS':   2.8042,  'kQDDS':   -2.2858,
+        'kQFDoub': 3.9170,  'kQDDoub': -2.5190,
+        'kQFtr':   4.4429,  'kQDtr':   -2.4723,
+    })
+    U0 = (0.88463e-31)*E0**4*(2.*np.pi) / (
+        4*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']))
+ 
+    _make_base_elements(pdr, quad_edge, bend_edge)
+    pdr.new('Bend_R', xt.Bend, length='l_bend', angle='hBarc*l_bend',
+            k0_from_h=True,
+            edge_entry_angle='hBarc*l_bend/2',
+            edge_exit_angle='hBarc*l_bend/2',
+            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+    pdr.new('BendDS_R', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS',
+            k0_from_h=True,
+            edge_entry_angle='hBarc*l_bendDS/2',
+            edge_exit_angle='hBarc*l_bendDS/2',
+            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+ 
+    cell_arc, cell_tr = _make_reference_cells(pdr)
+ 
+    # ------------------------------------------------------------------
+    # makesextant: arc cells + matching cell + single DS + ONE triplet.
+    # ------------------------------------------------------------------
+    def makesextant(name, fall):
+        comps = []
+        is_left  = (fall == 'left')
+        b_type   = 'Bend_R'   if is_left else 'Bend'
+        bds_type = 'BendDS_R' if is_left else 'BendDS'
+ 
+        # Regular arc cells
+        for ind in range(int(pdr['N_cells_S']) - 1):
+            comps += [pdr.new(f'Drarc_{name}_{ind}_1', 'Drarc'),
+                      pdr.new(f'Bend1_{name}{ind+1}',  b_type),
+                      pdr.new(f'Drarc_{name}_{ind}_2', 'Drarc'),
+                      pdr.new(f'QDA_{name}{ind+1}',    'QDarc'),
+                      pdr.new(f'Drarc_{name}_{ind}_3', 'Drarc'),
+                      pdr.new(f'Bend2_{name}{ind+1}',  b_type),
+                      pdr.new(f'Drarc_{name}_{ind}_4', 'Drarc'),
+                      pdr.new(f'QFA_{name}{ind+1}',    'QFarc')]
+ 
+        # Matching cell
+        n = int(pdr['N_cells_S'])
+        comps[-1] = pdr.new(f'QFA_M{name}{n-1}', xt.Quadrupole,
+                             length='l_quad', k1=pdr.vars['kQFarcM'],
+                             edge_entry_active=quad_edge,
+                             edge_exit_active=quad_edge)
+        comps += [pdr.new(f'Drarc_{name}_m1', 'Drarc'),
+                  pdr.new(f'Bend1_{name}{n}',  b_type),
+                  pdr.new(f'Drarc_{name}_m2', 'Drarc'),
+                  pdr.new(f'QDA_M{name}{n}',  xt.Quadrupole,
+                          length='l_quad', k1=pdr.vars['kQDarcM'],
+                          edge_entry_active=quad_edge,
+                          edge_exit_active=quad_edge),
+                  pdr.new(f'Drarc_{name}_m3', 'Drarc'),
+                  pdr.new(f'Bend2_{name}{n}',  b_type)]
+ 
+        # Single DS (arc -> straight boundary)
+        comps += [pdr.new(f'DrarcS_{name}',   'DrarcS'),
+                  pdr.new(f'QFDS_{name}',     xt.Quadrupole, length='l_quad',
+                          k1=pdr.vars['kQFDS'],
+                          edge_entry_active=quad_edge, edge_exit_active=quad_edge),
+                  pdr.new(f'DrDSL_{name}',    'DrDSL'),
+                  pdr.new(f'QDDS_{name}',     xt.Quadrupole, length='l_quad',
+                          k1=pdr.vars['kQDDS'],
+                          edge_entry_active=quad_edge, edge_exit_active=quad_edge),
+                  pdr.new(f'Drarc_{name}_ds', 'Drarc'),
+                  pdr.new(f'BendDS_{name}',    bds_type)]
+ 
+        # ONE triplet (single straight) — no _{ti} suffix
+        comps += [pdr.new(f'DrTrans_{name}',  'DrTrans'),
+                  pdr.new(f'QFDoub_{name}',   xt.Quadrupole, length='l_quad',
+                          k1=pdr.vars['kQFDoub'],
+                          edge_entry_active=quad_edge, edge_exit_active=quad_edge),
+                  pdr.new(f'DrDoub_{name}',   'DrDoub'),
+                  pdr.new(f'QDDoub_{name}',   xt.Quadrupole, length='l_quad',
+                          k1=pdr.vars['kQDDoub'],
+                          edge_entry_active=quad_edge, edge_exit_active=quad_edge),
+                  pdr.new(f'DrTripl_{name}',  'DrTripl'),
+                  pdr.new(f'QDTrip_{name}1',  xt.Quadrupole, length='l_quad',
+                          k1=pdr.vars['kQDtr'],
+                          edge_entry_active=quad_edge, edge_exit_active=quad_edge)]
+ 
+        # Fall-dependent boundary caps (DrTrips lives here in the 1-straight ring)
+        if fall == 'symm':
+            comps = [pdr.new(f'QFA_{name}CH', 'QFarcH')] + comps + \
+                    [pdr.new(f'DrTrips_{name}', 'DrTrips'),
+                     pdr.new(f'QFTripC_{name}2H', 'QFtrH')]
+        elif fall == 'right':
+            comps = [pdr.new(f'QFA_{name}C', 'QFarc')] + comps + \
+                    [pdr.new(f'DrTrips_{name}', 'DrTrips')]
+        elif fall == 'left':
+            comps += [pdr.new(f'DrTrips_{name}', 'DrTrips'),
+                      pdr.new(f'QFTripC_{name}2', xt.Quadrupole,
+                              length='l_quad', k1=pdr.vars['kQFtr'],
+                              edge_entry_active=quad_edge,
+                              edge_exit_active=quad_edge)]
+            comps = list(reversed(comps))
+        else:
+            raise ValueError(f'Unknown fall value: {fall!r}')
+ 
+        return pdr.new_line(components=comps)
+ 
+    arc1R = makesextant('xR', 'symm')
+    arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
+                 at='(l_tripl+l_quad)/2', from_='QDDoub_xR')
+    arc1R_sliced = _sliced(arc1R)
+ 
+    period = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
+    period_sliced = _sliced(period)
+ 
+    half_ring = makesextant('1R', 'right') + makesextant('2L', 'left')
+    ring = half_ring + makesextant('2R', 'right') + makesextant('1L', 'left')
+ 
+    if not matched:
+        pdr.lines['arc1R']    = arc1R
+        pdr.lines['cell_arc'] = cell_arc
+        pdr.lines['cell_tr']  = cell_tr
+        pdr.lines['period']   = period
+        pdr.lines['ring']     = ring
+        return pdr
+ 
+    cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
+                                                    mu_cell=phase_advance)
+    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+                           arc1R, constants.WP_D2, n_periods=4)
+ 
+    _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
+    _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
+    return pdr
+
+#-------------
+# Design 3
+#-------------
 
 def two_fold_racetrack_3straight(fringe_fields=True, matched=True, phase_advance=0.25):
     """

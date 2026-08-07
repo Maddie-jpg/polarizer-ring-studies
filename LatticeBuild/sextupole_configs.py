@@ -2,14 +2,15 @@
 Sextupole configs to be paired with linear optics script
 Each function should include a description of the configuration
 
-D1 - Ring design with 3 fold symmetry
-
-D2 - Ring design with racetrack configuration and 2-fold symmetry
 
 """
 
 import numpy as np
 import xtrack as xt
+
+#-----------------
+# Helper functions
+#-----------------
 
 def ChromCorrect(ring, pdr, variables, MakePlot=False):
     ring.configure_radiation(model='mean')
@@ -100,6 +101,10 @@ def ChromCorrect_ddq(ring, pdr, ksf, ksd,ksf2,ksd2,ddqx_val,ddqy_val,tol_val, Ma
     print(f"Matched kSD: {pdr.vars[f'{ksd}']._get_value():.6f}")   
     print(f"Matched kSF: {pdr.vars[f'{ksf2}']._get_value():.6f}")
     print(f"Matched kSD: {pdr.vars[f'{ksd2}']._get_value():.6f}")  
+
+#-------------
+# Design 1
+#-------------
 
 def config_D1_C1(pdr, fringe_fields=True):
 
@@ -894,6 +899,10 @@ def config_D1_C10(pdr):
     ChromCorrect(ring, pdr, ['k2XF2arc', 'k2XD2arc'], MakePlot=False)
 
     return pdr
+
+#---------------
+# Design 2
+#---------------
 
 def config_D2_C1(pdr):
     """

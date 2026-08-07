@@ -646,20 +646,7 @@ def misalignments(line, sigma, seed=None, cut=2.5):
 
 
 def snapshot_quad_strengths(ring, quad_prefixes=None):
-    """
-    Record each quad's integrated strength (sum of k1*length across all
-    current element(s) matching its name) before an insertion step, for
-    later comparison via check_quad_strength_conserved().
-
-    Grouping is done by name PREFIX rather than exact name, so this is
-    robust to however xtrack names pieces if it ends up slicing a quad
-    during a later insert() call (e.g. 'QFA_1R1' and any 'QFA_1R1'-prefixed
-    slice fragments all roll up into the same 'QFA_1R1' total).
-
-    quad_prefixes: optional list of base quad names to track (e.g. from
-    ring.get_table().rows[...].name at the time of the snapshot). If None,
-    every current Quadrupole element is tracked under its own full name.
-    """
+    
     tab = ring.get_table()
     quad_rows = tab.rows[tab.element_type == 'Quadrupole']
 
@@ -679,17 +666,7 @@ def snapshot_quad_strengths(ring, quad_prefixes=None):
 
 
 def check_quad_strength_conserved(ring, snapshot_before, tol=1e-9, verbose=True):
-    """
-    Compare each quad's integrated strength against a snapshot taken with
-    snapshot_quad_strengths() before an insertion step. Flags any quad
-    whose total k1*length changed by more than `tol` -- the signature of
-    an insertion having sliced through (and possibly removed part of) a
-    quad rather than landing cleanly in an adjacent drift, since
-    Line.insert() does this silently with no exception raised.
-
-    Returns a list of (name, before, after, delta) tuples for anything
-    flagged; empty list means nothing detected.
-    """
+   
     after = snapshot_quad_strengths(ring, quad_prefixes=list(snapshot_before.keys()))
 
     flagged = []

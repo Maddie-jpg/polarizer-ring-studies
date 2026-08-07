@@ -6,18 +6,18 @@ FCC-ee is a study on an electron-positron collider with a circumference of about
 
 - **[Project Plan](/Assignments/Project%20Plan/ProjectPlan.pdf)** : Outlines aims and objectives of the project.
 - **[Literature Review](/Assignments/Interim%20Dissertion%20(Literature%20Review)/Literature_Review.pdf)** : A report on the ideas and concepts behind the project.
-- **['A Low Energy Polarizer Ring for the FCC-ee'](https://github.com/user-attachments/files/30833367/WEP5048.pdf).pdf)** :
+- **[A Low Energy Polarizer Ring for the FCC-ee](https://github.com/user-attachments/files/30833367/WEP5048.pdf)** : IPAC '26 paper on the progress of the polarizer ring.
 
 ## Design variations and naming conventions
 Every stored lattice file and results folder is indexed by the four independent choices outlined below.
 
 ### Design -`{design}`
 This defines the linear optics, cell type, and periodicity of the lattice.
-|Design	|Geometry	|Notes|
-|--------|----------|------|
-|D1|	three-fold, 90° arcs — confirm|	|
-|D2|	three-fold, 120° arcs — confirm	| |
-|D3|	two-fold racetrack, long straights — confirm|	
+|Design	|Geometry|	
+|--------|----------|
+|D1|Three-fold symmetric (6 sextants), FODO arcs, 8 cells/sextant.|	
+|D2|Two-fold ring with a single triplet straight section, FODO arcs.| 
+|D3|Two-fold racetrack (4 sextants) with long straights, FODO arcs, 10 cells/sextant.|	
 
 
 ### Sextupole configuration - `{config}`
