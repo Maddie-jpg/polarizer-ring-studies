@@ -50,11 +50,11 @@ Each file contains a `ring` line (the full closed ring) and the periodic cell.
 
 ### Folder structure
 
-What each top-level folder is *for*. Paths follow the
+What each top-level folder is for. Paths follow the
 `D{design}/C{config}` indexing described above.
  
 | Path | Contents |
-|---|---|
+|---|---------|
 | `JSON Files/` | **The lattices.** Xsuite `Environment` JSON files, indexed `D{design}/C{config}/pdr_{mode}_{phase}.json`. This is what you load. |
 | `LatticeBuild/` | Code that **builds** a lattice from scratch: linear optics (`linear_optics.py`), sextupole/chromaticity configs (`sextupole_configs.py`), misalignments + orbit correction (`misalignments_corrections.py`), and the `lattice_build.py` driver. |
 | `Results/` | **Generated outputs** — plots, parameter dumps, `.dat`/`.csv` — written under `D{design}/C{config}/...`.Reproducible from the code. An example set-up of this folder is provided below.|
@@ -70,17 +70,19 @@ What each top-level folder is *for*. Paths follow the
 ```bash
 Results/
 └── D{design}/                            e.g. D1
-    ├── Macroparticle Distribution/       distribution-level: phase-space plots, TwissResults.json
-    │                                     (design-level — not per-config)
+    ├── Macroparticle Distribution/       distribution-level: phase-space plots,
+    │                                     TwissResults.json (design-level — not per-config)
     └── C{config}/                        e.g. C1
         └── {phase}deg_PhaseAdvance/      e.g. 90deg_PhaseAdvance 
             ├── perfect/ 
-            │   └── MPD-{energy}MeV/      injection/ECS results: tracking evolution, survival curves,
-            │                             CompressorParams.json for a certain energy
+            │   └── MPD-{energy}MeV/      injection/ECS results: tracking evolution, survival 
+            │                             curves, CompressorParams.json for a certain energy
             ├── misaligned/
             ├── corrected/
-            ├── Comparison/               spin tracking scan (misaligned vs corrected) from spin_tracking.py
-            └── SingleSeed_{seed}/        single-seed spin tracking results from spin_trackin_single_seed.py
+            ├── Comparison/               spin tracking scan (misaligned vs corrected) from 
+            │                             spin_tracking.py
+            └── SingleSeed_{seed}/        single-seed spin tracking results from 
+                                          spin_trackin_single_seed.py
 
 ```
 
