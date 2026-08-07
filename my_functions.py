@@ -866,7 +866,7 @@ def plot_invariant_spin_vector(base_line,seed_val, apply_correction,out_path):
 
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.26e-3, seed=seed_val)
+    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
 
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
@@ -926,7 +926,7 @@ def track_single_particle_nx1(base_line,seed_val, apply_correction, out_path):
     
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.26e-3, seed=seed_val)
+    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
  
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
@@ -988,7 +988,7 @@ def n0_vs_spin_tune_scan(base_line,seed_val, nu_min, nu_max, n_points=60,apply_c
     
     line.configure_radiation('mean')
     line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.26e-3, seed=seed_val)
+    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
     
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                         spin=True, polarization=True)
@@ -1201,7 +1201,7 @@ def compare_qy_spin_coupling_across_branches(base_line, seed_val,
 
 
 def assess_seed_resonance_excitation(seed_val, apply_correction, base_line,long_scan_turns,
-                                     misalign_sigma=0.26e-3, p_eq_suppression_flag=0.9,
+                                     misalign_sigma=0.25e-3, p_eq_suppression_flag=0.9,
                                      results_dir=None):
     branch_label = 'corrected' if apply_correction else 'misaligned'
 
@@ -1267,7 +1267,7 @@ def assess_seed_resonance_excitation(seed_val, apply_correction, base_line,long_
 
 def assess_resonance_excitation_multi_seed(seed_list, apply_correction, deep_track_single_fn,
                                            check_qy_spin_coupling_fn, base_line,
-                                           misalign_sigma=0.26e-3, p_eq_suppression_flag=0.9,
+                                           misalign_sigma=0.25e-3, p_eq_suppression_flag=0.9,
                                            results_dir=None, out_name='resonance_excitation_summary.csv'):
     rows = []
     for seed_val in seed_list:

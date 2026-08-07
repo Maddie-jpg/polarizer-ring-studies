@@ -27,7 +27,7 @@ SEED = random.randint(0,int(1e6))
 SEED = 1687758877
 
 design = int(os.environ.get('DESIGN', 1))
-config = int(os.environ.get('CONFIG', 9))
+config = int(os.environ.get('CONFIG', 1))
 phase=int(os.environ.get('PHASE',90))
 
 long_scan_turns = 20000  
