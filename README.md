@@ -13,9 +13,10 @@ Every stored lattice file and results folder is indexed by the four independent 
 
 ### Design `D{n}`
 This defines the linear optics, cell type, and periodicity of the lattice.
-Design	|Geometry	|Notes
-D1|	three-fold, 90° arcs — confirm|	
-D2|	three-fold, 120° arcs — confirm	|
-D3|	two-fold racetrack, long straights — confirm|	
+|Design	|Geometry	|Notes|
+|--------|----------|------|
+|D1|	three-fold, 90° arcs — confirm|	|
+|D2|	three-fold, 120° arcs — confirm	| |
+|D3|	two-fold racetrack, long straights — confirm|	
 
 ![](https://media.tenor.com/mMkJeuyHkRYAAAAj/cat-cat-on-computer.gif)
