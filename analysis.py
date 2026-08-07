@@ -28,6 +28,7 @@ design=int(os.environ.get('DESIGN',1))
 config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','corrected')
 phase=int(os.environ.get('PHASE',90))
+changes=os.environ.get('CHANGES',None)
 
 
 # %%
@@ -45,7 +46,10 @@ if pdf_run is True:
     plt.savefig = _new_savefig
 
 # %%
-pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_DSchange.json")
+if changes is not None:
+    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
+else:
+    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
 
 ring=pdr.lines['ring']
 print(ring.element_names)

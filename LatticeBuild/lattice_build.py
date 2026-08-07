@@ -9,7 +9,7 @@ parent_dir = os.path.abspath('..')
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-import linear_optics_TME as lo
+import LatticeBuild.linear_optics as lo
 import sextupole_configs as sc
 import misalignments_corrections as mc
 
@@ -21,6 +21,7 @@ design=1
 config=9
 mode='corrected' # 'perfect', 'misaligned', or 'corrected'
 phase=90
+changes=None
 
 #%%
 
@@ -34,12 +35,18 @@ if mode == 'perfect':
 
 #Misalignments
 elif mode == 'misaligned':
-    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}_DSchange.json')
+    if changes is not None:
+        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json')
+    else:
+        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
     ring=pdr.lines['ring']
     mc.misalignments(ring, 0.25e-3)
 
 elif mode=='corrected':
-    pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}_DSchange.json')
+    if changes is not None:
+        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json')
+    else:
+        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
     ring=pdr.lines['ring']
 
     mc.insert_BPMs_all_as_markers(pdr)
@@ -62,8 +69,10 @@ elif mode=='corrected':
 
 #%%
 #Save json file
-
-file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_DSchange.json'
+if changes is not None:
+    file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json'
+else:
+    file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json'
 
 output_file = Path(file_path_str)
 

@@ -26,10 +26,14 @@ import my_functions as mf
 design=int(os.environ.get('DESIGN',1))
 config=int(os.environ.get('CONFIG',9))
 phase=int(os.environ.get('PHASE',90))
+changes=os.environ.get('CHANGES',None)
 
 # %%
+if changes is not None:
+    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json")
+else:
+    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json")
 
-pdr = xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_perfect_{phase}_DSchange.json')
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9
 

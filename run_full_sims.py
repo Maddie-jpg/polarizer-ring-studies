@@ -2,14 +2,16 @@ import os
 import subprocess
 import sys
 
-def run_configuration(design, config, mode):
+def run_configuration(design, config, mode,phase,changes):
     """
-    Runs the appropriate scripts for a given design, config, and mode.
+    Runs the appropriate scripts for a given design, config, mode, phase, and changes.
     """
     env = os.environ.copy()
     env['DESIGN'] = str(design)
     env['CONFIG'] = str(config)
     env['MODE'] = mode
+    env['PHASE'] = str(phase)
+    env['CHANGES']=changes
 
     # Dynamically determine which scripts to run based on the mode
     if mode == 'perfect':
@@ -28,4 +30,4 @@ def run_configuration(design, config, mode):
 
 if __name__ == '__main__':
 
-    run_configuration(2, 3, 'corrected')
+    run_configuration(2, 3, 'corrected', 90, None)

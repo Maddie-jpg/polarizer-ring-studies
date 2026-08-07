@@ -21,6 +21,8 @@ import xobjects as xo
 design=int(os.environ.get('DESIGN',1))
 config=int(os.environ.get('CONFIG',1))
 mode=os.environ.get('MODE','perfect')
+phase=int(os.environ.get('PHASE',90))
+changes=os.environ.get('CHANGES',None)
 
 # %%
 #read in file
@@ -541,7 +543,11 @@ with open(f'Results/D{design}/Macroparticle Distribution/TwissResults.json', 'w'
 
 
 # %%
-pdr=xt.Environment.from_json(f'JSON Files/D{design}/C{config}/pdr_{mode}.json')
+if changes is not None:
+    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
+else:
+    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
+    
 ring=pdr.lines['ring']
 ring.element_dict['RFCav'].voltage = 20e6
 ring.element_dict['RFCav_1'].voltage = 20e6
