@@ -4,8 +4,9 @@ FCC-ee is a study on an electron-positron collider with a circumference of about
 
 ### Current literature on the project
 
-- **[Project Plan](/Assignments/Project%20Plan/ProjectPlan.pdf)** : Outlines aims and objectives of the project.
-- **[Literature Review](/Assignments/Interim%20Dissertion%20(Literature%20Review)/Literature_Review.pdf)** : A report on the ideas and concepts behind the project.
+- **[Project Plan](https://github.com/userattachments/files/30835035/ProjectPlan.pdf))** : Outlines aims and objectives of the project.
+
+- **[Literature Review](https://github.com/userattachments/files/30835066/Literature_Review.pdf)** : A report on the ideas and concepts behind the project.
 - **[A Low Energy Polarizer Ring for the FCC-ee](https://github.com/user-attachments/files/30833367/WEP5048.pdf)** : IPAC '26 paper on the progress of the polarizer ring.
 
 ## Design variations and naming conventions
