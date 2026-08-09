@@ -16,9 +16,9 @@ Every stored lattice file and results folder is indexed by the four independent 
 This defines the linear optics, cell type, and periodicity of the lattice.
 |Design	|Geometry|	
 |--------|----------|
-|D1|Three-fold symmetric (6 sextants), FODO arcs, 8 cells/sextant.|	
+|D1|Three-fold symmetric (6 sextants), FODO arcs, 8 cells/period.|	
 |D2|Two-fold ring with a single triplet straight section, FODO arcs.| 
-|D3|Two-fold racetrack (4 sextants) with long straights, FODO arcs, 10 cells/sextant.|	
+|D3|Two-fold racetrack (4 arcs) with long straights, FODO arcs, 10 cells/period.|	
 
 
 ### Sextupole configuration - `{config}`
