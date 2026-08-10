@@ -24,7 +24,7 @@ import csv
 #%%
 
 SEED = random.randint(0,int(1e6))
-SEED = 1687758877
+#SEED = 1687758877
 
 design = int(os.environ.get('DESIGN', 1))
 config = int(os.environ.get('CONFIG', 1))
@@ -38,7 +38,7 @@ if changes is not None:
     pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json")
 else:
     pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json")
-    
+
 energy=2.86e9
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0 = energy
@@ -51,8 +51,9 @@ else:
     mc.insert_correctors(pdr)
 
 
-
 line = pdr.lines['ring']
+mc.misalignments_correctors(line,0.25e-3,SEED+1)
+
 line.configure_spin('auto')
 
 base_line = line.copy()

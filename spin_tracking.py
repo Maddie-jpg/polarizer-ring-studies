@@ -78,6 +78,7 @@ def prep_branch(seed, apply_correction):
     if apply_correction:
         orbit_x_rms_before = np.std(tw.x)
         orbit_y_rms_before = np.std(tw.y)
+        mc.misalignments_correctors(seed_line,0.25e-3,seed+1)
         try:
             mc.orbit_correction(seed_line, tw, threading=False)
         except Exception as e:

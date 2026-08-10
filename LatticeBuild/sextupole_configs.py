@@ -33,7 +33,7 @@ def ChromCorrect(ring, pdr, variables, MakePlot=False):
 
         print(f"Starting iterative correction. Initial ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
 
-        for i in range(10):
+        for i in range(1):
             target_x = curr_x * 0.8
             target_y = curr_y * 0.8
             

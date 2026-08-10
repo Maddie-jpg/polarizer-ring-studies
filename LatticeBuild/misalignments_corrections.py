@@ -644,6 +644,38 @@ def misalignments(line, sigma, seed=None, cut=2.5):
 
     return line
 
+def misalignments_correctors(line, sigma, seed=None, cut=2.5):
+    rng = np.random.default_rng(seed)
+
+    actual_seed = rng.bit_generator.seed_seq.entropy
+    print(f"Applying misalignments with seed: {actual_seed}")
+
+    def truncnorm(cut, rgen):
+        var = rgen.normal()
+        if abs(var) > cut:
+            var = truncnorm(cut, rgen)
+        return var
+
+    tab = line.get_table()
+    correctors = list(tab.rows[tab.element_type == 'Multipole'].name)
+    
+
+    for name in correctors:
+        ref = line.element_refs[name]
+
+        ref.shift_x   = sigma * truncnorm(cut, rng)
+        ref.shift_y   = sigma * truncnorm(cut, rng)
+        ref.shift_s   = sigma * truncnorm(cut, rng)
+        ref.rot_s_rad = sigma * truncnorm(cut, rng)
+        ref.rot_x_rad = sigma * truncnorm(cut, rng)
+        ref.rot_y_rad = sigma * truncnorm(cut, rng)
+
+        relative_error = 1 + truncnorm(cut, rng) * 1e-3
+        ref.knl *= relative_error
+        ref.ksl *= relative_error
+
+    return line
+
 
 def snapshot_quad_strengths(ring, quad_prefixes=None):
     

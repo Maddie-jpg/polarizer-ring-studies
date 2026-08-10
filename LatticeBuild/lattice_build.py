@@ -17,19 +17,19 @@ from pathlib import Path
 
 #%%
 
-design=1
-config=9
-mode='corrected' # 'perfect', 'misaligned', or 'corrected'
+design=3
+config=1
+mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 phase=90
 changes=None
 
 #%%
-
+SEED=123456789
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity_90_deg(fringe_fields=True, matched=True)
-    sc.config_D1_C9(pdr)
+    pdr=lo.two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=(13.65, 13.23))
+    sc.config_D2_C3(pdr)
     
 
 
@@ -40,22 +40,23 @@ elif mode == 'misaligned':
     else:
         pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
     ring=pdr.lines['ring']
-    mc.misalignments(ring, 0.25e-3)
+    mc.misalignments(ring, 0.25e-3,SEED)
 
 elif mode=='corrected':
     if changes is not None:
-        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json')
+        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_misaligned_{phase}_{changes}.json')
     else:
-        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json')
+        pdr=xt.Environment.from_json(f'../JSON Files/D{design}/C{config}/pdr_misaligned_{phase}.json')
     ring=pdr.lines['ring']
 
     mc.insert_BPMs_all_as_markers(pdr)
     mc.insert_correctors(pdr)
+    mc.misalignments_correctors(ring,0.25e-3,SEED)
 
     twiss=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                    spin=True, polarization=True )
 
-    mc.misalignments(ring,0.25e-3)
+
 
     try:
         ring.discard_tracker()

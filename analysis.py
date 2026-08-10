@@ -24,9 +24,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',9))
-mode=os.environ.get('MODE','corrected')
+design=int(os.environ.get('DESIGN',3))
+config=int(os.environ.get('CONFIG',1))
+mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
 

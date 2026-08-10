@@ -279,7 +279,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # Design 1 (more variations as this was created before pipeline optimisation)
 # ---------------------------------------------------------------------------
 
-def three_fold_periodicity_90_deg(fringe_fields=True, matched=True):
+def three_fold_periodicity_90_deg(fringe_fields=True, matched=True,WP=constants.WP_D1):
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -366,7 +366,7 @@ def three_fold_periodicity_90_deg(fringe_fields=True, matched=True):
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=0.25)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, constants.WP_D1)
+                           arc1R, WP)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
     return pdr
@@ -374,7 +374,7 @@ def three_fold_periodicity_90_deg(fringe_fields=True, matched=True):
 
 
 
-def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True):
+def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True, WP=constants.WP_D1):
    
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -507,7 +507,7 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True):
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=0.25)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, constants.WP_D1)
+                           arc1R, WP)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
     return pdr
@@ -515,7 +515,7 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True):
 
 
 
-def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True):
+def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True, WP=constants.WP_D1_120):
   
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -663,7 +663,7 @@ def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True):
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=1/3)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, constants.WP_D1_120)
+                           arc1R, WP)
 
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
 
@@ -675,7 +675,7 @@ def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True):
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
     return pdr
 
-def three_fold_periodicity_120_deg(fringe_fields=True, matched=True):
+def three_fold_periodicity_120_deg(fringe_fields=True, matched=True, WP=constants.WP_D1_120):
 
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -785,7 +785,7 @@ def three_fold_periodicity_120_deg(fringe_fields=True, matched=True):
         cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                         mu_cell=1/3)
         _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                            arc1R, constants.WP_D1_120)
+                            arc1R, WP)
 
         _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
         _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
@@ -796,7 +796,7 @@ def three_fold_periodicity_120_deg(fringe_fields=True, matched=True):
 # Design 2
 #------------------
 
-def two_fold_1straight(fringe_fields=True, matched=True, phase_advance=0.25):
+def two_fold_1straight(fringe_fields=True, matched=True,WP=constants.WP_D2, phase_advance=0.25):
 
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0            # use the shared constants (16 MV RF), see note
@@ -942,7 +942,7 @@ def two_fold_1straight(fringe_fields=True, matched=True, phase_advance=0.25):
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, constants.WP_D2, n_periods=4)
+                           arc1R, WP, n_periods=4)
  
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
@@ -952,7 +952,7 @@ def two_fold_1straight(fringe_fields=True, matched=True, phase_advance=0.25):
 # Design 3
 #-------------
 
-def two_fold_racetrack_3straight(fringe_fields=True, matched=True, phase_advance=0.25):
+def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.WP_D3, phase_advance=0.25):
     """
     Two-fold racetrack based directly on two_fold_periodicity_90_deg,
     with the single end-of-sextant triplet replaced by 3 back-to-back
@@ -1124,7 +1124,7 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True, phase_advance
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, constants.WP_D3, n_periods=4)
+                           arc1R, WP, n_periods=4)
 
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R_2')
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)

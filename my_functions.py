@@ -650,6 +650,7 @@ def deep_track_single(base_line, seed_val,long_scan_turns, apply_correction, tra
     if apply_correction:
         orbit_x_rms_before = np.std(tw.x)
         orbit_y_rms_before = np.std(tw.y)
+        mc.misalignments_correctors(line,0.25e-3,seed_val+1)
         try:
             mc.orbit_correction(line, tw, threading=False)
         except Exception as e:
@@ -873,10 +874,12 @@ def plot_invariant_spin_vector(base_line,seed_val, apply_correction,out_path):
 
     if apply_correction:
         try:
+            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=False)
         except Exception as e:
             print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
                   f"{type(e).__name__}: {e} -- retrying with threading=True")
+            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=True)
         # Orbit correction changes the closed orbit/optics, so re-twiss to get
         # the n0 vector consistent with the corrected lattice.
@@ -933,10 +936,12 @@ def track_single_particle_nx1(base_line,seed_val, apply_correction, out_path):
  
     if apply_correction:
         try:
+            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=False)
         except Exception as e:
             print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
                   f"{type(e).__name__}: {e} -- retrying with threading=True")
+            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=True)
  
     tw_nx1 = line.twiss(start=tw_0.name[0], end=tw_0.name[-2], init_at=tw_0.name[0],
@@ -995,10 +1000,12 @@ def n0_vs_spin_tune_scan(base_line,seed_val, nu_min, nu_max, n_points=60,apply_c
     
     if apply_correction:
             try:
+                mc.misalignments_correctors(line,0.25e-3,seed_val+1)
                 mc.orbit_correction(line, tw, threading=False)
             except Exception as e:
                 print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
                       f"{type(e).__name__}: {e} -- retrying with threading=True")
+                mc.misalignments_correctors(line,0.25e-3,seed_val+1)
                 mc.orbit_correction(line, tw, threading=True)
             # Orbit correction changes the closed orbit/optics, so re-twiss to get
             # the n0 vector consistent with the corrected lattice.
@@ -1214,10 +1221,12 @@ def assess_seed_resonance_excitation(seed_val, apply_correction, base_line,long_
         tw = line.twiss(method='6d', radiation_integrals=True,
                         eneloss_and_damping=True, spin=True, polarization=True)
         try:
+            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=False)
         except Exception as e:
             print(f"orbit_correction(threading=False) raised: {type(e).__name__}: {e}"
                   f" -- retrying with threading=True")
+            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=True)
 
     coupling = check_qy_spin_coupling(line)
