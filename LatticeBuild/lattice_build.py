@@ -18,7 +18,7 @@ from pathlib import Path
 #%%
 
 design=3
-config=1
+config=0
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 phase=90
 changes=None
@@ -29,7 +29,7 @@ SEED=123456789
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
     pdr=lo.two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=(13.65, 13.23))
-    sc.config_D2_C3(pdr)
+    #sc.config_D2_C3(pdr)
     
 
 
