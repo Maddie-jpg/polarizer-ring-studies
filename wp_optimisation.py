@@ -167,7 +167,7 @@ def _annotate_best_point(ax, best, label='Best', value_fmt='{:.4e}',
 
 
 def plot_mux_muy_4panel(scan_result, cmap='viridis', log_emittance=False,
-                        show_best=False, objectives=None):
+                        show_best=True, objectives=None):
     """
     Four-panel (mu_x, mu_y) scan plot:
 
@@ -175,16 +175,6 @@ def plot_mux_muy_4panel(scan_result, cmap='viridis', log_emittance=False,
         top-right    = momentum compaction factor (alpha_c)
         bottom-left  = horizontal chromaticity (dqx)
         bottom-right = vertical chromaticity (dqy)
-
-    Axes are cell phase advance only (mu_x, mu_y) -- no ring working
-    point or secondary tune axes.
-
-    show_best: if True, each panel gets its own textbox marking the grid
-    point that's "best" FOR THAT SPECIFIC METRIC ALONE -- these four
-    points will generally NOT coincide, which is the point: the plot
-    exists to show the tradeoff between them, not to pick a single winner.
-    objectives: optional dict overriding the default per-panel objective.
-    Defaults: emit_x='min', alpha_c='abs_min', dqx='abs_min', dqy='abs_min'.
     """
     mux_grid = scan_result['mux_grid']
     muy_grid = scan_result['muy_grid']
@@ -236,14 +226,16 @@ def plot_mux_muy_4panel(scan_result, cmap='viridis', log_emittance=False,
     return fig, axes
 
 
-pdr = xt.Environment.from_json('/home/mwatson/Documents/laughing-octo-bassoon/JSON Files/D3/C0/pdr_perfect_90.json')
+
+
+pdr = xt.Environment.from_json('/home/mwatson/Documents/laughing-octo-bassoon/JSON Files/D1/C0/pdr_perfect_90_DSchange.json')
 ring = pdr.lines['ring']
 cell_arc = pdr.lines['cell_arc']
-tw = cell_arc.twiss(method='4d')
 
 scan = scan_mux_muy_emittance(
-    cell_arc, mux_range=(tw.mux[-1]-0.1, tw.mux[-1]+0.1), muy_range=(tw.muy[-1]-0.1, tw.muy[-1]+0.1),
+    cell_arc, mux_range=(0.30, 0.45), muy_range=(0.15, 0.35),
     n_mux=20, n_muy=20,
 )
 fig, axes = plot_mux_muy_4panel(scan)
 fig.savefig('wp_plots.png')
+
