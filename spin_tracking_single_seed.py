@@ -24,10 +24,10 @@ import csv
 #%%
 
 SEED = random.randint(0,int(1e6))
-#SEED = 1687758877
+SEED = 283792
 
 design = int(os.environ.get('DESIGN', 1))
-config = int(os.environ.get('CONFIG', 1))
+config = int(os.environ.get('CONFIG', 9))
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
 
@@ -52,7 +52,7 @@ else:
 
 
 line = pdr.lines['ring']
-mc.misalignments_correctors(line,0.25e-3,SEED+1)
+mc.misalignments_correctors(line,0.2e-3,SEED+1)
 
 line.configure_spin('auto')
 

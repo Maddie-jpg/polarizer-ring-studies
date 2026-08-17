@@ -194,7 +194,7 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 
 import re
 
-def insert_correctors(pdr, debug_check=False):
+def insert_correctors(pdr):
     """
     debug_check=True wraps EVERY single corrector insertion with a
     snapshot_quad_strengths()/check_quad_strength_conserved() pair, so if
@@ -213,8 +213,6 @@ def insert_correctors(pdr, debug_check=False):
     pdr['l_kick'] = 0.1
     ring = pdr.lines['ring']
 
-    if debug_check:
-        all_quad_snapshot = snapshot_quad_strengths(ring)
 
     drift_map = {
         'QDA_':     'l_drift',
@@ -281,20 +279,6 @@ def insert_correctors(pdr, debug_check=False):
         quad elsewhere named later in the loop -- that's what debug_check
         is for.
         """
-        if debug_check:
-            before = snapshot_quad_strengths(ring, quad_prefixes=list(all_quad_snapshot.keys()))
-
-        from_elem, anchor, final_offset = get_safe_insertion(
-            ring, prefix, elem, sign, default_offset)
-        ring.insert(new_element, at=final_offset,
-                    from_=from_elem, from_anchor=anchor)
-
-        if debug_check:
-            flagged = check_quad_strength_conserved(ring, before, verbose=False)
-            if flagged:
-                print(f"[insert_correctors] inserting corrector for "
-                      f"'{prefix}{elem}' damaged: "
-                      f"{[f[0] for f in flagged]}")
 
     # ---- vertical correctors on QD-type quads ----
     for prefix in ['QDA_', 'QDA_M', 'QDDoub_', 'QDDS_', 'QDTrip_']:
@@ -658,9 +642,10 @@ def misalignments_correctors(line, sigma, seed=None, cut=2.5):
 
     tab = line.get_table()
     correctors = list(tab.rows[tab.element_type == 'Multipole'].name)
+    BPMs = [name for name in tab.name if 'BPM' in name]
     
 
-    for name in correctors:
+    for name in BPMs:
         ref = line.element_refs[name]
 
         ref.shift_x   = sigma * truncnorm(cut, rng)
@@ -669,54 +654,18 @@ def misalignments_correctors(line, sigma, seed=None, cut=2.5):
         ref.rot_s_rad = sigma * truncnorm(cut, rng)
         ref.rot_x_rad = sigma * truncnorm(cut, rng)
         ref.rot_y_rad = sigma * truncnorm(cut, rng)
-
+    '''for name in correctors:
+        ref = line.element_refs[name]
+        
+        ref.shift_x   = sigma * truncnorm(cut, rng)
+        ref.shift_y   = sigma * truncnorm(cut, rng)
+        ref.shift_s   = sigma * truncnorm(cut, rng)
+        ref.rot_s_rad = sigma * truncnorm(cut, rng)
+        ref.rot_x_rad = sigma * truncnorm(cut, rng)
+        ref.rot_y_rad = sigma * truncnorm(cut, rng)
         relative_error = 1 + truncnorm(cut, rng) * 1e-3
         ref.knl *= relative_error
-        ref.ksl *= relative_error
+        ref.ksl *= relative_error'''
 
     return line
 
-
-def snapshot_quad_strengths(ring, quad_prefixes=None):
-    
-    tab = ring.get_table()
-    quad_rows = tab.rows[tab.element_type == 'Quadrupole']
-
-    if quad_prefixes is None:
-        quad_prefixes = list(quad_rows.name)
-
-    totals = {p: 0.0 for p in quad_prefixes}
-    for name in quad_rows.name:
-        for p in quad_prefixes:
-            if name == p or name.startswith(p + '.') or name.startswith(p + '_'):
-                elem = ring[name]
-                k1 = getattr(elem, 'k1', 0.0)
-                length = getattr(elem, 'length', 0.0)
-                totals[p] += k1 * length
-                break
-    return totals
-
-
-def check_quad_strength_conserved(ring, snapshot_before, tol=1e-9, verbose=True):
-   
-    after = snapshot_quad_strengths(ring, quad_prefixes=list(snapshot_before.keys()))
-
-    flagged = []
-    for name, before_val in snapshot_before.items():
-        after_val = after.get(name, 0.0)
-        delta = after_val - before_val
-        if abs(delta) > tol:
-            flagged.append((name, before_val, after_val, delta))
-
-    if verbose:
-        if flagged:
-            print(f"WARNING: {len(flagged)} quad(s) show a changed integrated "
-                  f"strength after insertion -- likely silently sliced/altered:")
-            for name, before_val, after_val, delta in flagged:
-                print(f"  {name}: before={before_val:.6e}  after={after_val:.6e}  "
-                      f"delta={delta:+.3e}")
-        else:
-            print(f"OK: all {len(snapshot_before)} tracked quads have unchanged "
-                  f"integrated strength after insertion.")
-
-    return flagged

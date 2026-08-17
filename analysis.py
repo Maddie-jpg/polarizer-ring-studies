@@ -24,8 +24,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',3))
-config=int(os.environ.get('CONFIG',1))
+design=int(os.environ.get('DESIGN',1))
+config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
@@ -265,36 +265,20 @@ for (row, col), cell in table.get_celld().items():
 plt.savefig(f'{new_results_folder}/table_{mode}.png')
 
 
-def dynamic_tune_ranges(qx_data, qy_data, pad_frac=0.15, min_span=0.02):
+def integer_tune_ranges(qx, qy, half_width=1):
     """
-    Compute (Qx_range, Qy_range) that encompass all plotted tune data.
-
-    qx_data / qy_data: scalars, lists, or arrays (mix is fine) -- everything
-    that will appear on the plot (WP, chromatic curve, footprint, ...).
-    pad_frac: fractional padding added on each side of the data span.
-    min_span: minimum half-window, so a single WP dot still gets a
-              readable neighborhood instead of a degenerate range.
+    Range of half_width on each side of the nearest integer to each tune.
+    e.g. qx=15.38 -> round to 15 -> (13.5, 16.5) with half_width=1.5,
+    or (14, 16) with half_width=1.0.
     """
-    qx_all = np.concatenate([np.atleast_1d(np.asarray(q, dtype=float)).ravel()
-                              for q in qx_data])
-    qy_all = np.concatenate([np.atleast_1d(np.asarray(q, dtype=float)).ravel()
-                              for q in qy_data])
-    qx_all = qx_all[np.isfinite(qx_all)]
-    qy_all = qy_all[np.isfinite(qy_all)]
-
-    def ranged(vals):
-        lo, hi = vals.min(), vals.max()
-        span = max(hi - lo, 2 * min_span)
-        pad = pad_frac * span
-        return (lo - pad, hi + pad)
-
-    return ranged(qx_all), ranged(qy_all)
+    nx = round(float(qx) * 2) / 2
+    ny = round(float(qy) * 2) / 2
+    return (nx - half_width, nx + half_width), (ny - half_width, ny + half_width)
 
 
 #Working point plot
 resonance_orders = (1,2,3,4)
-Qx_range, Qy_range = dynamic_tune_ranges([ring_tw.qx], [ring_tw.qy],
-                                          pad_frac=0.15, min_span=0.05)
+Qx_range, Qy_range = integer_tune_ranges(ring_tw.qx, ring_tw.qy)
 resonances = resonance_lines(Qx_range,Qy_range,resonance_orders,3)
 fig, ax = plt.subplots(1, figsize=(8,8), alpha=0.3)
 ax.plot(ring_tw.qx, ring_tw.qy,'o', 
@@ -361,8 +345,7 @@ plt.savefig(f'{new_results_folder}/momentum_deviation{current_wp}_{mode}.png')
 nominal_tw = ring.twiss4d(delta0=0)
 '''Qx_range = (nominal_tw.qx-0.005,tw.qx+0.005)
 Qy_range = (nominal_tw.qy-0.1,tw.qy+0.1)'''
-Qx_range, Qy_range = dynamic_tune_ranges(
-    [qx, nominal_tw.qx], [qy, nominal_tw.qy], pad_frac=0.15)
+Qx_range, Qy_range = integer_tune_ranges(ring_tw.qx, ring_tw.qy)
 resonances = resonance_lines(Qx_range,Qy_range,resonance_orders,3)
 fig, ax = plt.subplots(1, figsize=(8,8), alpha=0.3)
 
@@ -437,10 +420,7 @@ if fp0 is not None:
     # footprint and a narrow chromatic sweep, the data-driven window alone
     # was too small to show any resonance context (previous plot had only
     # one or two lines barely clipping the edge).
-    Qx_range, Qy_range = dynamic_tune_ranges(
-        [fp0.qx, qx, nominal_tw.qx],
-        [fp0.qy, qy, nominal_tw.qy],
-        pad_frac=0.15, min_span=0.06)
+    Qx_range, Qy_range = integer_tune_ranges(ring_tw.qx, ring_tw.qy,half_width=0.25)
 
     fig, ax = plt.subplots(figsize=(9, 9))
 
@@ -458,28 +438,27 @@ if fp0 is not None:
     # "systematic" (red) from the layer above; those are two different
     # pieces of information (structural type vs. distance to WP) and
     # deserve visually distinct colors.
-    mf.plot_dangerous_resonances(
+    '''mf.plot_dangerous_resonances(
         ring, ring_tw.qx, ring_tw.qy, max_order=(1, 2, 3, 4, 5),
         ax=ax, qx_range=Qx_range, qy_range=Qy_range,
         legend_tiers=(1, 2), tier_colors={1: 'black', 2: 'dimgray'},
-        draw_background_grid=False)
+        draw_background_grid=False)'''
 
     # Layer 2 (middle): amplitude footprint -- the widest-reaching data on
     # the plot, so give it a muted, translucent color that reads as a
     # "region" rather than competing with the resonance lines for attention.
-    fp0.plot(ax=ax, color='tab:purple', alpha=0.55,
+    fp0.plot(ax=ax, color='tab:green', alpha=0.55,
              label=f'Amplitude Footprint ({r_max}$\\sigma$)')
 
     # Layer 3 (front): chromatic footprint -- a single clean curve, the
     # most important "how far do we move" indicator, drawn last so it
     # stays visually on top.
-    ax.plot(qx, qy, '.-', lw=2, color='tab:green', ms=4,
+    ax.plot(qx, qy, '.-', lw=2, color='tab:purple', ms=4,
             label=f'Chromatic shift ($\\delta$: {min(delta):.1e} to {max(delta):.1e})')
 
     # Nominal WP marker -- distinct from the Tier-1 red resonance lines,
     # so use a black star rather than red.
-    ax.plot(nominal_tw.qx, nominal_tw.qy, marker='o', color='black',
-            markersize=16, linestyle='', zorder=6,
+    ax.plot(nominal_tw.qx, nominal_tw.qy, 'ro',
             label='Nominal ($\\delta=0$)')
 
     ax.set_xlim(Qx_range)

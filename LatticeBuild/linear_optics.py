@@ -70,7 +70,8 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6, MakePlot=Fals
 
 
 def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
-                 cell_tr_opt, cell_tr, arc1R, MakePlot=False):
+                 cell_tr_opt, cell_tr, arc1R, betay_DS_target=None,
+                 MakePlot=False):
     """Match beta functions at the centre of the straight section."""
     cell_arc_opt.run_jacobian(10)
     tw_cell = cell_arc.twiss(method='4d')
@@ -78,21 +79,29 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     cell_tr_opt.targets[1].value = betyS
     cell_tr_opt.run_jacobian(10)
     tw_tr = cell_tr.twiss(method='4d')
+
+    vary = [xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
+            xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
+            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
+            xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4)]
+    targets = [
+        xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
+        xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
+        xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0],
+                     at=xt.END, tol=1e-6),
+    ]
+    # The extra DS quad (QDDoubDS_*) reuses kQDDoub, which is already in the
+    # vary list above, so it is powered automatically with the real doublet
+    # quad -- no separate knob or target is needed here.
+
+
     opt = arc1R.match(
         method='4d', solve=True, assert_within_tol=False,
         betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
         bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
         dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0],
-        vary=[xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
-              xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
-              xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
-              xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4)],
-        targets=[
-            xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
-            xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-            xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0],
-                         at=xt.END, tol=1e-6),
-        ])
+        vary=vary,
+        targets=targets)
     opt.run_jacobian(30)
     if MakePlot:
         arc1R.twiss(method='4d',
@@ -100,6 +109,86 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
                     bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
                     dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0]).plot()
 
+def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
+                          l_qy=None, frac=0.9):
+    """
+    Insert one extra defocusing quad into the DrDSL drift of every DS region,
+    IDENTICAL to the existing doublet quad QDDoub: same length ('l_quad') and
+    same shared strength knob 'kQDDoub'. Because it references kQDDoub -- which
+    the matching routine already varies -- it is powered automatically together
+    with the existing doublet quad; no new knob or match target is needed.
+
+    frac : position of the new quad centre within DrDSL, as a fraction of the
+           drift length measured FROM the QFDS end (0.9 = near the QDDS/peak end
+           where beta_y is largest). Set l_qy to override the length (defaults
+           to the same 'l_quad' as the real doublet quad).
+    """
+    q_length = l_qy if l_qy is not None else 'l_quad'
+
+    def insert_into_line(line, line_label):
+        names = line.element_names
+
+        def drift_length(nm):
+            try:
+                el = line.element_dict[nm]
+                return el.length if el.__class__.__name__ == 'Drift' else None
+            except Exception:
+                return None
+
+        LONG = 1.0  # DrDSL is 2.25 m; anything >1 m is "the long drift"
+
+        # ---- PASS 1: resolve every placement on the UNTOUCHED lattice ----
+        # Computing all offsets before any insertion prevents index drift from
+        # earlier inserts corrupting the neighbour detection for later sectors.
+        plan, skipped = [], []
+        for qfds in sorted(n for n in names if n.startswith('QFDS_')):
+            sector = qfds[len('QFDS_'):]
+            new_name = 'QDDoubDS_' + sector
+            if new_name in names:
+                continue
+            idx = names.index(qfds)
+            qfds_half = line.element_dict[qfds].length / 2.0
+
+            prev_nm = names[idx - 1] if idx - 1 >= 0 else None
+            next_nm = names[idx + 1] if idx + 1 < len(names) else None
+            prev_len = drift_length(prev_nm)
+            next_len = drift_length(next_nm)
+
+            cand = []
+            if next_len is not None and next_len > LONG:
+                cand.append(('+', next_len))
+            if prev_len is not None and prev_len > LONG:
+                cand.append(('-', prev_len))
+
+            if not cand:
+                skipped.append((qfds, prev_nm, prev_len, next_nm, next_len))
+                continue
+
+            sign, dlen = cand[0]  # if both long, prefers downstream (symmetric)
+            off = qfds_half + frac * dlen
+            plan.append((new_name, qfds, f'{sign}{off}', sign, round(off, 3)))
+
+        # ---- PASS 2: insert, anchored to the (stable) QFDS names ----
+        for new_name, qfds, at_expr, sign, off in plan:
+            line.insert(
+                pdr.new(new_name, xt.Quadrupole, length=q_length, k1='kQDDoub'),
+                at=at_expr, from_=qfds, from_anchor='center')
+
+        print(f"insert_DS_betay_quads [{line_label}]: inserted {len(plan)} quads "
+              f"(copies of QDDoub, on kQDDoub)")
+        for new_name, qfds, at_expr, sign, off in plan:
+            print(f"   {new_name}: at {sign}{off} m from {qfds} centre")
+        if skipped:
+            print(f"   WARNING [{line_label}]: {len(skipped)} QFDS had no adjacent "
+                  f"long drift -- not inserted:")
+            for row in skipped:
+                print(f"     {row}")
+
+    insert_into_line(ring, 'ring')
+    insert_into_line(period, 'period')
+    for i, ln in enumerate(extra_lines):
+        insert_into_line(ln, f'extra[{i}]')
+    return pdr
 
 # ----------------
 # Shared Builders
@@ -235,7 +324,8 @@ def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
     return cell_arc_opt, cell_tr_opt
 
 def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                            arc1R, wp_constants, n_periods=6):
+                            arc1R, wp_constants, n_periods=6,
+                            betay_DS_target=None):
     kQFtr_saved = arc1R.vars['kQFtr']._value
     kQDtr_saved = arc1R.vars['kQDtr']._value
 
@@ -263,7 +353,8 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
     mid   = len(tw_tr.betx) // 2
 
     matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
-                 cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R)
+                 cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
+                 betay_DS_target=betay_DS_target)
     matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
 
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
@@ -279,7 +370,8 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # Design 1 (more variations as this was created before pipeline optimisation)
 # ---------------------------------------------------------------------------
 
-def three_fold_periodicity_90_deg(fringe_fields=True, matched=True,WP=constants.WP_D1):
+def three_fold_periodicity_90_deg(fringe_fields=True, matched=True,WP=constants.WP_D1,
+                                   betay_DS_target=None):
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -358,6 +450,11 @@ def three_fold_periodicity_90_deg(fringe_fields=True, matched=True,WP=constants.
             makesextant('2R', 'right') + makesextant('3L', 'left') +
             makesextant('3R', 'right') + makesextant('1L', 'left'))
 
+    # arc1R included so the extra DS quad is present where matching runs.
+    # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
+    # the existing doublet quad automatically.
+    insert_DS_betay_quads(pdr, ring, period, arc1R)
+
     _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
 
     if not matched:
@@ -366,7 +463,7 @@ def three_fold_periodicity_90_deg(fringe_fields=True, matched=True,WP=constants.
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=0.25)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, WP)
+                           arc1R, WP, betay_DS_target=betay_DS_target)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
     return pdr

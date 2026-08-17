@@ -874,12 +874,10 @@ def plot_invariant_spin_vector(base_line,seed_val, apply_correction,out_path):
 
     if apply_correction:
         try:
-            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=False)
         except Exception as e:
             print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
                   f"{type(e).__name__}: {e} -- retrying with threading=True")
-            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
             mc.orbit_correction(line, tw, threading=True)
         # Orbit correction changes the closed orbit/optics, so re-twiss to get
         # the n0 vector consistent with the corrected lattice.
