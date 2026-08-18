@@ -80,11 +80,11 @@ def prep_branch(seed, apply_correction):
         orbit_y_rms_before = np.std(tw.y)
         mc.misalignments_correctors(seed_line,0.25e-3,seed+1)
         try:
-            mc.orbit_correction(seed_line, tw, threading=False)
+            mc.orbit_correction(seed_line, tw, threading=False,seed=seed)
         except Exception as e:
             print(f"  [seed {seed}] orbit_correction(threading=False) raised: "
                   f"{type(e).__name__}: {e} -- retrying with threading=True")
-            mc.orbit_correction(seed_line, tw, threading=True)
+            mc.orbit_correction(seed_line, tw, threading=True,seed=seed)
         # Re-twiss after correction so tw reflects the corrected orbit/optics.
         tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                         spin=True, polarization=True)
@@ -365,6 +365,7 @@ axes[1].legend()
 axes[1].grid(True, linestyle=':', alpha=0.6)
 
 fig.suptitle('Equilibrium Polarization Distributions — Misaligned vs Corrected', fontweight='bold')
+plt.xlim(0,100)
 plt.tight_layout()
 plt.savefig(f'{results_dir}/PEq_Misaligned_vs_Corrected_Histograms.png', dpi=300)
 plt.close()

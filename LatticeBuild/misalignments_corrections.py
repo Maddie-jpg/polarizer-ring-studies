@@ -194,25 +194,12 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 
 import re
 
-def insert_correctors(pdr):
-    """
-    debug_check=True wraps EVERY single corrector insertion with a
-    snapshot_quad_strengths()/check_quad_strength_conserved() pair, so if
-    an insertion silently slices/removes part of some OTHER quad (the
-    failure mode get_safe_insertion can't detect ahead of time, since it
-    only knows about the target quad's immediate neighbors), you get an
-    immediate, per-insertion warning naming exactly which quad it damaged
-    and which corrector insertion did it -- instead of finding out several
-    iterations later as a confusing 'element not found' error when
-    something ELSE tries to reference the now-missing quad.
 
-    This is slower (one extra get_table() call per insertion) so it's off
-    by default; turn it on when chasing exactly this kind of bug.
-    """
+def insert_correctors(pdr):
+
     offset = (pdr['l_quad'] + pdr['l_drift']) / 2
     pdr['l_kick'] = 0.1
     ring = pdr.lines['ring']
-
 
     drift_map = {
         'QDA_':     'l_drift',
@@ -255,30 +242,19 @@ def insert_correctors(pdr):
 
     def safe_insert(new_element, prefix, elem, sign, default_offset):
         """
-        Uses the module-level get_safe_insertion() pre-check (same one
-        insert_correctors_var2 is meant to use) instead of trying an
-        insertion and catching exceptions.
+        Places new_element using get_safe_insertion()'s real-neighbor-length
+        computation rather than the caller's generic drift_map guess.
 
-        This changed from an earlier version that wrapped ring.insert() in
-        a try/except (ValueError, AssertionError) and fell back only if
-        that raised. xtrack's Line.insert() does NOT raise in the failure
-        case that matters here: it calls cut_at_s() to slice the line at
-        the insertion boundaries -- which slices straight through a thick
-        element like a quad if the target position lands inside one -- and
-        then silently removes whatever ends up fully inside the insertion
-        span. No exception is raised. So the old except-branch fallback
-        could never actually trigger for the case it was written for, and
-        a corrector landing inside a quad's span would silently delete
-        part of that quad with no warning. get_safe_insertion looks at the
-        real neighboring element types before choosing where to insert, so
-        it doesn't depend on an exception that doesn't happen.
-
-        NOTE: get_safe_insertion only checks the TARGET quad's own
-        immediate neighbors. It has no way to know that inserting THIS
-        corrector might reach far enough to damage some OTHER, unrelated
-        quad elsewhere named later in the loop -- that's what debug_check
-        is for.
+        get_safe_insertion returns (ref_element, anchor, offset) -- the
+        element to anchor against, which point on it to anchor from, and
+        the (string, deferred-expression) offset to place new_element at.
+        We just hand those straight to ring.insert().
         """
+        ref_element, anchor, insertion_offset = get_safe_insertion(
+            ring, prefix, elem, sign, default_offset)
+
+        ring.insert(new_element, at=insertion_offset, anchor=anchor,
+                     from_=ref_element)
 
     # ---- vertical correctors on QD-type quads ----
     for prefix in ['QDA_', 'QDA_M', 'QDDoub_', 'QDDS_', 'QDTrip_']:
@@ -339,7 +315,8 @@ def report_eigenvector_counts(ring, twiss, rcond_x=1e-4, rcond_y=1e-2):
 
 def orbit_correction(ring, twiss, threading=False,
                       rcond_x=1e-4, rcond_y=1e-2,
-                      n_eig_x=None, n_eig_y=None):
+                      n_eig_x=None, n_eig_y=None,
+                      bpm_error=True, sigma=0.25e-3, seed=1234):
     """
     n_eig_x / n_eig_y: number of singular values (eigenvectors) to keep
     for the x / y correction, respectively. Can be an int, or a (low, high)
@@ -357,29 +334,37 @@ def orbit_correction(ring, twiss, threading=False,
     ring.steering_correctors_x = corr_x_names
     ring.steering_correctors_y = corr_y_names
 
+    monitor_align = None
+    if bpm_error:
+        BPMs = [name for name in tt.name if 'BPM' in name]
+        rng = np.random.default_rng(seed)
+        monitor_align = bpm_reading_errors(BPMs, sigma, rng)
+
     def run_correction(corr_handler):
+        corr_handler.x_correction.rcond = rcond_x
+        corr_handler.y_correction.rcond = rcond_y
         if n_eig_x is not None or n_eig_y is not None:
-            corr_handler.x_correction.rcond = rcond_x
-            corr_handler.y_correction.rcond = rcond_y
             corr_handler.correct(n_singular_values=(n_eig_x, n_eig_y))
         else:
-            corr_handler.x_correction.rcond = rcond_x
-            corr_handler.y_correction.rcond = rcond_y
             corr_handler.correct()
 
     if threading is False:
-        corr_handler = ring.correct_trajectory(twiss_table=twiss, run=False)
+        corr_handler = ring.correct_trajectory(twiss_table=twiss, run=False,
+                                                monitor_alignment=monitor_align)
         run_correction(corr_handler)
     else:
         tw0 = twiss
-        corr_handler = ring.correct_trajectory(twiss_table=tw0, run=False)
+        corr_handler = ring.correct_trajectory(twiss_table=tw0, run=False,
+                                                monitor_alignment=monitor_align)
         corr_handler.thread(ds_thread=10., rcond_long=1e-2)
 
         tw1 = ring.twiss(method='6d')
-        corr_handler_final = ring.correct_trajectory(twiss_table=tw1, run=False)
+        corr_handler_final = ring.correct_trajectory(twiss_table=tw1, run=False,
+                                                       monitor_alignment=monitor_align)
         run_correction(corr_handler_final)
 
     return ring
+
 def insert_BPMs_all(pdr, start_at_turn, stop_at_turn, fRev):
    
    ring=pdr.lines['ring']
@@ -642,19 +627,8 @@ def misalignments_correctors(line, sigma, seed=None, cut=2.5):
 
     tab = line.get_table()
     correctors = list(tab.rows[tab.element_type == 'Multipole'].name)
-    BPMs = [name for name in tab.name if 'BPM' in name]
-    
 
-    for name in BPMs:
-        ref = line.element_refs[name]
-
-        ref.shift_x   = sigma * truncnorm(cut, rng)
-        ref.shift_y   = sigma * truncnorm(cut, rng)
-        ref.shift_s   = sigma * truncnorm(cut, rng)
-        ref.rot_s_rad = sigma * truncnorm(cut, rng)
-        ref.rot_x_rad = sigma * truncnorm(cut, rng)
-        ref.rot_y_rad = sigma * truncnorm(cut, rng)
-    '''for name in correctors:
+    for name in correctors:
         ref = line.element_refs[name]
         
         ref.shift_x   = sigma * truncnorm(cut, rng)
@@ -665,7 +639,25 @@ def misalignments_correctors(line, sigma, seed=None, cut=2.5):
         ref.rot_y_rad = sigma * truncnorm(cut, rng)
         relative_error = 1 + truncnorm(cut, rng) * 1e-3
         ref.knl *= relative_error
-        ref.ksl *= relative_error'''
+        ref.ksl *= relative_error
 
     return line
+
+def bpm_reading_errors(bpm_names, sigma, rng, cut=2.5):
+    def truncnorm(cut, rgen):
+        var = rgen.normal()
+        if abs(var) > cut:
+            var = truncnorm(cut, rgen)
+        return var
+
+    return {
+        name: {
+            'shift_x':   sigma * truncnorm(cut, rng),
+            'shift_y':   sigma * truncnorm(cut, rng),
+            'rot_s_rad': sigma * truncnorm(cut, rng),
+        }
+        for name in bpm_names
+    }
+
+
 

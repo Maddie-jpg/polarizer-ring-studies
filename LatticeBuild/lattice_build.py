@@ -28,8 +28,8 @@ SEED=123456789
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity_90_deg_many_sext(fringe_fields=True,matched=True)
-    #sc.config_D1_C9(pdr)
+    pdr=lo.three_fold_periodicity_90(fringe_fields=True,matched=True)
+    sc.config_D1_C9(pdr)
     
 
 
@@ -51,7 +51,7 @@ elif mode=='corrected':
 
     mc.insert_BPMs_all_as_markers(pdr)
     mc.insert_correctors_var2(pdr)
-    #mc.misalignments_correctors(ring,0.25e-3,SEED)
+    mc.misalignments_correctors(ring,0.25e-3,SEED)
 
     twiss=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                    spin=True, polarization=True )
@@ -60,10 +60,10 @@ elif mode=='corrected':
 
     try:
         ring.discard_tracker()
-        mc.orbit_correction(ring, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2)
+        mc.orbit_correction(ring, twiss, threading=False, rcond_x=1e-4, rcond_y=1e-2,seed=SEED)
         
     except:
-        mc.orbit_correction(ring, twiss, threading=True, rcond_x=1e-4, rcond_y=1e-2)
+        mc.orbit_correction(ring, twiss, threading=True, rcond_x=1e-4, rcond_y=1e-2,seed=SEED)
         
 
 
