@@ -18,8 +18,8 @@ from pathlib import Path
 #%%
 
 design=1
-config=9
-mode='perfect' # 'perfect', 'misaligned', or 'corrected'
+config=1
+mode='corrected' # 'perfect', 'misaligned', or 'corrected'
 phase=90
 changes=None
 
@@ -28,8 +28,8 @@ SEED=123456789
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity_90_deg(fringe_fields=True,matched=True)
-    sc.config_D1_C9(pdr)
+    pdr=lo.three_fold_periodicity_90_deg_many_sext(fringe_fields=True,matched=True)
+    #sc.config_D1_C9(pdr)
     
 
 
@@ -50,8 +50,8 @@ elif mode=='corrected':
     ring=pdr.lines['ring']
 
     mc.insert_BPMs_all_as_markers(pdr)
-    mc.insert_correctors(pdr)
-    mc.misalignments_correctors(ring,0.25e-3,SEED)
+    mc.insert_correctors_var2(pdr)
+    #mc.misalignments_correctors(ring,0.25e-3,SEED)
 
     twiss=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                    spin=True, polarization=True )
