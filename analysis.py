@@ -24,10 +24,10 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
+design=int(os.environ.get('DESIGN',3))
+config=int(os.environ.get('CONFIG',2))
 mode=os.environ.get('MODE','perfect')
-phase=int(os.environ.get('PHASE',120))
+phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
 
 
@@ -189,7 +189,8 @@ def calc_damping_time_constant(m):
 
 # Initialize the table
 brho = ring.particle_ref.p0c[0] / 299792458.0 
-max_k0 = np.max(np.abs(ring_tw.k0l))
+_mask = ring_tw.length > 0
+max_k0 = np.max(np.abs(ring_tw.k0l[_mask]) / ring_tw.length[_mask])
 max_field_tesla = max_k0 * brho
 # 1. Prepare your data in a list of lists
 data = [

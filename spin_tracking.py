@@ -370,6 +370,61 @@ plt.tight_layout()
 plt.savefig(f'{results_dir}/PEq_Misaligned_vs_Corrected_Histograms.png', dpi=300)
 plt.close()
 
+#%%
+fig = plt.figure(figsize=(8, 8))
+gs = fig.add_gridspec(
+    2, 2,
+    width_ratios=(4, 1), height_ratios=(1, 4),
+    left=0.1, right=0.95, bottom=0.1, top=0.92,
+    wspace=0.05, hspace=0.05
+)
+ 
+ax_scatter = fig.add_subplot(gs[1, 0])
+ax_histx = fig.add_subplot(gs[0, 0], sharex=ax_scatter)
+ax_histy = fig.add_subplot(gs[1, 1], sharey=ax_scatter)
+
+ax_histx.tick_params(axis='x', labelbottom=False)
+ax_histy.tick_params(axis='y', labelleft=False)
+
+ax_scatter.scatter(p_eq_mis, p_eq_cor, color='purple', alpha=0.7)
+ 
+
+x_pad = 0.05 * (p_eq_mis.max() - p_eq_mis.min())
+y_pad = 0.05 * (p_eq_cor.max() - p_eq_cor.min())
+ax_scatter.set_xlim(p_eq_mis.min() - x_pad, p_eq_mis.max() + x_pad)
+ax_scatter.set_ylim(p_eq_cor.min() - y_pad, p_eq_cor.max() + y_pad)
+ 
+
+full_lims = [min(p_eq_mis.min(), p_eq_cor.min()), max(p_eq_mis.max(), p_eq_cor.max())]
+#ax_scatter.plot(full_lims, full_lims, color='gray', linestyle=':', label='No improvement (y=x)')
+ax_scatter.set_xlabel('Misaligned $P_{eq}$ (%)')
+ax_scatter.set_ylabel('Corrected $P_{eq}$ (%)')
+ax_scatter.grid(True, linestyle=':', alpha=0.6)
+ 
+
+ax_histx.hist(p_eq_mis, bins=30, color='tab:red', edgecolor='black', alpha=0.8)
+ax_histx.axvline(p_eq_mis.mean(), color='black', linestyle='--',
+                  label=f'Mean: {p_eq_mis.mean():.2f}%')
+ax_histx.set_ylabel('Count')
+ax_histx.legend(fontsize=8)
+ax_histx.grid(True, linestyle=':', alpha=0.6)
+
+ax_histy.hist(p_eq_cor, bins=30, color='tab:blue', edgecolor='black',
+              alpha=0.8, orientation='horizontal')
+ax_histy.axhline(p_eq_cor.mean(), color='black', linestyle='--',
+                  label=f'Mean: {p_eq_cor.mean():.2f}%')
+ax_histy.set_xlabel('Count')
+ax_histy.legend(fontsize=8, loc='lower right')
+ax_histy.grid(True, linestyle=':', alpha=0.6)
+ 
+fig.suptitle('Equilibrium Polarization: Misaligned vs Corrected\n'
+             '(same misalignment seed per point, with marginal distributions)',
+             fontsize=12)
+ 
+plt.savefig(f'{results_dir}/PEq_Misaligned_vs_Corrected_Jointplot.png', dpi=300)
+plt.close()
+
+
 # %%
 # PART 2 — DEEP TRACK on the single best and single worst seed from the scan
 

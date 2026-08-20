@@ -19,10 +19,10 @@ import xobjects as xo
 
 # %%
 design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
+config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','corrected')
 phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES',None)
+changes=os.environ.get('CHANGES','DSchange')
 
 # %%
 #read in file
@@ -618,7 +618,7 @@ plt.show()
 
 #Reference particle
 p0c_reference = df['p[MeV/c]'].mean() * 1e6 
-p0c_reference = 2910*1e6
+p0c_reference = 2952*1e6
 
 ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
 
