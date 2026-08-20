@@ -370,8 +370,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # Design 1 (more variations as this was created before pipeline optimisation)
 # ---------------------------------------------------------------------------
 
-def three_fold_periodicity_90_deg(fringe_fields=True, matched=True,WP=constants.WP_D1,
-                                   betay_DS_target=None):
+def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,                                  betay_DS_target=None):
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -461,7 +460,7 @@ def three_fold_periodicity_90_deg(fringe_fields=True, matched=True,WP=constants.
         return pdr
 
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
-                                                    mu_cell=0.25)
+                                                    mu_cell=phase_advance)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP, betay_DS_target=betay_DS_target)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,

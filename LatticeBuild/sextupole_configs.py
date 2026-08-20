@@ -12,6 +12,12 @@ import xtrack as xt
 # Helper functions
 #-----------------
 
+def _quad_name(prefix, sext, ref_cell):
+    if ref_cell == '8':
+        return f'{prefix}_M{sext}{ref_cell}'
+    else:
+        return f'{prefix}_{sext}{ref_cell}'
+
 def ChromCorrect(ring, pdr, variables, MakePlot=False):
     ring.configure_radiation(model='mean')
     
@@ -490,29 +496,49 @@ def config_D1_C6(pdr):
 
     return pdr
 
+
+
+
 def config_D1_C1_120(pdr, fringe_fields=True):
-    """
-    Sextupole configuration for the 120-degree phase advance three-fold ring
-    (three_fold_periodicity_120_deg_many_sext / three_fold_periodicity_120_deg).
 
-    6 SF + 6 SD per arc sextant (12 per sextant total, 72 per ring):
-      - SD inserted after QDA_1..6 (near defocusing quads, cells 1-6)
-      - SF inserted after QFA_1..6 (near focusing quads, cells 1-6)
-      - Cells 7-8 (including the matching cell) have no sextupoles
-      - SF also inserted at the half-quad centre (QFA_{name}CH)
+    def _ordered_quads(tt, prefix, sext):
+        """Real, cell-order list of {prefix}_{sext}* quad names for one
+        sextant, taken directly from the line's element table -- not
+        reconstructed from a guessed numbering scheme. QDA runs 1..7,M8.
+        QFA runs C,1..6,M8 (no '7' -- confirmed absent from this lattice).
+        L sextants have no 'C' entry; R sextants do."""
+        cand = [n for n in tt.name
+                if n.startswith(f'{prefix}_{sext}') or n.startswith(f'{prefix}_M{sext}')]
+        def key(n):
+            tag = n.split('_')[1].replace(sext, '', 1)
+            if tag == 'C':
+                return -1
+            if tag.startswith('M'):
+                return 100
+            return int(tag)
+        return sorted(cand, key=key)
 
-    Sign convention:
-      - Right sextants (1R, 2R, 3R): positive offset '+' 
-      - Left sextants  (1L, 2L, 3L): negative offset '-'
-
-    Two sextupole families:
-      XF2arc  — focusing   (k2 = k2XF2arc)
-      XD2arc  — defocusing (k2 = k2XD2arc)
-
-    Chromaticity corrected to dqx=dqy=0 via ChromCorrect.
-    """
+    def _ordered_quads_period(tt, prefix, side):
+        """Same idea as _ordered_quads, but for the `period` line's own
+        naming: {prefix}_P{side}n for n=1..7, {prefix}_MP{side}8 for the
+        outer boundary quad, and {prefix}_P{side}CH for the inner boundary
+        quad (QFA only -- QDA has no CH-type entry in this line)."""
+        cand = [n for n in tt.name
+                if n.startswith(f'{prefix}_P{side}') or n.startswith(f'{prefix}_MP{side}')]
+        def key(n):
+            tag = n.split('_')[1].replace(f'P{side}', '', 1).replace(f'MP{side}', '', 1)
+            if tag == 'CH':
+                return -1
+            if tag == '':   # the MP{side}8 case: after stripping P{side}, 'M8' remains -> handled below
+                return 100
+            if tag.startswith('M'):
+                return 100
+            return int(tag)
+        return sorted(cand, key=key)
+    
     ring   = pdr.lines['ring']
     period = pdr.lines['period']
+    tt = ring.get_table()
 
     pdr.vars({'l_sext': 0.1, 'k2XF2arc': 0.0, 'k2XD2arc': 0.0})
     pdr.new('XF2arc', xt.Sextupole, length='l_sext', k2='k2XF2arc',
@@ -520,65 +546,56 @@ def config_D1_C1_120(pdr, fringe_fields=True):
     pdr.new('XD2arc', xt.Sextupole, length='l_sext', k2='k2XD2arc',
             edge_entry_active=fringe_fields, edge_exit_active=fringe_fields)
 
-    # Cells 1-6 of each sextant get sextupoles; cells 7-8 do not.
-    sext_cells  = [str(i) for i in range(1, 7)]   # '1'..'6'
+    sextants = [('1R','+'), ('2R','+'), ('3R','+'),
+                ('1L','-'), ('2L','-'), ('3L','-')]
 
-    # ---------------------------------------------------------------
-    # Ring insertions
-    # ---------------------------------------------------------------
+    for sext, sign in sextants:
+        qda_list = _ordered_quads(tt, 'QDA', sext)   # 8 entries: 1..7, M8
+        qfa_list = _ordered_quads(tt, 'QFA', sext)   # 7 or 8 entries
 
-    # SD near defocusing quads (QDA), cells 1-6
-    for sext, sign in [('1R','+'),('2R','+'),('3R','+'),
-                        ('1L','-'),('2L','-'),('3L','-')]:
-        for cell in sext_cells:
+        # Extend to 7 consecutive quads starting at the FIRST position,
+        # then shift that window up by one -> positions 1..7.
+        qda_window = qda_list[1:8]   # e.g. ['2','3','4','5','6','7','M8'] worth
+        qfa_window = qfa_list[1:8]   # for R: ['1',...,'6','M8']; for L: only 6 long (no 'C' to skip)
+
+        for name in qda_window:
+            cell = name.split(sext)[-1]
             ring.insert(pdr.new(f'XD2arc_{sext}{cell}', 'XD2arc'),
-                        at=sign + '(l_drift+l_quad)/2',
-                        from_=f'QDA_{sext}{cell}')
+                        at=sign + '(l_drift+l_quad)/2', from_=name)
 
-    # SF near focusing quads (QFA), cells 1-6
-    for sext, sign in [('1R','+'),('2R','+'),('3R','+'),
-                        ('1L','-'),('2L','-'),('3L','-')]:
-        for cell in sext_cells:
+        for name in qfa_window:
+            cell = name.split(sext)[-1]
             ring.insert(pdr.new(f'XF2arc_{sext}{cell}', 'XF2arc'),
-                        at=sign + '(l_drift+l_quad)/2',
-                        from_=f'QFA_{sext}{cell}')
+                        at=sign + '(l_drift+l_quad)/2', from_=name)
 
-    # SF at half-quad centre (QFA_{sext}CH)
-    for sext, sign in [('1R','+'),('2R','+'),('3R','+'),
-                        ('1L','-'),('2L','-'),('3L','-')]:
-        ring.insert(pdr.new(f'XF2arc_{sext}CH', 'XF2arc'),
-                    at=sign + '(l_drift+l_quad)/2',
-                    from_=f'QFA_{sext}CH')
+        tt_period = period.get_table()
 
-    # ---------------------------------------------------------------
-    # Period insertions (PR = right, PL = left)
-    # ---------------------------------------------------------------
+    for side, sign in [('R', '+'), ('L', '-')]:
+        qda_list = _ordered_quads_period(tt_period, 'QDA', side)   # 8: 1..7, M8
+        qfa_list = _ordered_quads_period(tt_period, 'QFA', side)   # 8: CH,1..6,M8
 
-    # SD, cells 1-6
-    for cell in sext_cells:
-        period.insert(pdr.new(f'XD2arc_PR{cell}', 'XD2arc'),
-                      at='+(l_drift+l_quad)/2', from_=f'QDA_PR{cell}')
-        period.insert(pdr.new(f'XD2arc_PL{cell}', 'XD2arc'),
-                      at='-(l_drift+l_quad)/2', from_=f'QDA_PL{cell}')
+        qda_window = qda_list[1:8]
+        qfa_window = qfa_list[1:8]
 
-    # SF, cells 1-6
-    for cell in sext_cells:
-        period.insert(pdr.new(f'XF2arc_PR{cell}', 'XF2arc'),
-                      at='+(l_drift+l_quad)/2', from_=f'QFA_PR{cell}')
-        period.insert(pdr.new(f'XF2arc_PL{cell}', 'XF2arc'),
-                      at='-(l_drift+l_quad)/2', from_=f'QFA_PL{cell}')
+        for name in qda_window:
+            cell = name.replace(f'QDA_P{side}', '').replace(f'QDA_MP{side}', 'M')
+            period.insert(pdr.new(f'XD2arc_P{side}{cell}', 'XD2arc'),
+                          at=sign + '(l_drift+l_quad)/2', from_=name)
 
-    # SF at half-quad centre
+        for name in qfa_window:
+            cell = name.replace(f'QFA_P{side}', '').replace(f'QFA_MP{side}', 'M')
+            period.insert(pdr.new(f'XF2arc_P{side}{cell}', 'XF2arc'),
+                          at=sign + '(l_drift+l_quad)/2', from_=name)
+
+    # Both boundary quads are genuine, independent elements in `period`
+    # (unlike `ring`, where the equivalent quad is shared between two
+    # sextants) -- so a 15th sextupole per side is unambiguous here.
     period.insert(pdr.new('XF2arc_PRCH', 'XF2arc'),
                   at='+(l_drift+l_quad)/2', from_='QFA_PRCH')
     period.insert(pdr.new('XF2arc_PLCH', 'XF2arc'),
                   at='-(l_drift+l_quad)/2', from_='QFA_PLCH')
 
-    # ---------------------------------------------------------------
-    # Chromaticity correction
-    # ---------------------------------------------------------------
     ChromCorrect(ring, pdr, ['k2XF2arc', 'k2XD2arc'])
-
     return pdr
 
 def config_D1_C7(pdr):

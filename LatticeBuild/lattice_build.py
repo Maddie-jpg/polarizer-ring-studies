@@ -12,15 +12,15 @@ if parent_dir not in sys.path:
 import LatticeBuild.linear_optics as lo
 import sextupole_configs as sc
 import misalignments_corrections as mc
-
+import constants
 from pathlib import Path
 
 #%%
 
 design=1
 config=1
-mode='corrected' # 'perfect', 'misaligned', or 'corrected'
-phase=90
+mode='perfect' # 'perfect', 'misaligned', or 'corrected'
+phase=120
 changes=None
 
 #%%
@@ -28,8 +28,8 @@ SEED=123456789
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity_90(fringe_fields=True,matched=True)
-    sc.config_D1_C9(pdr)
+    pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=constants.WP_D1_120,phase_advance=1/3)
+    sc.config_D1_C1_120(pdr)
     
 
 

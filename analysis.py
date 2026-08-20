@@ -24,10 +24,10 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',3))
-config=int(os.environ.get('CONFIG',2))
+design=int(os.environ.get('DESIGN',1))
+config=int(os.environ.get('CONFIG',1))
 mode=os.environ.get('MODE','perfect')
-phase=int(os.environ.get('PHASE',90))
+phase=int(os.environ.get('PHASE',120))
 changes=os.environ.get('CHANGES',None)
 
 
@@ -189,8 +189,7 @@ def calc_damping_time_constant(m):
 
 # Initialize the table
 brho = ring.particle_ref.p0c[0] / 299792458.0 
-_mask = ring_tw.length > 0
-max_k0 = np.max(np.abs(ring_tw.k0l[_mask]) / ring_tw.length[_mask])
+max_k0 = np.max(np.abs(ring_tw.k0l))
 max_field_tesla = max_k0 * brho
 # 1. Prepare your data in a list of lists
 data = [
@@ -397,23 +396,36 @@ while r_max >= 1:
         r_max -= 1.0
 
 if fp0 is not None:
-    q_offset_x = np.floor(WP[0])
-    q_offset_y = np.floor(WP[1])
+    # get_footprint's internal FFT uses rfftfreq, which only ever resolves
+    # frequencies in [0, 0.5] (real-signal Nyquist limit). If the TRUE
+    # fractional tune on an axis is above 0.5, the FFT peak for it is
+    # indistinguishable from one at (1 - true_frac) and gets reported
+    # there instead -- i.e. it silently folds back into [0, 0.5]. Because
+    # of that fold, the raw fp0.qx/fp0.qy values can never actually reveal
+    # whether aliasing happened (they're always <= 0.5 by construction), so
+    # checking np.nanmax(fp0.qx) > 0.5 -- as this block used to -- can never
+    # fire and is not a real guard. The only reliable way to know is to look
+    # at the true fractional part of the known nominal WP itself, decided
+    # BEFORE trusting the FFT output, and unfold accordingly.
+    def _reconstruct_absolute_tune(frac_from_fft, wp_value):
+        n = np.floor(wp_value)
+        true_frac = wp_value - n
+        if true_frac > 0.5:
+            # rfftfreq folded the true peak back to (1 - true_frac); undo it.
+            return (n + 1) - frac_from_fft
+        else:
+            return n + frac_from_fft
 
-    # get_footprint's internal FFT uses rfftfreq, which only resolves
-    # frequencies in [0, 0.5] (real-signal Nyquist limit) -- if the true
-    # fractional tune is above 0.5 it aliases and this offset reconstruction
-    # would silently be wrong. Guard against that rather than fail silently.
-    frac_x_max, frac_y_max = np.nanmax(fp0.qx), np.nanmax(fp0.qy)
-    if frac_x_max > 0.5 or frac_y_max > 0.5:
-        print(f"WARNING: footprint fractional tune near/above 0.5 "
-              f"(max frac Qx={frac_x_max:.3f}, Qy={frac_y_max:.3f}) -- "
-              f"FFT peak detection may be aliased; treat this footprint "
-              f"with caution.")
+    if (WP[0] % 1) > 0.5 or (WP[1] % 1) > 0.5:
+        print(f"NOTE: fractional tune above 0.5 detected from the nominal "
+              f"WP directly (Qx frac={WP[0] % 1:.3f}, Qy frac={WP[1] % 1:.3f}) "
+              f"-- applying fold-back correction to reconstruct the absolute "
+              f"footprint tunes on the affected axis.")
 
-    # get_footprint returns fractional tunes -> shift to absolute.
-    fp0.qx += q_offset_x
-    fp0.qy += q_offset_y
+    # get_footprint returns fractional tunes -> reconstruct to absolute,
+    # correctly unfolding any axis where the true fractional tune is > 0.5.
+    fp0.qx = _reconstruct_absolute_tune(fp0.qx, WP[0])
+    fp0.qy = _reconstruct_absolute_tune(fp0.qy, WP[1])
 
     # NOTE: qx/qy (from twiss4d) and nominal_tw.qx/qy are ALREADY absolute
     # tunes -- do not add the integer offset to them again.
