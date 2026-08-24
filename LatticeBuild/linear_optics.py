@@ -12,7 +12,7 @@ import constants
 
 # ----------------------
 # Module-level helpers
-# =---------------------
+# ----------------------
 
 def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
     """Return (qx, qy) implied by current knobs: n_periods × sextant phase advance."""
@@ -72,7 +72,6 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6, MakePlot=Fals
 def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
                  cell_tr_opt, cell_tr, arc1R, betay_DS_target=None,
                  MakePlot=False):
-    """Match beta functions at the centre of the straight section."""
     cell_arc_opt.run_jacobian(10)
     tw_cell = cell_arc.twiss(method='4d')
     cell_tr_opt.targets[0].value = betxS
@@ -82,18 +81,14 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
 
     vary = [xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
             xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
-            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
-            xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4)]
+            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4)]
+            #xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4)]
     targets = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
         xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0],
                      at=xt.END, tol=1e-6),
     ]
-    # The extra DS quad (QDDoubDS_*) reuses kQDDoub, which is already in the
-    # vary list above, so it is powered automatically with the real doublet
-    # quad -- no separate knob or target is needed here.
-
 
     opt = arc1R.match(
         method='4d', solve=True, assert_within_tol=False,
@@ -113,15 +108,10 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
                           l_qy=None, frac=0.9):
     """
     Insert one extra defocusing quad into the DrDSL drift of every DS region,
-    IDENTICAL to the existing doublet quad QDDoub: same length ('l_quad') and
-    same shared strength knob 'kQDDoub'. Because it references kQDDoub -- which
-    the matching routine already varies -- it is powered automatically together
-    with the existing doublet quad; no new knob or match target is needed.
+    identical to the existing doublet quad QDDoub: same length ('l_quad') and
+    same shared strength knob 'kQDDoub'. Because it references kQDDoub it is powered 
+    automatically together with the existing doublet quad; no new knob or match target is needed.
 
-    frac : position of the new quad centre within DrDSL, as a fraction of the
-           drift length measured FROM the QFDS end (0.9 = near the QDDS/peak end
-           where beta_y is largest). Set l_qy to override the length (defaults
-           to the same 'l_quad' as the real doublet quad).
     """
     q_length = l_qy if l_qy is not None else 'l_quad'
 
@@ -137,9 +127,6 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
 
         LONG = 1.0  # DrDSL is 2.25 m; anything >1 m is "the long drift"
 
-        # ---- PASS 1: resolve every placement on the UNTOUCHED lattice ----
-        # Computing all offsets before any insertion prevents index drift from
-        # earlier inserts corrupting the neighbour detection for later sectors.
         plan, skipped = [], []
         for qfds in sorted(n for n in names if n.startswith('QFDS_')):
             sector = qfds[len('QFDS_'):]
@@ -168,7 +155,6 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
             off = qfds_half + frac * dlen
             plan.append((new_name, qfds, f'{sign}{off}', sign, round(off, 3)))
 
-        # ---- PASS 2: insert, anchored to the (stable) QFDS names ----
         for new_name, qfds, at_expr, sign, off in plan:
             line.insert(
                 pdr.new(new_name, xt.Quadrupole, length=q_length, k1='kQDDoub'),
@@ -329,7 +315,7 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
     kQFtr_saved = arc1R.vars['kQFtr']._value
     kQDtr_saved = arc1R.vars['kQDtr']._value
 
-    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
+    #matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
     
     # Check what we actually got
     tw_cell = cell_arc.twiss(method='4d')
@@ -463,7 +449,7 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
                                                     mu_cell=phase_advance)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP, betay_DS_target=betay_DS_target)
-    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
+    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc_opt, cell_tr_opt,
                           period, U0, VRF, bend_edge)
     return pdr
 
@@ -1049,32 +1035,6 @@ def two_fold_1straight(fringe_fields=True, matched=True,WP=constants.WP_D2, phas
 #-------------
 
 def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.WP_D3, phase_advance=0.25):
-    """
-    Two-fold racetrack based directly on two_fold_periodicity_90_deg,
-    with the single end-of-sextant triplet replaced by 3 back-to-back
-    triplets with NO DS sections between them.
-
-    Sextant layout (fall='right' or 'left'):
-        QFarc - [N_cells_S arc cells] - DS - triplet0 - triplet1 - triplet2 - DrTrips
-
-    One DS only per sextant (at the arc-to-straight boundary).
-    Triplets are contiguous — no bending between them, so the straight
-    sections are genuinely straight.
-
-    Full ring (2-fold):
-        makesextant('1R','right') + makesextant('2L','left')
-        + makesextant('2R','right') + makesextant('1L','left')
-
-    hBarc accounts for one BendDS per sextant only:
-        2*pi / (4 * (2*N_cells_S*l_bend + l_bendDS))
-
-    Parameters
-    ----------
-    fringe_fields : bool
-    matched : bool
-        If True (default), run WP and beta matching.
-        If False, return unmatched lattice immediately.
-    """
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = 2.86e9; VRF = 4.0e6
 
@@ -1113,13 +1073,6 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
 
     cell_arc, cell_tr = _make_reference_cells(pdr)
 
-    # ------------------------------------------------------------------
-    # makesextant
-    #
-    # Arc cells + matching cell: identical to two_fold_periodicity_90_deg.
-    # ONE DS section at the arc-to-straight boundary.
-    # THREE triplets back-to-back with no DS between them.
-    # ------------------------------------------------------------------
     def makesextant(name, fall):
         comps = []
         is_left  = (fall == 'left')

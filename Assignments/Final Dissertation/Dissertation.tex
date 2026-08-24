@@ -1,0 +1,117 @@
+% ============================================================
+%  MPhys Dissertation — Main Preamble
+%  University of Surrey, PHYM051
+% ============================================================
+
+\documentclass[12pt, a4paper, oneside]{report}
+
+% ---------- Page geometry ----------
+% Standard dissertation margins (not the AIP RYID margins — this is
+% the final Dissertation, which is not format-prescriptive per the handbook)
+\usepackage[a4paper, margin=2.5cm, bindingoffset=0.5cm]{geometry}
+
+% ---------- Spacing toggle ----------
+% Handbook requires two submitted PDFs: one single-spaced, one double-spaced.
+% Set \doublespacedtrue for the double-spaced build, \doublespacedfalse for
+% the single-spaced build, then recompile — avoids maintaining two copies.
+\usepackage{setspace}
+\newif\ifdoublespaced
+\doublespacedfalse   % <-- toggle this per build
+\ifdoublespaced
+  \doublespacing
+\else
+  \singlespacing
+\fi
+
+% ---------- Fonts / encoding ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}         % or \usepackage{mathptmx} for Times-like output
+\usepackage{microtype}
+
+% ---------- Maths & units ----------
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{siunitx}
+\sisetup{per-mode=symbol}
+
+% ---------- Figures & tables ----------
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{longtable}
+\usepackage{rotating}        % for wide/rotated tables or figures if needed
+
+% ---------- Appendix A: original RYID PDF, included verbatim ----------
+\usepackage{pdfpages}
+
+% ---------- Cross-referencing ----------
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks   = true,
+    linkcolor    = black,
+    citecolor    = black,
+    urlcolor     = blue,
+    bookmarksopen = true,
+}
+\usepackage[capitalise, nameinlink]{cleveref}
+
+% ---------- Bibliography ----------
+% Numeric style — standard for accelerator/physics writing (matches JACoW-style
+% citations already used in your Zotero library)
+\usepackage[backend=biber, style=numeric, sorting=none, maxbibnames=99]{biblatex}
+\addbibresource{MPhys-Dissertation.bib}   % <-- point to your exported Zotero .bib
+
+% ---------- Chapter/section styling ----------
+\usepackage{titlesec}
+% Example: numbered subsubsections deep enough for e.g. 3.4.3
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+
+% ---------- Front matter helpers ----------
+\usepackage{abstract}
+\usepackage{acronym}         % for the List of Abbreviations
+\usepackage{enumitem}
+
+% ---------- Misc ----------
+\usepackage{xcolor}
+\usepackage{csquotes}
+\usepackage[nottoc]{tocbibind}   % include bibliography in ToC without renumbering it
+
+% ============================================================
+\begin{document}
+
+% ----- Front matter -----
+\input{frontmatter/titlepage}
+\input{frontmatter/declaration}
+\input{frontmatter/abstract}
+\input{frontmatter/acknowledgements}
+\input{frontmatter/abbreviations}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+
+% ----- Main chapters -----
+\input{chapters/Ch1_intro.tex}
+\input{chapters/Ch2_ring_design.tex}
+\input{chapters/Ch3_beam_dynamics.tex}
+\input{chapters/Ch4_results_discussion.tex}
+\input{chapters/Ch5_conclusions.tex}
+
+% ----- Bibliography -----
+\clearpage
+\printbibliography[heading=bibintoc, title={References}]
+
+% ----- Appendices -----
+\appendix
+\chapter{Research-Year Interim Dissertation}
+\includepdf[pages=-]{Files/Literature_Review.pdf}
+
+\input{appendices/A_lit_review.tex}
+\input{appendices/B_more_plots.tex}
+\input{appendices/C_code_snippets.tex}
+
+\end{document}
