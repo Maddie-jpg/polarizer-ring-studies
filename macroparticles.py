@@ -15,6 +15,7 @@ import json
 import xtrack as xt
 import xpart as xp
 import xobjects as xo
+from scipy.stats import gaussian_kde
 
 
 # %%
@@ -374,6 +375,22 @@ def plot_twiss_with_particles(df, pos_col, ang_col, alpha, beta, emittance):
     plt.show()
 
 
+
+def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # Estimate density
+    xy = np.vstack([x, y])
+    z = gaussian_kde(xy)(xy)
+    z = z / z.max()
+
+    # Sort so densest points are plotted last (on top)
+    idx = z.argsort()
+    x, y, z = x[idx], y[idx], z[idx]
+
+    sc = ax.scatter(x, y, c=z, s=s, cmap=cmap, **kwargs)
+    return sc
 # %%
 
 emittance_x=CalcEmittanceAuto(df, 'x[mm]', 'xp[mrad]')
@@ -407,30 +424,30 @@ print(f"RMS Momentum Spread: {relative_spread} %")
 # %%
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
-#Horizontal Phase Space
-axes[0, 0].scatter(df['x[mm]'], df['xp[mrad]'], s=1, alpha=0.5)
+sc0 = density_scatter(axes[0, 0], df['x[mm]'], df['xp[mrad]'])
 axes[0, 0].set_xlabel('x [mm]')
 axes[0, 0].set_ylabel('xp [mrad]')
 axes[0, 0].set_title('Horizontal Phase Space')
+fig.colorbar(sc0, ax=axes[0, 0], label='Relative Density')
 
-#Vertical Phase Space
-axes[0, 1].scatter(df['y[mm]'], df['yp[mrad]'], s=1, alpha=0.5, color='orange')
+sc1 = density_scatter(axes[0, 1], df['y[mm]'], df['yp[mrad]'])
 axes[0, 1].set_xlabel('y [mm]')
 axes[0, 1].set_ylabel('yp [mrad]')
 axes[0, 1].set_title('Vertical Phase Space')
+fig.colorbar(sc1, ax=axes[0, 1], label='Relative Density')
 
-#Longitudinal Phase Space
 main_bunch = df[df['t[mm/c]'] < 278.540]
-axes[1, 0].scatter(main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'], s=1, alpha=0.5, color='green')
+sc2 = density_scatter(axes[1, 0], main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'])
 axes[1, 0].set_xlabel('t [mm/c]')
 axes[1, 0].set_ylabel('p [MeV/c]')
 axes[1, 0].set_title('Longitudinal Phase Space')
+fig.colorbar(sc2, ax=axes[1, 0], label='Relative Density')
 
-#Transverse Profile
-axes[1, 1].scatter(df['x[mm]'], df['y[mm]'], s=1, alpha=0.5, color='purple')
+sc3 = density_scatter(axes[1, 1], df['x[mm]'], df['y[mm]'])
 axes[1, 1].set_xlabel('x [mm]')
 axes[1, 1].set_ylabel('y [mm]')
 axes[1, 1].set_title('Transverse Real-Space Profile')
+fig.colorbar(sc3, ax=axes[1, 1], label='Relative Density')
 
 plt.savefig(f'Results/D{design}/Macroparticle Distribution/phase_space_plots.png')
 
@@ -447,33 +464,32 @@ p = df.loc[mask, 'p[MeV/c]']
 # Style
 plt.style.use('ggplot')
 
-# Figure layout
-fig = plt.figure(figsize=(8,8))
+# Figure layout — extra slim column (4) reserved for the colorbar
+fig = plt.figure(figsize=(8,9))
 gs = GridSpec(
-    4, 4,
-    hspace=0.05,
-    wspace=0.05
+    4, 6,
+    width_ratios=[1, 1, 1, 0.9, 0.3, 0.08],  # last real col + gap + colorbar
+    height_ratios=[0.8, 1, 1, 1], 
+    hspace=0.08,
+    wspace=0.15
 )
 
 # Axes
 ax_main  = fig.add_subplot(gs[1:4, 0:3])
 ax_top   = fig.add_subplot(gs[0, 0:3], sharex=ax_main)
 ax_right = fig.add_subplot(gs[1:4, 3], sharey=ax_main)
+cax      = fig.add_subplot(gs[1:4, 4])
 
 # =========================
-# Main longitudinal phase space
+# Main longitudinal phase space (density coloured)
 # =========================
-ax_main.scatter(
-    t,
-    p,
-    s=4,
-    alpha=0.5,
-    color='green'
-)
+sc = density_scatter(ax_main, t, p, s=4, alpha=0.8)
 
 ax_main.set_xlabel(r'$t$ [mm/c]')
 ax_main.set_ylabel(r'$p$ [MeV/c]')
-ax_main.set_title('Longitudinal Phase Space')
+#ax_main.set_title('Longitudinal Phase Space')
+
+fig.colorbar(sc, cax=cax, label='Relative Density')
 
 # =========================
 # Top histogram
@@ -484,7 +500,6 @@ ax_top.hist(
     color='steelblue',
     edgecolor='black'
 )
-
 ax_top.set_ylabel('Counts')
 ax_top.tick_params(axis='x', labelbottom=False)
 
@@ -498,11 +513,9 @@ ax_right.hist(
     color='darkorange',
     edgecolor='black'
 )
-
 ax_right.set_xlabel('Counts')
 ax_right.tick_params(axis='y', labelleft=False)
 
-plt.tight_layout()
 plt.savefig(f'Results/D{design}/Macroparticle Distribution/longitudinal_phase_space.png')
 plt.show()
 

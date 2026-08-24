@@ -39,7 +39,7 @@ def ChromCorrect(ring, pdr, variables, MakePlot=False):
 
         print(f"Starting iterative correction. Initial ddqx: {curr_x:.4f}, ddqy: {curr_y:.4f}")
 
-        for i in range(1):
+        for i in range(15):
             target_x = curr_x * 0.8
             target_y = curr_y * 0.8
             
@@ -540,14 +540,23 @@ def config_D1_C1_120(pdr, fringe_fields=True):
     period = pdr.lines['period']
     tt = ring.get_table()
 
-    pdr.vars({'l_sext': 0.1, 'k2XF2arc': 0.0, 'k2XD2arc': 0.0})
+    pdr.vars({'l_sext': 0.1, 'k2XF2arc': 0.0, 'k2XD2arc': 0.0, 'k2XF2arc2': 0.0, 'k2XD2arc2': 0.0})
     pdr.new('XF2arc', xt.Sextupole, length='l_sext', k2='k2XF2arc',
             edge_entry_active=fringe_fields, edge_exit_active=fringe_fields)
     pdr.new('XD2arc', xt.Sextupole, length='l_sext', k2='k2XD2arc',
             edge_entry_active=fringe_fields, edge_exit_active=fringe_fields)
+    pdr.new('XF2arc2', xt.Sextupole, length='l_sext', k2='k2XF2arc2',
+                edge_entry_active=fringe_fields, edge_exit_active=fringe_fields)
+    pdr.new('XD2arc2', xt.Sextupole, length='l_sext', k2='k2XD2arc2',
+                edge_entry_active=fringe_fields, edge_exit_active=fringe_fields)
 
     sextants = [('1R','+'), ('2R','+'), ('3R','+'),
                 ('1L','-'), ('2L','-'), ('3L','-')]
+
+    def _safe_alternating(lst, indices):
+        return [lst[i] for i in indices if i < len(lst)]
+
+
 
     for sext, sign in sextants:
         qda_list = _ordered_quads(tt, 'QDA', sext)   # 8 entries: 1..7, M8
@@ -555,18 +564,30 @@ def config_D1_C1_120(pdr, fringe_fields=True):
 
         # Extend to 7 consecutive quads starting at the FIRST position,
         # then shift that window up by one -> positions 1..7.
-        qda_window = qda_list[1:8]   # e.g. ['2','3','4','5','6','7','M8'] worth
-        qfa_window = qfa_list[1:8]   # for R: ['1',...,'6','M8']; for L: only 6 long (no 'C' to skip)
+        qda_window1 = _safe_alternating(qda_list, (0, 2, 4, 6))
+        qfa_window1 = _safe_alternating(qfa_list, (1, 3, 5, 7))
+        qda_window2 = _safe_alternating(qda_list, (1, 3, 5, 7))
+        qfa_window2 = _safe_alternating(qfa_list, (2, 4, 6))
 
-        for name in qda_window:
+        for name in qda_window1:
             cell = name.split(sext)[-1]
             ring.insert(pdr.new(f'XD2arc_{sext}{cell}', 'XD2arc'),
                         at=sign + '(l_drift+l_quad)/2', from_=name)
 
-        for name in qfa_window:
+        for name in qda_window2:
+                    cell = name.split(sext)[-1]
+                    ring.insert(pdr.new(f'XD2arc2_{sext}{cell}', 'XD2arc2'),
+                                at=sign + '(l_drift+l_quad)/2', from_=name)
+
+        for name in qfa_window1:
             cell = name.split(sext)[-1]
             ring.insert(pdr.new(f'XF2arc_{sext}{cell}', 'XF2arc'),
                         at=sign + '(l_drift+l_quad)/2', from_=name)
+
+        for name in qfa_window2:
+                    cell = name.split(sext)[-1]
+                    ring.insert(pdr.new(f'XF2arc2_{sext}{cell}', 'XF2arc2'),
+                                at=sign + '(l_drift+l_quad)/2', from_=name)
 
         tt_period = period.get_table()
 
@@ -574,28 +595,37 @@ def config_D1_C1_120(pdr, fringe_fields=True):
         qda_list = _ordered_quads_period(tt_period, 'QDA', side)   # 8: 1..7, M8
         qfa_list = _ordered_quads_period(tt_period, 'QFA', side)   # 8: CH,1..6,M8
 
-        qda_window = qda_list[1:8]
-        qfa_window = qfa_list[1:8]
+        qda_window1 = _safe_alternating(qda_list, (0, 2, 4, 6))
+        qfa_window1 = _safe_alternating(qfa_list, (1, 3, 5, 7))
+        qda_window2 = _safe_alternating(qda_list, (1, 3, 5, 7))
+        qfa_window2 = _safe_alternating(qfa_list, (2, 4, 6))   
 
-        for name in qda_window:
+        for name in qda_window1:
             cell = name.replace(f'QDA_P{side}', '').replace(f'QDA_MP{side}', 'M')
             period.insert(pdr.new(f'XD2arc_P{side}{cell}', 'XD2arc'),
                           at=sign + '(l_drift+l_quad)/2', from_=name)
 
-        for name in qfa_window:
+        for name in qda_window2:
+                    cell = name.replace(f'QDA_P{side}', '').replace(f'QDA_MP{side}', 'M')
+                    period.insert(pdr.new(f'XD2arc2_P{side}{cell}', 'XD2arc2'),
+                                  at=sign + '(l_drift+l_quad)/2', from_=name)    
+
+        for name in qfa_window1:
             cell = name.replace(f'QFA_P{side}', '').replace(f'QFA_MP{side}', 'M')
             period.insert(pdr.new(f'XF2arc_P{side}{cell}', 'XF2arc'),
                           at=sign + '(l_drift+l_quad)/2', from_=name)
 
+        for name in qfa_window2:
+                    cell = name.replace(f'QFA_P{side}', '').replace(f'QFA_MP{side}', 'M')
+                    period.insert(pdr.new(f'XF2arc2_P{side}{cell}', 'XF2arc2'),
+                                  at=sign + '(l_drift+l_quad)/2', from_=name)
+
     # Both boundary quads are genuine, independent elements in `period`
     # (unlike `ring`, where the equivalent quad is shared between two
     # sextants) -- so a 15th sextupole per side is unambiguous here.
-    period.insert(pdr.new('XF2arc_PRCH', 'XF2arc'),
-                  at='+(l_drift+l_quad)/2', from_='QFA_PRCH')
-    period.insert(pdr.new('XF2arc_PLCH', 'XF2arc'),
-                  at='-(l_drift+l_quad)/2', from_='QFA_PLCH')
+    
 
-    ChromCorrect(ring, pdr, ['k2XF2arc', 'k2XD2arc'])
+    ChromCorrect(ring, pdr, ['k2XF2arc', 'k2XD2arc','k2XF2arc2', 'k2XD2arc2'])
     return pdr
 
 def config_D1_C7(pdr):

@@ -28,7 +28,7 @@ SEED=123456789
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=constants.WP_D1_120,phase_advance=1/3)
+    pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=(18.56,19.17),phase_advance=1/3)
     sc.config_D1_C1_120(pdr)
     
 

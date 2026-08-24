@@ -25,9 +25,9 @@ xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
 design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
+config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
-phase=int(os.environ.get('PHASE',120))
+phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
 
 
@@ -62,7 +62,7 @@ current_wp = getattr(constants, variable_name)
 # %%
 E0 = constants.E0; VRF = constants.VRF
 
-U0 = (0.88463e-31)*E0**4*(2.*np.pi)/(6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']) )
+U0 = (0.88463e-31) * E0**4 * pdr['hBarc']
 
 period_sliced = period.select()
 period_sliced.cut_at_s( np.linspace(.05, period.get_length()-.05, int(period.get_length()/.05-.5)) )
@@ -189,7 +189,11 @@ def calc_damping_time_constant(m):
 
 # Initialize the table
 brho = ring.particle_ref.p0c[0] / 299792458.0 
-max_k0 = np.max(np.abs(ring_tw.k0l))
+length_arr = np.asarray(ring_tw.length)
+k0l_arr = np.asarray(ring_tw.k0l)
+
+mask = length_arr > 0         
+max_k0 = np.max(np.abs(k0l_arr[mask] / length_arr[mask]))
 max_field_tesla = max_k0 * brho
 # 1. Prepare your data in a list of lists
 data = [
@@ -203,7 +207,7 @@ data = [
     ["Circumference", f"{ring_tw.circumference:8.4f}", "m"],
     ["Revolution Time", f"{1e6*ring_tw.T_rev0:8.5f}", "us"],
     ["Energy Loss (Manual)", f"{U0*1e-3:10.2f}", "keV"],
-    ["Energy Loss (Twiss)", f"{ring_tw.eneloss_turn:10.2f}", "keV"],
+    ["Energy Loss (Twiss)", f"{ring_tw.eneloss_turn*1e-3:10.2f}", "keV"],
     ["Vertical Damping Time", f"{1/ring_tw.damping_constants_turns[1]:10.3f}", "turns"],
     ["Horizontal Tune (qx)", f"{ring_tw.qx:10.5f}", ""],
     ["Vertical Tune (qy)", f"{ring_tw.qy:10.5f}", ""],
@@ -533,17 +537,7 @@ parameters = xutil.log_parameters (None, operation_mode, particle_type=particle,
 context = xo.ContextCpu()         # For CPU
 context_tracking = xo.ContextCpu(omp_num_threads=0) # For CPU with activate multi-core CPU parallelization
 
-
-# ## Transfer lattice on context and compile tracking code
-# line.build_tracker(_context=context)
-
-# line.configure_radiation(model='mean')
-# line.compensate_radiation_energy_loss()
-
 tw = line.twiss(eneloss_and_damping=True)
-
-#xutil.update_reference_parameters_from_line (line, parameters, BS_scale_factor=0, update_type='all', max_bb_param=0)
-# xutil.correct_parameters_conflicts(parameters, update_study_parameters_from_reference=False)
 
 gamma0 = ring.particle_ref.gamma0[0]
 beta0 = ring.particle_ref.beta0[0]
@@ -554,7 +548,7 @@ n_emittancey = 1.420755089827341e-6 * gamma0 * beta0
 parameters['study_parameters'] = {
     'ini_cond_type' : 'grid_DA', # grid_DA, grid_MA, distribution_matched, distribution_injected
     'output_dir' : 'out',
-    'number_of_turns' : 2500,
+    'number_of_turns' : 5000,
     'number_of_particles' : 1000, 
     'inv1': 0, # np.arange(2)+1,
     'inv2': 0, # np.arange(2,2+3)+1,
@@ -568,11 +562,6 @@ parameters['study_parameters'] = {
     'covariance_dispertion_free': False
 }
 
-
-
-
-## Initial conditions
-#particles = xutil.generate_particle_distribution (line, parameters['study_parameters'], beambeam_strength_used=1, radiation_off=True)
 particles, grid_details = xutil.generate_particle_grid (line, parameters['study_parameters'])
 
 line.discard_tracker()
@@ -594,22 +583,6 @@ line.build_tracker(_context=context_tracking)
 line.track(particles, num_turns=parameters['study_parameters']['number_of_turns'], turn_by_turn_monitor=True, time=True, with_progress=10) #, freeze_longitudinal=True
 particles.sort(interleave_lost_particles=True)
 
-# dic_particles_all = xutil.tracking_data_process (tracking_data=line.record_last_track, 
-#                             monitor_twiss=ring_tw.rows[0], 
-#                             norm_emit_x=parameters['reference_parameters']['normalized_emittance_x'],
-#                             norm_emit_y=parameters['reference_parameters']['normalized_emittance_y'],
-#                             sigma_z=parameters['reference_parameters']['bunch_length'], 
-#                             sigma_delta=parameters['reference_parameters']['energy_spread'],
-#                             particle_id_to_use='all')
-# xutil.save_dict_to_h5(f'{output_dir}/dic_particles_all.h5', dic_particles_all)
-
-
-# liftime = my_xpf.particle_population_vs_turns (dic_particles_all['state'], T_rev0=tw.T_rev0)
-# my_xpf.phase_space_evolution_difference (dic_particles_all['zeta'][:,0], dic_particles_all['delta'][:,0], dic_particles_all['zeta'][:,-1], dic_particles_all['delta'][:,-1], x_axis_label=r'$z~[m]$', y_axis_label=r'$\delta$')
-# my_xpf.phase_space_evolution_difference (dic_particles_all['x'][:,0], dic_particles_all['px'][:,0], dic_particles_all['x'][:,-1], dic_particles_all['px'][:,-1], x_axis_label=r'$x~[m]$', y_axis_label=r'$px$')
-# my_xpf.emittances_vs_turns (dic_particles_all['emit_x'], dic_particles_all['emit_y'], dic_particles_all['emit_zeta'], reference_emit_x=ref_param['emittance_x'], reference_emit_y=ref_param['emittance_y'], reference_emit_z=ref_param['energy_spread']*ref_param['bunch_length'], log_y_axis=True)
-# my_xpf.coordinates_vs_turns (dic_particles_all['x_sigma'], dic_particles_all['px_sigma'], dic_particles_all['at_turn'], r'$x~[\sigma_x]$', r'$p_x~[\sigma_x]$', particle_id_list=dic_particles_all['particle_id_list'], full_init_cond=study_param['number_of_particles'])
-# my_xpf.MA_vs_turns(particles, grid_details['num_r_y_points'], grid_details['num_delta'], grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'])
 x_DA,y_DA,_,_=my_xpf.DA_vs_turns(particles, grid_details['num_r_y_points'], grid_details['num_theta_x_points'], grid_details['x_normalized'], grid_details['y_normalized'], grid_details['delta_init'],delta_plots=True)
 
 ax = plt.gca()
@@ -725,7 +698,7 @@ line.configure_radiation(model=None)
 parameters['study_parameters'] = {
     'ini_cond_type' : 'grid_MA', # grid_DA, grid_MA, distribution_matched, distribution_injected
     'output_dir' : 'out',
-    'number_of_turns' : 2500,
+    'number_of_turns' : 5000,
     'number_of_particles' : 1000, 
     'inv1': 0, # np.arange(2)+1,
     'inv2': 0, # np.arange(2,2+3)+1,
@@ -773,234 +746,191 @@ ax.set_ylim(None, 12)
 plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
+import numpy as np
+import matplotlib.pyplot as plt
+import xobjects as xo
+import LatticeBuild.misalignments_corrections as mc
+import xutil_DA_CC.xsuite_utilities as xutil
 
+context_tracking = xo.ContextCpu(omp_num_threads=0)
+misalignment_val = 0.25e-3
+
+
+if design == 1 and config == 1:
+    mc.insert_BPMs_all_as_markers(pdr)
+    mc.insert_correctors_var2(pdr)
+else:
+    mc.insert_BPMs_all_as_markers(pdr)
+    mc.insert_correctors(pdr)
+
+# ---- lightweight boundary extractors (logic copied from xsuite_plot_functions,
+#      but with plotting stripped out so nothing pops open/gets thrown away) ----
+
+def get_DA_boundary(particles, num_r_steps, num_theta_steps, x_norm, y_norm):
+    if isinstance(particles, dict):
+        max_turns = np.shape(particles['x'])[1] - 1
+        part_at_turn = np.nanmax(particles['at_turn'], axis=1)
+    else:
+        max_turns = np.max(particles.filter(particles.at_element == 0).at_turn)
+        part_at_turn = particles.at_turn
+
+    x_2d = x_norm.reshape(num_r_steps, num_theta_steps)
+    y_2d = y_norm.reshape(num_r_steps, num_theta_steps)
+    p_2d = part_at_turn.reshape(num_r_steps, num_theta_steps)
+
+    x_DA = np.full(num_theta_steps, np.nan)
+    y_DA = np.full(num_theta_steps, np.nan)
+    for jj in range(num_theta_steps):
+        for ii in range(num_r_steps):
+            if p_2d[ii, jj] != max_turns:
+                x_DA[jj], y_DA[jj] = x_2d[ii, jj], y_2d[ii, jj]
+                break
+
+    min_DA = np.nanmin(np.round(np.sqrt(x_DA**2 + y_DA**2), 1))
+    return x_DA, y_DA, min_DA
+
+
+def get_MA_boundary(particles, num_r_steps, num_delta_steps, x_norm, y_norm, delta_initial):
+    if isinstance(particles, dict):
+        max_turns = np.shape(particles['x'])[1] - 1
+        part_at_turn = np.nanmax(particles['at_turn'], axis=1)
+    else:
+        max_turns = np.max(particles.filter(particles.at_element == 0).at_turn)
+        part_at_turn = particles.at_turn
+
+    x_2d = x_norm.reshape(num_delta_steps, num_r_steps)
+    delta_2d = delta_initial.reshape(num_delta_steps, num_r_steps)
+    p_2d = part_at_turn.reshape(num_delta_steps, num_r_steps)
+
+    x_MA = np.full(num_delta_steps, np.nan)
+    delta_MA = np.full(num_delta_steps, np.nan)
+    for jj in range(num_delta_steps):
+        for ii in range(num_r_steps):
+            if p_2d[jj, ii] != max_turns:
+                x_MA[jj], delta_MA[jj] = x_2d[jj, ii], delta_2d[jj, ii]
+                break
+
+    min_MA = np.nanmin(np.round(np.sqrt(x_MA**2 + delta_MA**2), 1))
+    return x_MA, delta_MA, min_MA
+
+
+# ---- per-seed branch prep, mirrors prep_branch() in spin_tracking.py ----
+
+def prep_seed_line(base_line, seed, apply_correction):
+    seed_line = base_line.copy()
+    seed_line.configure_radiation(model='mean')
+    seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
+    seed_line = mc.misalignments(seed_line, misalignment_val, seed=seed)
+
+    if apply_correction:
+        tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True)
+        mc.misalignments_correctors(seed_line, 0.25e-3, seed + 1)
+        try:
+            mc.orbit_correction(seed_line, tw, threading=False, seed=seed)
+        except Exception as e:
+            print(f"  [seed {seed}] orbit_correction(threading=False) raised: {e}")
+            mc.orbit_correction(seed_line, tw, threading=True, seed=seed)
+
+    return seed_line
+
+
+def get_DA_for_seed(base_line, seed, apply_correction, study_params_DA):
+    seed_line = prep_seed_line(base_line, seed, apply_correction)
+    seed_line.discard_tracker()
+    seed_line.build_tracker(_context=context_tracking)
+    seed_line.configure_radiation(model='mean')
+
+    particles, grid_details = xutil.generate_particle_grid(seed_line, study_params_DA)
+    seed_line.track(particles, num_turns=study_params_DA['number_of_turns'],
+                     turn_by_turn_monitor=True, time=True, with_progress=10)
+    particles.sort(interleave_lost_particles=True)
+
+    return get_DA_boundary(particles, grid_details['num_r_y_points'],
+                            grid_details['num_theta_x_points'],
+                            grid_details['x_normalized'], grid_details['y_normalized'])
+
+
+def get_MA_for_seed(base_line, seed, apply_correction, study_params_MA):
+    seed_line = prep_seed_line(base_line, seed, apply_correction)
+    seed_line.discard_tracker()
+    seed_line.build_tracker(_context=context_tracking)
+    seed_line.configure_radiation(model='mean')
+
+    particles, grid_details = xutil.generate_particle_grid(seed_line, study_params_MA)
+    seed_line.track(particles, num_turns=study_params_MA['number_of_turns'],
+                     turn_by_turn_monitor=True, time=True, with_progress=10)
+    particles.sort(interleave_lost_particles=True)
+
+    return get_MA_boundary(particles, grid_details['num_r_y_points'], 51,
+                            grid_details['x_normalized'], grid_details['y_normalized'],
+                            grid_details['delta_init'])
+
+
+# ---- run: misaligned seeds first, then corrected seeds ----
+
+# ---- run: misaligned seeds first, then corrected seeds ----
+
+seeds = [111, 222, 333, 444, 555]
+colors = plt.cm.gist_rainbow(np.linspace(0, 0.95, len(seeds)))  # more spread than tab10
+
+study_params_DA = dict(parameters['study_parameters'])  # ini_cond_type='grid_DA', as in analysis.py
+study_params_MA = dict(study_params_DA); study_params_MA['ini_cond_type'] = 'grid_MA'
+
+fig_da_mis, ax_da_mis = plt.subplots(figsize=(8, 8))
+fig_da_cor, ax_da_cor = plt.subplots(figsize=(8, 8))
+fig_ma_mis, ax_ma_mis = plt.subplots(figsize=(8, 6))
+fig_ma_cor, ax_ma_cor = plt.subplots(figsize=(8, 6))
+
+# --- pass 1: misaligned ---
+for seed, c in zip(seeds, colors):
+    x_DA, y_DA, min_DA = get_DA_for_seed(ring, seed, apply_correction=False,
+                                          study_params_DA=study_params_DA)
+    ax_da_mis.plot(x_DA, y_DA, '-', color=c,
+                   label=f'seed {seed} (DA$_{{min}}$={min_DA:.1f}$\\sigma$)')
+
+    x_MA, delta_MA, min_MA = get_MA_for_seed(ring, seed, apply_correction=False,
+                                              study_params_MA=study_params_MA)
+    ax_ma_mis.plot(delta_MA * 100, x_MA, '-', color=c, label=f'seed {seed}')
+
+# --- pass 2: corrected ---
+for seed, c in zip(seeds, colors):
+    x_DA, y_DA, min_DA = get_DA_for_seed(ring, seed, apply_correction=True,
+                                          study_params_DA=study_params_DA)
+    ax_da_cor.plot(x_DA, y_DA, '-', color=c,
+                   label=f'seed {seed} (DA$_{{min}}$={min_DA:.1f}$\\sigma$)')
+
+    x_MA, delta_MA, min_MA = get_MA_for_seed(ring, seed, apply_correction=True,
+                                              study_params_MA=study_params_MA)
+    ax_ma_cor.plot(delta_MA * 100, x_MA, '-', color=c, label=f'seed {seed}')
+
+# ---- formatting + saving, one block per plot ----
+
+for ax, title in [(ax_da_mis, 'DA — misaligned seeds'), (ax_da_cor, 'DA — corrected seeds')]:
+    ax.set_xlabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
+    ax.set_ylabel(r'$\hat{y}$ [$\sqrt{\varepsilon_y}$]')
+    ax.set_xlim(-16, 16); ax.set_ylim(0, 20)
+    ax.set_title(title)
+    ax.legend(fontsize='x-small', loc='best', ncol=2)
+
+for ax, title in [(ax_ma_mis, 'MA — misaligned seeds'), (ax_ma_cor, 'MA — corrected seeds')]:
+    ax.set_xlabel(r'$\delta$ [%]')
+    ax.set_ylabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
+    ax.set_xlim(-5, 5)
+    ax.set_title(title)
+    ax.legend(fontsize='x-small', loc='best', ncol=2)
+
+fig_da_mis.tight_layout()
+fig_da_mis.savefig(f'{new_results_folder}/DA_overlay_misaligned.png')
+
+fig_da_cor.tight_layout()
+fig_da_cor.savefig(f'{new_results_folder}/DA_overlay_corrected.png')
+
+fig_ma_mis.tight_layout()
+fig_ma_mis.savefig(f'{new_results_folder}/MA_overlay_misaligned.png')
+
+fig_ma_cor.tight_layout()
+fig_ma_cor.savefig(f'{new_results_folder}/MA_overlay_corrected.png')
+# %%
 if pdf_run is True:
     pdf.close()
 
-# %%
-'''min_DAs=[]
-
-line.discard_tracker()
-line.build_tracker(_context=context_tracking)
-
-qx_vals=np.linspace(15.3,15.4,2)
-qy_vals=np.linspace(15.3,15.4,2)
-
-for qx_val in qx_vals:
-    for qy_val in qy_vals:
-
-        try:
-            lo2.matchingWP(qx_val,qy_val)
-            parameters['study_parameters'] = {
-            'ini_cond_type' : 'grid_DA', # grid_DA, grid_MA, distribution_matched, distribution_injected
-            'output_dir' : 'out',
-            'number_of_turns' : 100,
-            'number_of_particles' : 100, 
-            'inv1': 0, # np.arange(2)+1,
-            'inv2': 0, # np.arange(2,2+3)+1,
-            'start_element' : 'QD1_R1', # 'ca1.1','ip' #'rf400'
-            'ini_cond_nemittance_x':13000e-6,
-            'ini_cond_nemittance_y': 12000e-6,
-            'ini_cond_bunch_length': 4.8e-3,
-            'ini_cond_energy_spread': 2e-3,
-            'ini_cond_energy_offset': None,
-            'new_closed_orbit': None, # {'x': -x_co_inj_marker, 'px': None, 'y': None, 'py': None, 'zeta': None, 'delta': None}
-            'covariance_dispertion_free': False
-                }
-                ## Initial conditions
-                #particles = xutil.generate_particle_distribution (line, parameters['study_parameters'], beambeam_strength_used=1, radiation_off=True)
-
-            line.configure_radiation(model=None)
-            particles, grid_details = xutil.generate_particle_grid (line, parameters['study_parameters'])
-
-            ## Tracking studies
-            line.configure_radiation(model='mean')
-
-
-            ## Change context for multy CPU for tracking
-
-
-
-            # Use tracking
-            max_turns = parameters['study_parameters']['number_of_turns']
-            line.track(particles, num_turns=max_turns, turn_by_turn_monitor=True, time=True, with_progress=10) 
-            particles.sort(interleave_lost_particles=True)
-
-            if isinstance(particles, dict):
-                max_turns = np.shape(particles['x'])[1]-1 
-                part_at_turn = np.nanmax(particles['at_turn'],axis=1)
-            else:
-                max_turns = np.max(particles.filter(particles.at_element==0).at_turn) 
-                part_at_turn = particles.at_turn
-                
-            delta_plots=False
-            delta_initial=grid_details['delta_init']
-            x_norm=grid_details['x_normalized']
-            y_norm=grid_details['y_normalized']
-            num_r_steps=grid_details['num_r_y_points']
-            num_theta_steps=grid_details['num_theta_x_points']
-            
-            if not delta_plots and np.size(delta_initial) > 1:
-                closest_to_zero_delta = delta_initial[(np.abs(delta_initial - 0)).argmin()]
-                delta_index = np.where(delta_initial==closest_to_zero_delta)[0]
-                x_norm_1d = x_norm[delta_index]
-                y_norm_1d = y_norm[delta_index]
-                part_at_turn_1d = part_at_turn[delta_index]
-            else:
-                x_norm_1d = x_norm
-                y_norm_1d = y_norm      
-                part_at_turn_1d = part_at_turn
-
-            x_norm_2d = x_norm_1d.reshape(num_r_steps, num_theta_steps)
-            y_norm_2d = y_norm_1d.reshape(num_r_steps, num_theta_steps)
-            part_at_turn_2d = part_at_turn_1d.reshape(num_r_steps, num_theta_steps)
-            
-            x_DA = np.full(num_theta_steps, np.nan)
-            y_DA = np.full(num_theta_steps, np.nan)
-            
-            for jj in range(num_theta_steps):
-                for ii in range(num_r_steps):
-                    if part_at_turn_2d[ii,jj] != max_turns:
-                        x_DA[jj] = x_norm_2d[ii,jj]
-                        y_DA[jj] = y_norm_2d[ii,jj]
-                        break
-
-            min_DA = np.nanmin(np.round(np.sqrt(x_DA**2+y_DA**2),1)) 
-            where_min_DA = np.where(np.round(np.sqrt(x_DA**2+y_DA**2),1) == min_DA)[0]
-
-            min_DAs.append({
-                'qx': qx_val,
-                'qy': qy_val,
-                'min_da': min_DA
-            })
-            print(f"WP ({qx_val:.3f}, {qy_val:.3f}) computed successfully. DA: {min_DA}")
-            
-        except RuntimeError:
-            continue'''
-
-        
-
-
-# %%
-'''import pandas as pd
-%matplotlib widget
-df = pd.DataFrame(min_DAs)
-
-# 2. Pivot the data to create a 2D matrix (Qy rows, Qx columns)
-# If a specific tune pair crashed or has multiples, 'min' handles it gracefully
-heatmap_data = df.pivot_table(index='qy', columns='qx', values='min_da', aggfunc='min')
-
-# Sort index descendingly so higher vertical tunes are at the top of the plot
-heatmap_data = heatmap_data.sort_index(ascending=False)
-
-# 3. Define the spatial extent for boundary alignment
-qx_centers = heatmap_data.columns.values
-qy_centers = heatmap_data.index.values
-
-dx = (qx_centers[1] - qx_centers[0]) / 2.0 if len(qx_centers) > 1 else 0.05
-dy = (qy_centers[1] - qy_centers[0]) / 2.0 if len(qy_centers) > 1 else 0.05
-
-extent = [
-    qx_centers.min() - dx, qx_centers.max() + dx,
-    qy_centers.min() - dy, qy_centers.max() + dy
-]
-
-# 4. Generate the plot
-fig, ax = plt.subplots(figsize=(9, 8))
-
-# Using 'viridis' or 'jet'. 'inferno' works great for structural DA scans.
-cax = ax.imshow(heatmap_data.values, extent=extent, cmap='viridis', aspect='auto')
-
-# Labels and aesthetics
-ax.set_xlabel(r'Horizontal Tune ($q_x$)', fontsize=12)
-ax.set_ylabel(r'Vertical Tune ($q_y$)', fontsize=12)
-ax.set_title('Working Point Scan: Minimum Dynamic Aperture', fontsize=14, pad=15, fontweight='bold')
-
-# Set tick markers directly on your scanned tune steps
-ax.set_xticks(qx_vals)
-ax.set_yticks(qy_vals)
-plt.xticks(rotation=45)
-
-# Colorbar setup
-cbar = fig.colorbar(cax, ax=ax)
-cbar.set_label(r'Minimum DA [$\sigma$]', fontsize=12)
-
-ax.grid(True, which='both', linestyle='--', alpha=0.5, color='grey')
-
-plt.tight_layout()
-plt.show()'''
-
-# %%
-'''context = xo.ContextCpu(omp_num_threads=None)
-
-#  Simple test of tracking with synchrotron radiation - takes some time
-ring.configure_radiation(model='mean')
-ring_tw=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True)
-#ring_tw.plot()
-#print( ring_tw.keys() )
-print( f' Energy loss per turn from twiss {ring_tw.eneloss_turn:10.2f} and me {U0:10.2f}')
-print( 1/ring_tw.damping_constants_turns )
-print( 2*E0/ring_tw.eneloss_turn )
-
-npts = 200
-epsx, epsy, epsl = 1.0e-7, 1.0e-7, 1.0e-4  # starting with somewhat large emittances
-betxin, alfxin  = ring_tw.betx[0], ring_tw.alfx[0] 
-xin, pxin       = ring_tw.x[0], ring_tw.px[0]
-dxin, dpxin     = ring_tw.dx[0], ring_tw.dpx[0]
-betyin, alfyin  = ring_tw.bety[0], ring_tw.alfy[0] 
-yin, pyin       = ring_tw.y[0], ring_tw.py[0]   # should be zero for perfect case
-#epsx, epsl      = 2.0*ring_tw.eq_gemitt_x, 2.0*ring_tw.eq_gemitt_zeta
-betlin          = ring_tw.bets0
-zetain, deltain = ring_tw.zeta[0], ring_tw.delta[0]
-print( f'At reference location: D ={dxin:7.4f} m, Dp ={dpxin:7.4f},' +
-       f' betx ={betxin:7.4f} m, alfx ={alfxin:7.4f},' + 
-       f' betl ={betlin:7.4f} m ')
-
-normat = np.array([
-    [(epsx*betxin)**.5,         0,                 0,  0, 0, dxin*(epsl/betlin)**.5],
-    [-alfxin*(epsx/betxin)**.5, (epsx/betxin)**.5, 0,  0, 0, dpxin*(epsl/betlin)**.5],
-    [0,  0,  (epsx*betyin)**.5,         0,                 0, 0],
-    [0,  0,  -alfyin*(epsx/betyin)**.5, (epsx/betyin)**.5, 0, 0],
-    [0, 0, 0, 0, (epsl*betlin)**.5, 0                ],
-    [0, 0, 0, 0, 0,                 (epsl/betlin)**.5]               
-    ])
-
-parts = np.array([
-     [xin, pxin, yin, pyin, zetain, deltain] + normat@np.random.randn(6) 
-         for ind in range(npts) ]).T
-# quit()
-p2 = xt.Particles(kinetic_energy0 = 2860.e6, mass0 = xt.ELECTRON_MASS_EV,
-                  x    = parts[0], px   = parts[1],
-                  y    = parts[2], py   = parts[3],
-                  zeta = parts[4], delta = parts[5] )
-ring.configure_radiation(model='quantum')
-ring.track( p2, num_turns = 6100, turn_by_turn_monitor = True,
-            with_progress = True )
-
-data = ring.record_last_track
-trnplt = [1, 2000, 4000, 6000]
-#trnplt = range( len(data.x.T) ) # superimpose all turns, rendering is slowish
-fig = plt.figure( figsize=(14., 4.) )
-fig.suptitle( f'Phase Space Plots - particle survival {int(((p2.state + 1)/2).sum()):5d} out of {npts:5d}' )
-ax = fig.subplots(1, 3)
-fig.subplots_adjust( wspace=0.4 )
-ax[0].set_xlabel('x (mm)')
-ax[0].set_ylabel("x' (mrad)")
-ax[1].set_xlabel('y (mm)')
-ax[1].set_ylabel("y' (mrad)")
-ax[2].set_xlabel('z (mm)')
-ax[2].set_ylabel(r'rel. mom. offset ($10^{-3}$)')
-for ind in range( len(trnplt) ):  # data.x.T[ind] is nparray (behaviour of multiplication)!
-   print( f' ==> Plotting turn"{trnplt[ind]:5d}')
-   ax[0].scatter( 1000*(data.x.T[trnplt[ind]] - 1.*ring_tw.dx[0]*data.delta.T[trnplt[ind]]), 
-            1000*(data.px.T[trnplt[ind]] - 1.*ring_tw.dpx[0]*data.delta.T[trnplt[ind]]),
-            s=.4, c = f'C{ind:1d}')
-   ax[1].scatter( 1000*(data.y.T[trnplt[ind]]), 1000*(data.py.T[trnplt[ind]]), 
-            s=.2, c = f'C{ind:1d}' )
-   ax[2].scatter(1000*data.zeta.T[trnplt[ind]], 1000*data.delta.T[trnplt[ind]], 
-            s=.2, color=f'C{ind:1d}' )
-
-print( [pdr['RFCav_1'].lag, pdr['RFCav_1'].voltage] )
-
-print( f' Particle survival: {int(((p2.state + 1)/2).sum()):5d} out of {npts:5d}' )
-plt.savefig(f'config_D{n}/Particle_survival_{n}.png')'''
