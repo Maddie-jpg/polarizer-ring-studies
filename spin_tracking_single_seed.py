@@ -52,13 +52,13 @@ else:
 
 
 line = pdr.lines['ring']
-mc.misalignments_correctors(line,0.2e-3,SEED+1)
+mc.misalignments_correctors(line,0.25e-3,SEED+1)
 
 line.configure_spin('auto')
 
 base_line = line.copy()
 
-results_dir = f'Results/D{design}/C{config}/SingleSeed_{SEED}'
+results_dir = mf.results_dir(design, config, phase, changes=changes, metric='Spin', sub=f'Seed_{SEED}')
 os.makedirs(results_dir, exist_ok=True)
 
 scan = mf.spin_tune_resonance_scan(line, nu_min=5.5, nu_max=7.5, n_points=80,

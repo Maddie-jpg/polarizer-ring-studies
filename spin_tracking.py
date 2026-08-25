@@ -59,7 +59,7 @@ misalignment_val=0.25e-3
 
 base_line = line.copy()
 
-results_dir = f'Results/D{design}/C{config}/Comparison'
+results_dir = mf.results_dir(design, config, phase, changes=changes, metric='Spin', sub='Scan')
 os.makedirs(results_dir, exist_ok=True)
 results_path = f'{results_dir}/SpinTrackingResults_MisalignedVsCorrected.dat'
 

@@ -80,36 +80,34 @@ ring_tw=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=Tr
 # %%
 print(ring.element_names)
 
-new_results_folder=f'Results/D{design}/C{config}/{phase}deg_PhaseAdvance/{mode}'
 
-if not os.path.exists(new_results_folder):
-    os.makedirs(new_results_folder)
 # %%
 #%matplotlib widget
+folder=mf.results_dir(design, config, phase, changes=changes, metric='LatticeOptics', sub=None)
 if mode in ['perfect','misaligned']:
     ring.survey().plot()
-    plt.savefig(f'{new_results_folder}/ring_survey_{mode}.png')
+    plt.savefig(f'{folder}/ring_survey_{mode}.png')
 else:
     mf.survey_plot(ring)
     #plt.tight_layout()
-    plt.savefig(f'{new_results_folder}/ring_survey_{mode}.png')
+    plt.savefig(f'{folder}/ring_survey_{mode}.png')
 
 # %%
 print(ring.element_names)
 
 # %%
-
+folder1=mf.results_dir(design, config, phase, changes=changes, metric='LatticeOptics', sub=mode)
 ring_tw.plot(f'delta (zeta+0.00504) x y-0.001')
 ring_tw.plot(f'x y-0.001')
 plt.tight_layout()
-plt.savefig(f'{new_results_folder}/ring_closed_orbit_{mode}.png')
+plt.savefig(f'{folder1}/ring_closed_orbit_{mode}.png')
 
 
 # %%
 
 ring_tw.plot()
 plt.tight_layout()
-plt.savefig(f'{new_results_folder}/ring_twiss_{mode}.png')
+plt.savefig(f'{folder1}/ring_twiss_{mode}.png')
 
 
 # %% Straight-section zoom: optics and phase advances
@@ -150,7 +148,7 @@ ax1.legend(h1 + h2, l1 + l2, loc='best')
 ax1.set_xlim(s_lo, s_hi)
 ax1.set_title(f'Straight section optics ({mode})')
 plt.tight_layout()
-plt.savefig(f'{new_results_folder}/straight_optics_{mode}.png')
+plt.savefig(f'{folder1}/straight_optics_{mode}.png')
 
 # --- Plot 3: same zoom, optics + phase advances on a shared s-axis ---
 mux0 = ring_tw.mux[mask][0]
@@ -178,7 +176,7 @@ axm.grid(True, linestyle=':', alpha=0.6)
 axm.legend(loc='best')
 axo.set_xlim(s_lo, s_hi)
 plt.tight_layout()
-plt.savefig(f'{new_results_folder}/straight_phase_advance_{mode}.png')
+plt.savefig(f'{folder1}/straight_phase_advance_{mode}.png')
 
 
 def calc_damping_time_constant(m):
@@ -266,7 +264,7 @@ for (row, col), cell in table.get_celld().items():
     if row == 0:
         cell.set_text_props(weight='bold')
 
-plt.savefig(f'{new_results_folder}/table_{mode}.png')
+plt.savefig(f'{folder1}/table_{mode}.png')
 
 
 def integer_tune_ranges(qx, qy, half_width=1):
@@ -292,14 +290,14 @@ resonances.plot_resonance(fig)
 ax.set_xlim(Qx_range)
 ax.set_ylim(Qy_range)
 plt.tight_layout()
-plt.savefig(f'{new_results_folder}/WP_{mode}.png')
+plt.savefig(f'{folder1}/WP_{mode}.png')
 
 print('2nd order chrom x', ring_tw.ddqx)
 print('2nd order chrom y', ring_tw.ddqy)
 
 # %%
 
-mf.SpuckParsAus( ring, period_sliced.twiss(method='4d'), period,(0., 38.), (0., 12.), (0., 1.), .08,pdr, f"{new_results_folder}/Standard.png" )
+mf.SpuckParsAus( ring, period_sliced.twiss(method='4d'), period,(0., 38.), (0., 12.), (0., 1.), .08,pdr, f"{folder}/Standard.png" )
 
 # %%
 max_dp = 4e-2
@@ -342,7 +340,7 @@ plt.ylabel('Fractional tune')
 plt.legend()
 plt.grid(True)
 plt.xlim(-max_dp*1.05,max_dp*1.05)
-plt.savefig(f'{new_results_folder}/momentum_deviation{current_wp}_{mode}.png')
+plt.savefig(f'{folder1}/momentum_deviation{current_wp}_{mode}.png')
 
 
 
@@ -362,7 +360,7 @@ resonances.plot_resonance(fig)
 ax.set_xlim(Qx_range)
 ax.set_ylim(Qy_range)
 plt.tight_layout()
-plt.savefig(f'{new_results_folder}/momentum_dev_working_point{current_wp}_{mode}.png')
+plt.savefig(f'{folder1}/momentum_dev_working_point{current_wp}_{mode}.png')
 
 
 
@@ -487,7 +485,7 @@ if fp0 is not None:
     ax.grid(alpha=0.2)
 
     plt.tight_layout()
-    plt.savefig(f'{new_results_folder}/momentum_dev_working_point_{mode}.png', dpi=200)
+    plt.savefig(f'{folder1}/momentum_dev_working_point_{mode}.png', dpi=200)
     plt.show()
 else:
     print("Could not generate a stable footprint even at 1 sigma.")
@@ -517,7 +515,7 @@ except NameError:
 
 
 mf.plot_dangerous_resonances(ring, ring_tw.qx, ring_tw.qy, max_order=(1,2,3,4,5), tune_range=0.1)
-plt.savefig(f'{new_results_folder}/dangerous_resonances_{mode}.png')
+plt.savefig(f'{folder1}/dangerous_resonances_{mode}.png')
 
 # %%
 
@@ -587,14 +585,15 @@ x_DA,y_DA,_,_=my_xpf.DA_vs_turns(particles, grid_details['num_r_y_points'], grid
 
 ax = plt.gca()
 
+folder2=mf.results_dir(design, config, phase, changes=changes, metric='DA_MA', sub=None)
 
-plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{folder2}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
 
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
 ax.set_xlim(-15, 15)
 ax.set_ylim(None, 12)
-plt.savefig(f"{new_results_folder}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{folder2}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
 #%matplotlib widget
@@ -737,13 +736,13 @@ my_xpf.MA_vs_turns(particles, grid_details['num_r_y_points'], 51, grid_details['
 
 ax = plt.gca()
 
-plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{folder2}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
 
 ax.relim(); ax.autoscale_view()          
 (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
 ax.set_xlim(-7, 7)
 ax.set_ylim(None, 12)
-plt.savefig(f"{new_results_folder}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{folder2}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
 # %%
 import numpy as np
@@ -920,16 +919,16 @@ for ax, title in [(ax_ma_mis, 'MA — misaligned seeds'), (ax_ma_cor, 'MA — co
     ax.legend(fontsize='x-small', loc='best', ncol=2)
 
 fig_da_mis.tight_layout()
-fig_da_mis.savefig(f'{new_results_folder}/DA_overlay_misaligned.png')
+fig_da_mis.savefig(f'{folder2}/DA_overlay_misaligned.png')
 
 fig_da_cor.tight_layout()
-fig_da_cor.savefig(f'{new_results_folder}/DA_overlay_corrected.png')
+fig_da_cor.savefig(f'{folder2}/DA_overlay_corrected.png')
 
 fig_ma_mis.tight_layout()
-fig_ma_mis.savefig(f'{new_results_folder}/MA_overlay_misaligned.png')
+fig_ma_mis.savefig(f'{folder2}/MA_overlay_misaligned.png')
 
 fig_ma_cor.tight_layout()
-fig_ma_cor.savefig(f'{new_results_folder}/MA_overlay_corrected.png')
+fig_ma_cor.savefig(f'{folder2}/MA_overlay_corrected.png')
 # %%
 if pdf_run is True:
     pdf.close()

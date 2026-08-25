@@ -14,6 +14,17 @@ import csv
 
 pdr=xt.Environment()
 
+def results_dir(design, config, phase, changes=None, metric=None, sub=None,sub2=None):
+    base = f'Results/D{design}/C{config}/{phase}deg' + (f'_{changes}' if changes else '')
+    if metric:
+        base = f'{base}/{metric}'
+    if sub:
+        base = f'{base}/{sub}'
+    if sub2:
+        base = f'{base}/{sub2}'
+    os.makedirs(base, exist_ok=True)
+    return base
+
 #-----------------------------------
 # FUNCTIONS FOR analysis.py SCRIPT
 #-----------------------------------

@@ -16,6 +16,7 @@ import xtrack as xt
 import xpart as xp
 import xobjects as xo
 from scipy.stats import gaussian_kde
+import my_functions as mf
 
 
 # %%
@@ -449,7 +450,8 @@ axes[1, 1].set_ylabel('y [mm]')
 axes[1, 1].set_title('Transverse Real-Space Profile')
 fig.colorbar(sc3, ax=axes[1, 1], label='Relative Density')
 
-plt.savefig(f'Results/D{design}/Macroparticle Distribution/phase_space_plots.png')
+folder=mf.results_dir(design, config, phase, changes=changes, metric='InjectionEfficiency', sub='BeamSource')
+plt.savefig(f'{folder}/phase_space_plots.png')
 
 # %%
 from matplotlib.gridspec import GridSpec
@@ -516,7 +518,7 @@ ax_right.hist(
 ax_right.set_xlabel('Counts')
 ax_right.tick_params(axis='y', labelleft=False)
 
-plt.savefig(f'Results/D{design}/Macroparticle Distribution/longitudinal_phase_space.png')
+plt.savefig(f'{folder}/longitudinal_phase_space.png')
 plt.show()
 
 # %%
@@ -551,11 +553,13 @@ beam_results = {
     }
 }
 
-with open(f'Results/D{design}/Macroparticle Distribution/TwissResults.json', 'w') as f:
+with open(f'{folder}/TwissResults.json', 'w') as f:
     json.dump(beam_results, f, indent=4)
 
 
 # %%
+
+
 if changes is not None:
     pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
 else:
@@ -622,7 +626,7 @@ axes[1, 1].set_xlabel(r"$\zeta_y$")
 axes[1, 1].set_ylabel(r"$\zeta'_y$")
 plt.xlabel
 plt.tight_layout()
-plt.savefig(f'Results/D{design}/Macroparticle Distribution/twiss_ellipses.png')
+plt.savefig(f'{folder}/twiss_ellipses.png')
 plt.show()
 
 
@@ -710,14 +714,9 @@ ax[0].legend(fontsize='small')
 
 
 # %%
+folder2=mf.results_dir(design, config, phase, changes=changes, metric='InjectionEfficiency', sub=mode,sub2=f'MPD-{int(p0c_reference/1e6)}MeV')
 
-new_folder=f'Results/D{design}/C{config}/{mode}/MPD-{int(p0c_reference/1e6)}MeV'
-
-if not os.path.exists(new_folder):
-    os.makedirs(new_folder)
-
-
-plt.savefig(f'{new_folder}/injection_tracking_evolution_{rand_num}_{p0c_reference/1e6}MeV.png')
+plt.savefig(f'{folder2}/injection_tracking_evolution_{rand_num}_{p0c_reference/1e6}MeV.png')
 
 # %%
 
@@ -731,7 +730,7 @@ compressor_params = {
         "Phase_deb": Phasdeb
     }
 
-with open(f'{new_folder}/CompressorParams.json', 'w') as f:
+with open(f'{folder}/CompressorParams.json', 'w') as f:
     json.dump(compressor_params, f, indent=4)
 
 
@@ -853,7 +852,7 @@ for row, turn in enumerate(turns_to_plot):
     
 
 fig.suptitle(f'Phase Space Evolution at {p0c_reference/1e6:.2f} MeV', fontsize=16, y=0.92)
-plt.savefig(f'{new_folder}/initial_turns_{rand_num}_{int(p0c_reference/1e6)} MeV.png')
+plt.savefig(f'{folder2}/initial_turns_{rand_num}_{int(p0c_reference/1e6)} MeV.png')
 plt.show()
 
 # %%
@@ -873,7 +872,7 @@ plt.legend()
 
 
 # 3. Save the plot
-plt.savefig(f'{new_folder}/survival_vs_turns_{int(p0c_reference/1e6)}MeV.png', bbox_inches='tight')
+plt.savefig(f'{folder2}/survival_vs_turns_{int(p0c_reference/1e6)}MeV.png', bbox_inches='tight')
 plt.show()
 
 # Print final efficiency
@@ -931,12 +930,13 @@ plt.plot(energy_range_mev, efficiency_results, 'o-', color='teal', linewidth=2)
 plt.axvline(best_energy, color='red', linestyle='--', label=f'Best: {best_energy:.3f} MeV')
 plt.axvline(p0c_reference/1e6, color='blue', linestyle='--', label=f'Avg: {p0c_reference/1e6:.3f} MeV')
 
+folder3=mf.results_dir(design, config, phase, changes=changes, metric='InjectionEfficiency', sub=mode)
 plt.title('Injection Efficiency vs. Beam Energy', fontsize=14)
 plt.xlabel('Energy [MeV]', fontsize=12)
 plt.ylabel('Survival Efficiency [%]', fontsize=12)
 plt.grid(True, alpha=0.3)
 plt.legend()
-plt.savefig(f'Results/D{design}/C{config}/{mode}/MPD_energy_scan.png')
+plt.savefig(f'{folder3}/MPD_energy_scan.png')
 plt.show()
 
 print(f"\nThe best injection efficiency is at {best_energy:.3f} MeV.")
