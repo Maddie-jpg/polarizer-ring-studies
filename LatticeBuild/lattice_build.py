@@ -30,7 +30,8 @@ if mode == 'perfect':
     #Linear optics - uncomment desired optics
     pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=(18.56,19.17),phase_advance=1/3)
     sc.config_D1_C1_120(pdr)
-    
+    '''pdr=lo.two_fold_racetrack_3straight(fringe_fields=True,matched=True,WP=(13.7,13.275),phase_advance=0.25)
+    sc.config_D2_C4(pdr)'''
 
 
 #Misalignments

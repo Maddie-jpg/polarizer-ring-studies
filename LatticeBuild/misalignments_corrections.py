@@ -2,46 +2,12 @@ import xtrack as xt
 import numpy as np
 
 def get_safe_insertion(ring, prefix, elem, sign, default_offset):
-    """
-    default_offset is kept for backward compatibility (existing callers
-    still pass it) but is no longer used to compute the placement -- see
-    below for why.
-
-    Why: default_offset is built by the caller from a generic drift_map
-    (e.g. prefix -> 'l_tripl'), which assumes a specific nominal drift
-    length for that quad TYPE. That assumption can be wrong at specific
-    locations -- e.g. triplet quads that sit at an IP/symmetry boundary,
-    where the 'L1' quad of one sextant and the 'R1' quad of a DIFFERENT
-    sextant share a much shorter drift than the generic 'l_tripl' value
-    implies. When that happens, is_open_drift correctly identifies a real
-    Drift-class neighbor, but centering using the caller's oversized
-    assumed offset overshoots straight through that drift and into
-    whatever quad sits beyond it -- with no exception raised (see
-    insert_correctors' safe_insert docstring). This showed up as
-    corrector insertions for one triplet quad silently damaging an
-    unrelated triplet quad elsewhere in the ring.
-
-    Fix: measure the actual neighboring element's length directly and use
-    that to compute the centering offset, and explicitly check the kicker
-    (length l_kick) actually fits inside it before treating that side as
-    usable. If it doesn't fit, this falls through exactly like the
-    already-existing "neither side is a plain open drift" case.
-    """
+    
     ref_element = prefix + elem
     names = ring.element_names
 
     if ref_element not in names:
-        # This should not legitimately happen: callers only ever pass
-        # ref_element values discovered by scanning ring.element_names in
-        # the first place (see elems_for_prefix / qy_ring_list etc). If
-        # we get here, ref_element existed when that scan ran but is gone
-        # NOW -- almost certainly because an earlier insertion in the same
-        # call silently sliced through and removed it. Line.insert() does
-        # this with no exception of its own (see cut_at_s + the
-        # remove-overlap logic), so failing silently here would surface as
-        # a confusing deep ValueError from xtrack several frames down,
-        # pointing at the wrong place. Fail loudly here instead, at the
-        # actual missing element.
+
         try:
             l_kick_val = ring.vars['l_kick']._value
         except Exception:
@@ -445,22 +411,71 @@ def insert_correctors_var2(pdr):
         'QFA_3RC': 'l_drift-l_sext',
     }
 
-    #vertical correctors
-    qy_ring_list = (
-    # Standard Arc Defocusing Quads (R1-R7 and L1-L7)
-    [[el, '-', 'QDA_'] for el in ['1R1','1R2','1R3','1R4','1R5','1R6','1R7','2R1','2R2','2R3','2R4','2R5','2R6','2R7','3R1','3R2','3R3','3R4','3R5','3R6','3R7']] +
-    [[el, '+', 'QDA_'] for el in ['1L1','1L2','1L3','1L4','1L5','1L6','1L7','2L1','2L2','2L3','2L4','2L5','2L6','2L7','3L1','3L2','3L3','3L4','3L5','3L6','3L7']] +
-    # Matching and DS Quads
-    [[el, '-', 'QDA_M'] for el in ['1R8','2R8','3R8']] +
-    [[el, '+', 'QDA_M'] for el in ['1L8','2L8','3L8']] +
-    [[el, '-', 'QDDoub_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QDDoub_'] for el in ['1L','2L','3L']] +
-    [[el, '-', 'QDDS_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QDDS_'] for el in ['1L','2L','3L']] +
-    # Interaction Region Triplets (Adding missing R side)
-    [[el, '-', 'QDTrip_'] for el in ['1R1','2R1','3R1']] +
-    [[el, '+', 'QDTrip_'] for el in ['1L1','2L1','3L1']] 
-)
+    # ------------------------------------------------------------------
+    # Build corrector target lists by DISCOVERING the quads actually in the
+    # ring, instead of hardcoding cell numbers. Hardcoded lists broke across
+    # designs (e.g. this one has QFA_1R1..1R6 + 1RC and NO 1R0, so the old
+    # '1R0' entry referenced a nonexistent element). Discovery adapts to
+    # whatever cell numbering / sector count a given lattice actually uses.
+    #
+    # sign convention (unchanged): R-side -> '-', L-side -> '+',
+    # centre quads (suffix ending 'C' or 'CH') -> '+'.
+    # ------------------------------------------------------------------
+    all_names = list(ring.element_names)
+
+    # longest-prefix match so 'QDA_' doesn't swallow 'QDA_M...', etc.
+    known_prefixes = ['QDA_M', 'QFA_M', 'QDDS_', 'QFDS_', 'QDDoub_',
+                      'QFDoub_', 'QDTrip_', 'QFTripC_', 'QDA_', 'QFA_']
+
+    def suffixes_for(prefix):
+        """All element-name suffixes for `prefix`, excluding names that
+        belong to a longer known prefix. Skips already-sliced pieces."""
+        longer = [p for p in known_prefixes if p != prefix and p.startswith(prefix)]
+        out = []
+        for n in all_names:
+            if not n.startswith(prefix):
+                continue
+            if any(n.startswith(lp) for lp in longer):
+                continue
+            suf = n[len(prefix):]
+            # skip slice artefacts / sub-elements (e.g. '..0', '_entry')
+            if '..' in suf or suf.endswith('_entry') or suf.endswith('_exit') \
+               or 'entry_map' in suf or 'exit_map' in suf:
+                continue
+            out.append(suf)
+        return sorted(set(out))
+
+    def sign_for(suffix):
+        s = suffix.upper()
+        if s.endswith('C') or s.endswith('CH'):   # centre quad
+            return '+'
+        if 'R' in s:
+            return '-'
+        if 'L' in s:
+            return '+'
+        return None   # can't determine -> skip, reported below
+
+    def build_list(prefixes):
+        out, skipped = [], []
+        for prefix in prefixes:
+            for suf in suffixes_for(prefix):
+                sg = sign_for(suf)
+                if sg is None:
+                    skipped.append(prefix + suf)
+                    continue
+                out.append([suf, sg, prefix])
+        return out, skipped
+
+    # vertical correctors go on the DEFOCUSING (QD*) quads
+    qy_prefixes = ['QDA_', 'QDA_M', 'QDDoub_', 'QDDS_', 'QDTrip_']
+    # horizontal correctors go on the FOCUSING (QF*) quads
+    qx_prefixes = ['QFA_', 'QFA_M', 'QFDoub_', 'QFDS_', 'QFTripC_']
+
+    qy_ring_list, qy_skipped = build_list(qy_prefixes)
+    qx_ring_list, qx_skipped = build_list(qx_prefixes)
+    if qy_skipped or qx_skipped:
+        print(f"insert_correctors_var2: could not infer sign for "
+              f"{qy_skipped + qx_skipped} -- skipped.")
 
     for elem, sign, prefix in qy_ring_list:
         current_drift = drift_map.get(prefix, 'l_drift')
@@ -482,25 +497,7 @@ def insert_correctors_var2(pdr):
                     at=final_offset, from_=from_elem, from_anchor=anchor)
 
 
-    # horizontal correctors
-    qx_ring_list = (
-    # QFA Arc body (Added R0/L0 and R1-R5)
-    [[el, '-', 'QFA_'] for el in ['1R0','2R0','3R0', '1R1','1R2','1R3','1R4','1R5','2R1','2R2','2R3','2R4','2R5','3R1','3R2','3R3','3R4','3R5']] +
-    [[el, '+', 'QFA_'] for el in ['1L0','2L0','3L0', '1L1','1L2','1L3','1L4','1L5','2L1','2L2','2L3','2L4','2L5','3L1','3L2','3L3','3L4','3L5']] +
-    # QFA Center Quads (Added R side and corrected L side with 'H' suffix to match ring names)
-    [[el, '+', 'QFA_'] for el in ['1RC','2RC','3RC']] +
-    #[[el, '+', 'QFA_'] for el in ['1LCH','2LCH','3LCH']] +
-    # Matching and DS Quads
-    [[el, '-', 'QFA_M'] for el in ['1R8','2R8','3R8']] +
-    [[el, '+', 'QFA_M'] for el in ['1L8','2L8','3L8']] +
-    [[el, '-', 'QFDoub_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QFDoub_'] for el in ['1L','2L','3L']] +
-    [[el, '-', 'QFDS_'] for el in ['1R','2R','3R']] +
-    [[el, '+', 'QFDS_'] for el in ['1L','2L','3L']] +
-    #[[el, '-', 'QFTripC_'] for el in ['1R2','2R2','3R2']] +
-    [[el, '+', 'QFTripC_'] for el in ['1L2','2L2','3L2']]
-)
-    
+    # horizontal correctors (qx_ring_list built dynamically above)
     for elem, sign, prefix in qx_ring_list:
         full_name = prefix + elem
         h_name = f'hk_ring_{elem}'
@@ -658,6 +655,3 @@ def bpm_reading_errors(bpm_names, sigma, rng, cut=2.5):
         }
         for name in bpm_names
     }
-
-
-

@@ -114,21 +114,24 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     return axt
 
 # Routine generating graphical and text output describing the ring
-def SpuckParsAus(line, acc_tw, acc, lims, limy1, limy2, scK1, pdr, grname='NoGraph'):
+def SpuckParsAus(line, acc_tw, acc, lims, limy1, limy2, scK1, pdr, grname='NoGraph', n_periods=None):
 
-    element_names = line.element_names
-    sectors = set()
-    for name in element_names:
-        # Looking for structural segment identifiers e.g. '_1R', '_2R', '_3L'
-        if "_" in name:
-            parts = name.split("_")[-1]
-            if len(parts) >= 2 and parts[0].isdigit() and parts[1] in ["R", "L"]:
-                sectors.add(parts[0])
+    if n_periods is not None:
+        N_c = n_periods
+    else:
+        element_names = line.element_names
+        sectors = set()
+        for name in element_names:
+            # Looking for structural segment identifiers e.g. '_1R', '_2R', '_3L'
+            if "_" in name:
+                parts = name.split("_")[-1]
+                if len(parts) >= 2 and parts[0].isdigit() and parts[1] in ["R", "L"]:
+                    sectors.add(parts[0])
 
-    N_c = len(sectors) if len(sectors) > 0 else 1
-    # Fallback default if your specific layout operates on a hardcoded sector configuration:
-    if N_c == 1:
-        N_c = 2
+        N_c = len(sectors) if len(sectors) > 0 else 1
+        # Fallback default if your specific layout operates on a hardcoded sector configuration:
+        if N_c == 1:
+            N_c = 2
 
     axt = addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1)
     axt.text(0.0, .7, f'C ={N_c*acc_tw.circumference:8.4f} m', horizontalalignment='left')

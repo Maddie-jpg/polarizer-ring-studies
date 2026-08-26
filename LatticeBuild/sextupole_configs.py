@@ -960,9 +960,10 @@ def config_D2_C1(pdr):
     period = pdr.lines['period']
     n_cells = pdr.vars['N_cells_S']._value 
 
-    pdr.vars({'l_sext': 0.1, 'k2XF2arc': 0.00, 'k2XD2arc': 0.00})  
-    pdr.new('XF2arc', xt.Sextupole, length='l_sext', k2='k2XF2arc', edge_entry_active=True, edge_exit_active=True)
-    pdr.new('XD2arc', xt.Sextupole, length='l_sext', k2='k2XD2arc', edge_entry_active=True, edge_exit_active=True)
+    pdr.vars( {'l_sext':0.1, 'k2XF2arc': 0.00, 'k2XD2arc': 0.00} ) 
+    pdr.new('XF2arc',  xt.Sextupole, length='l_sext',    k2='k2XF2arc' , edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XD2arc' , edge_entry_active=True, edge_exit_active=True)
+    
 
     # Correct dynamic indexing for N_cells_S = 10:
     # Standard FODO cells: 1 -> 8
@@ -1167,4 +1168,124 @@ def config_D2_C3(pdr):
 
     return pdr
         
-    
+
+def config_D2_C4(pdr):
+
+    ring = pdr.lines['ring']
+    period = pdr.lines['period']
+    n_cells = pdr.vars['N_cells_S']._value
+
+    # --- Four families: two focusing, two defocusing ---
+    pdr.vars({'l_sext': 0.1,
+              'k2XF2arc':  0.00, 'k2XD2arc':  0.00,
+              'k2XF2arc2': 0.00, 'k2XD2arc2': 0.00})
+    pdr.new('XF2arc',  xt.Sextupole, length='l_sext', k2='k2XF2arc',
+            edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc',  xt.Sextupole, length='l_sext', k2='k2XD2arc',
+            edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XF2arc2', xt.Sextupole, length='l_sext', k2='k2XF2arc2',
+            edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc2', xt.Sextupole, length='l_sext', k2='k2XD2arc2',
+            edge_entry_active=True, edge_exit_active=True)
+
+    # Family choice by cell-number parity (by CELL NUMBER, so e.g. 1R3 and
+    # 2L3 share a family -> symmetric correction across sectors).
+    def xf_fam(cell):
+        return 'XF2arc' if (int(cell) % 2 == 1) else 'XF2arc2'
+
+    def xd_fam(cell):
+        return 'XD2arc' if (int(cell) % 2 == 1) else 'XD2arc2'
+
+    # Families for the center / half-quad entries (no cell number -> pick one).
+    CENTER_XF = 'XF2arc'   # e.g. for '1RC', '2RC', 'PRCH', 'PLCH'
+
+    # Correct dynamic indexing for N_cells_S = 10:
+    sda_mid_cells   = [str(i) for i in range(1, n_cells)]       # 1 .. 9
+    sda_last_cell   = str(n_cells)                              # 10
+    sfa_mid_cells   = [str(i) for i in range(1, n_cells - 1)]   # 1 .. 8
+    sfa_match_cells = [str(n_cells - 1)]                        # 9
+
+    # ------------------------------------------------------------------
+    # Right-handed sectors (standard processing orientation, '+')
+    # ------------------------------------------------------------------
+    for prefix in ['1R', '2R']:
+        for cell in sda_mid_cells:
+            ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', xd_fam(cell)),
+                        at='+(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
+        ring.insert(pdr.new(f'XD2arc_{prefix}{sda_last_cell}', xd_fam(sda_last_cell)),
+                    at='+(l_drift+l_quad)/2', from_=f'QDA_M{prefix}{sda_last_cell}')
+
+        for cell in sfa_mid_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', xf_fam(cell)),
+                        at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
+        for cell in sfa_match_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', xf_fam(cell)),
+                        at='+(l_drift+l_quad)/2', from_=f'QFA_M{prefix}{cell}')
+
+    # ------------------------------------------------------------------
+    # Left-handed sectors (reversed structural orientation, '-')
+    # ------------------------------------------------------------------
+    for prefix in ['2L', '1L']:
+        for cell in sda_mid_cells:
+            ring.insert(pdr.new(f'XD2arc_{prefix}{cell}', xd_fam(cell)),
+                        at='-(l_drift+l_quad)/2', from_=f'QDA_{prefix}{cell}')
+        ring.insert(pdr.new(f'XD2arc_{prefix}{sda_last_cell}', xd_fam(sda_last_cell)),
+                    at='-(l_drift+l_quad)/2', from_=f'QDA_M{prefix}{sda_last_cell}')
+
+        for cell in sfa_mid_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', xf_fam(cell)),
+                        at='-(l_drift+l_quad)/2', from_=f'QFA_{prefix}{cell}')
+        for cell in sfa_match_cells:
+            ring.insert(pdr.new(f'XF2arc_{prefix}{cell}', xf_fam(cell)),
+                        at='-(l_drift+l_quad)/2', from_=f'QFA_M{prefix}{cell}')
+
+    # ------------------------------------------------------------------
+    # Second focusing entries (center) -- no cell number
+    # ------------------------------------------------------------------
+    for prefix in ['1RC', '2RC']:
+        ring.insert(pdr.new(f'XF2arc_{prefix}', CENTER_XF),
+                    at='+(l_drift+l_quad)/2', from_=f'QFA_{prefix}')
+
+    # ------------------------------------------------------------------
+    # Period line -- Symmetric Right Segment ('+')
+    # ------------------------------------------------------------------
+    for cell in sda_mid_cells:
+        period.insert(pdr.new(f'XD2arc_PR{cell}', xd_fam(cell)),
+                      at='+(l_drift+l_quad)/2', from_=f'QDA_PR{cell}')
+    period.insert(pdr.new(f'XD2arc_PR{sda_last_cell}', xd_fam(sda_last_cell)),
+                  at='+(l_drift+l_quad)/2', from_=f'QDA_MPR{sda_last_cell}')
+
+    for cell in sfa_mid_cells:
+        period.insert(pdr.new(f'XF2arc_PR{cell}', xf_fam(cell)),
+                      at='+(l_drift+l_quad)/2', from_=f'QFA_PR{cell}')
+    for cell in sfa_match_cells:
+        period.insert(pdr.new(f'XF2arc_PR{cell}', xf_fam(cell)),
+                      at='+(l_drift+l_quad)/2', from_=f'QFA_MPR{cell}')
+
+    # ------------------------------------------------------------------
+    # Period line -- Symmetric Inverted Left Segment ('-')
+    # ------------------------------------------------------------------
+    for cell in sda_mid_cells:
+        period.insert(pdr.new(f'XD2arc_PL{cell}', xd_fam(cell)),
+                      at='-(l_drift+l_quad)/2', from_=f'QDA_PL{cell}')
+    period.insert(pdr.new(f'XD2arc_PL{sda_last_cell}', xd_fam(sda_last_cell)),
+                  at='-(l_drift+l_quad)/2', from_=f'QDA_MPL{sda_last_cell}')
+
+    for cell in sfa_mid_cells:
+        period.insert(pdr.new(f'XF2arc_PL{cell}', xf_fam(cell)),
+                      at='-(l_drift+l_quad)/2', from_=f'QFA_PL{cell}')
+    for cell in sfa_match_cells:
+        period.insert(pdr.new(f'XF2arc_PL{cell}', xf_fam(cell)),
+                      at='-(l_drift+l_quad)/2', from_=f'QFA_MPL{cell}')
+
+    # Half quad central markers (no cell number)
+    period.insert(pdr.new('XF2arc_PRCH', CENTER_XF),
+                  at='+(l_drift+l_quad)/2', from_='QFA_PRCH')
+    period.insert(pdr.new('XF2arc_PLCH', CENTER_XF),
+                  at='-(l_drift+l_quad)/2', from_='QFA_PLCH')
+
+    # All four families varied so none stay at zero.
+    variables = ['k2XF2arc', 'k2XD2arc', 'k2XF2arc2', 'k2XD2arc2']
+    ChromCorrect(ring, pdr, variables, MakePlot=False)
+
+    return pdr

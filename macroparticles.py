@@ -483,7 +483,7 @@ ax_right = fig.add_subplot(gs[1:4, 3], sharey=ax_main)
 cax      = fig.add_subplot(gs[1:4, 4])
 
 # =========================
-# Main longitudinal phase space (density coloured)
+# Main longitudinal phase space
 # =========================
 sc = density_scatter(ax_main, t, p, s=4, alpha=0.8)
 
@@ -631,306 +631,66 @@ plt.show()
 
 
 # %%
-#Particle mapping
-
-#Reference particle
-p0c_reference = df['p[MeV/c]'].mean() * 1e6 
-p0c_reference = 2952*1e6
-
-ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
-
-rand_num=74
+# ============================================================
+# ENERGY SCAN — run first, to find the optimal reference energy
+# ============================================================
+rand_num = 74
 n_subset = 500
 df_subset = df.sample(n=n_subset, random_state=rand_num)
 
-#Map coordinates
-x = df_subset['x[mm]'].values * 1e-3
-y = df_subset['y[mm]'].values * 1e-3
-px = df_subset['xp[mrad]'].values * 1e-3
-py = df_subset['yp[mrad]'].values * 1e-3
+p0c_avg_mev = df['p[MeV/c]'].mean()          # average measured beam momentum
+p0c_avg = p0c_avg_mev * 1e6
+ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
-delta = (df_subset['p[MeV/c]'].values * 1e6 - p0c_reference) / p0c_reference
 
-x_matched = (df_subset['x[mm]'].values * 1e-3) + (dx * delta) 
-px_matched = (df_subset['xp[mrad]'].values * 1e-3) + (ddx * delta) 
+def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
 
-y_matched = (df_subset['y[mm]'].values * 1e-3) + (dy * delta) 
-py_matched = (df_subset['yp[mrad]'].values * 1e-3) + (ddy * delta) 
+    delta = (df_in['p[MeV/c]'].values * 1e6 - p0c_ref) / p0c_ref
+    x_matched  = df_in['x[mm]'].values  * 1e-3 + dx  * delta
+    px_matched = df_in['xp[mrad]'].values * 1e-3 + ddx * delta
+    y_matched  = df_in['y[mm]'].values  * 1e-3 + dy  * delta
+    py_matched = df_in['yp[mrad]'].values * 1e-3 + ddy * delta
+    t_mm = df_in['t[mm/c]'].values
+    zeta = (np.mean(t_mm) - t_mm) * 1e-3 * ref_particle.beta0[0]
+    return x_matched, px_matched, y_matched, py_matched, delta, zeta
 
-t_mm = df_subset['t[mm/c]'].values
-zeta = (np.mean(t_mm) - t_mm) * 1e-3 * ref_particle.beta0[0]
 
-particles = xp.Particles(
-    p0c=p0c_reference,
-    mass0=xp.ELECTRON_MASS_EV,
-    x=x_matched,
-    px=px_matched,
-    y=y_matched,
-    py=py_matched,
-    zeta=zeta,
-    delta=delta
-)
+x_m, px_m, y_m, py_m, _, zeta_m = match_coordinates(
+    df_subset, p0c_avg, ref_particle_avg, dx, ddx, dy, ddy)
 
-
-# %%
-n_track = len(particles.x) 
-ring.configure_radiation(model='quantum')
-ring.track(particles, num_turns=6100,turn_by_turn_monitor=True, with_progress=True)
-
-
-data = ring.record_last_track
-trnplt = [1, 2000, 4000, 6000]
-
-
-fig, ax = plt.subplots(1, 3, figsize=(14, 4))
-fig.subplots_adjust(wspace=0.4)
-
-survival_count = np.sum(particles.state > 0)
-fig.suptitle(f'Particle Survival: {survival_count} / {n_track}')
-
-
-labels = [("$x$ (mm)", "$x'$ (mrad)"), 
-          ("$y$ (mm)", "$y'$ (mrad)"), 
-          ("$z$ (mm)", "$\\delta$ ($10^{-3}$)" )]
-
-for i, (xl, yl) in enumerate(labels):
-    ax[i].set_xlabel(xl)
-    ax[i].set_ylabel(yl)
-
-
-for ind, turn in enumerate(trnplt):
-
-    x_beta = 1000 * (data.x[:, turn] - ring_tw.dx[0] * data.delta[:, turn])
-    px_beta = 1000 * (data.px[:, turn] - ring_tw.dpx[0] * data.delta[:, turn])
-    ax[0].scatter(x_beta, px_beta, s=2, color=f'C{ind}', label=f'Turn {turn}', alpha=0.6)
-    
-    # Vertical
-    ax[1].scatter(1000 * data.y[:, turn], 1000 * data.py[:, turn], s=2, color=f'C{ind}', alpha=0.6)
-    
-    # Longitudinal
-    ax[2].scatter(1000 * data.zeta[:, turn], 1000 * data.delta[:, turn], s=2, color=f'C{ind}', alpha=0.6)
-
-ax[0].legend(fontsize='small')
-
-
-# %%
-folder2=mf.results_dir(design, config, phase, changes=changes, metric='InjectionEfficiency', sub=mode,sub2=f'MPD-{int(p0c_reference/1e6)}MeV')
-
-plt.savefig(f'{folder2}/injection_tracking_evolution_{rand_num}_{p0c_reference/1e6}MeV.png')
-
-# %%
-
-# Compressor parameters
-compressor_params = {
-    
-        "operation_energy_MeV": int(p0c_reference),
-        "RF_voltage": ring.element_dict['RFCav'].voltage,
-        "R_56": R56,
-        "V_deb": Vdeb,
-        "Phase_deb": Phasdeb
-    }
-
-with open(f'{folder}/CompressorParams.json', 'w') as f:
-    json.dump(compressor_params, f, indent=4)
-
-
-# %%
-#Particle mapping
-
-'''#Reference particle
-p0c_reference = df['p[MeV/c]'].mean() * 1e6 
-p0c_reference = 2910*1e6
-
-ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
-
-
-#Map coordinates
-x = df_copy['x[mm]'].values * 1e-3
-y = df_copy['y[mm]'].values * 1e-3
-px = df_copy['xp[mrad]'].values * 1e-3
-py = df_copy['yp[mrad]'].values * 1e-3
-
-delta = (df_copy['p[MeV/c]'].values * 1e6 - p0c_reference) / p0c_reference
-
-x_matched = (df_copy['x[mm]'].values * 1e-3) + (dx * delta) 
-px_matched = (df_copy['xp[mrad]'].values * 1e-3) + (ddx * delta) 
-
-y_matched = (df_copy['y[mm]'].values * 1e-3) + (dy * delta) 
-py_matched = (df_copy['yp[mrad]'].values * 1e-3) + (ddy * delta) 
-
-t_mm = df_copy['t[mm/c]'].values
-zeta = (np.mean(t_mm) - t_mm) * 1e-3 * ref_particle.beta0[0]
-
-particles = xp.Particles(
-    p0c=p0c_reference,
-    mass0=xp.ELECTRON_MASS_EV,
-    x=x_matched,
-    px=px_matched,
-    y=y_matched,
-    py=py_matched,
-    zeta=zeta,
-    delta=delta
-)
-
-context = xo.ContextCpu()         # For CPU
-context_tracking = xo.ContextCpu(omp_num_threads='auto')
-ring.build_tracker(_context=context_tracking)
-
-
-n_track = len(particles.x) 
-ring.configure_radiation(model='quantum')
-ring.track(particles, num_turns=6100, turn_by_turn_monitor=False, with_progress=True)
-
-
-
-fig, ax = plt.subplots(1, 3, figsize=(14, 4))
-fig.subplots_adjust(wspace=0.4)
-
-# Filter for particles whose status flag is > 0 (meaning they survived)
-survived_mask = particles.state > 0
-survival_count = np.sum(survived_mask)
-
-fig.suptitle(f'Particle Survival at Turn 6100: {survival_count} / {n_track}')
-
-labels = [("$x$ (mm)", "$x'$ (mrad)"), 
-          ("$y$ (mm)", "$y'$ (mrad)"), 
-          ("$z$ (mm)", "$\\delta$ ($10^{-3}$)" )]
-
-for i, (xl, yl) in enumerate(labels):
-    ax[i].set_xlabel(xl)
-    ax[i].set_ylabel(yl)
-
-# Render coordinates for the full set of surviving particles
-if survival_count > 0:
-    # Horizontal betatron components at final turn
-    x_beta = 1000 * (particles.x[survived_mask] - ring_tw.dx[0] * particles.delta[survived_mask])
-    px_beta = 1000 * (particles.px[survived_mask] - ring_tw.dpx[0] * particles.delta[survived_mask])
-    ax[0].scatter(x_beta, px_beta, s=1, color='C0', label='Final Turn', alpha=0.4)
-    
-    # Vertical components at final turn
-    ax[1].scatter(1000 * particles.y[survived_mask], 1000 * particles.py[survived_mask], s=1, color='C0', alpha=0.4)
-    
-    # Longitudinal components at final turn
-    ax[2].scatter(1000 * particles.zeta[survived_mask], 1000 * particles.delta[survived_mask], s=1, color='C0', alpha=0.4)
-
-ax[0].legend(fontsize='small')
-
-# Save the diagnostic plot for the complete distribution
-plt.savefig(f'{new_folder}/injection_tracking_final_state_full_{p0c_reference/1e6}MeV.png')
-'''
-# %%
-
-
-turns_to_plot = [0, 1, 2, 3]
-
-
-fig, axes = plt.subplots(4, 3, figsize=(15, 18))
-fig.subplots_adjust(hspace=0.4, wspace=0.35)
-
-col_labels = [
-    ("$x$ (mm)", "$x'$ (mrad)"),
-    ("$y$ (mm)", "$y'$ (mrad)"),
-    ("$\zeta$ (mm)", "$\delta$ ($10^{-3}$)"),
-    ("$x$ (mm)", "$y$ (mm)")
-]
-
-for row, turn in enumerate(turns_to_plot):
-    survived = np.sum(data.state[:, turn] > 0)
-    
-    axes[row, 0].scatter(data.x[:, turn]*1000, data.px[:, turn]*1000, s=2, color='C0', alpha=0.6)
-    axes[row, 0].set_xlabel(col_labels[0][0])
-    axes[row, 0].set_ylabel(f"Turn {turn}\n\n{col_labels[0][1]}")
-    
-    axes[row, 1].scatter(data.y[:, turn]*1000, data.py[:, turn]*1000, s=2, color='C1', alpha=0.6)
-    axes[row, 1].set_xlabel(col_labels[1][0])
-    axes[row, 1].set_ylabel(col_labels[1][1])
-    axes[row, 1].set_title(f"Survivors: {survived}")
-    
-    axes[row, 2].scatter(data.zeta[:, turn]*1000, data.delta[:, turn]*1000, s=2, color='C2', alpha=0.6)
-    axes[row, 2].set_xlabel(col_labels[2][0])
-    axes[row, 2].set_ylabel(col_labels[2][1])
-    
-
-fig.suptitle(f'Phase Space Evolution at {p0c_reference/1e6:.2f} MeV', fontsize=16, y=0.92)
-plt.savefig(f'{folder2}/initial_turns_{rand_num}_{int(p0c_reference/1e6)} MeV.png')
-plt.show()
-
-# %%
-survival_counts = np.sum(data.state > 0, axis=0)
-turns = np.arange(len(survival_counts))
-
-# 2. Plotting
-plt.figure(figsize=(10, 6))
-plt.plot(turns, survival_counts, color='firebrick', linewidth=2)
-
-plt.title(f'Particle Survival over {len(turns)} Turns', fontsize=14)
-plt.xlabel('Turn Number', fontsize=12)
-plt.ylabel('Number of Surviving Particles', fontsize=12)
-plt.grid(True, which='both', linestyle=':', alpha=0.6)
-plt.ylim(min(survival_counts)-5, survival_counts[0]+5)  # Set y-axis to start at 0
-plt.legend()
-
-
-# 3. Save the plot
-plt.savefig(f'{folder2}/survival_vs_turns_{int(p0c_reference/1e6)}MeV.png', bbox_inches='tight')
-plt.show()
-
-# Print final efficiency
-final_efficiency = (survival_counts[-1] / survival_counts[0]) * 100
-print(f"Final Survival: {survival_counts[-1]} / {survival_counts[0]} ({final_efficiency:.2f}%)")
-
-# %%
-plt.figure(figsize=(8, 6))
-plt.hist(data.x[:, 0] * 1000, bins=50, color='C0', edgecolor='black', alpha=0.7)
-plt.xlabel('$x$ (mm)')
-plt.ylabel('Number of Particles')
-plt.title(f'Longitudinal Distribution')
-plt.grid(axis='y', alpha=0.3)
-#plt.savefig(f'initial_x_distribution_{int(p0c_reference/1e6)}MeV.png')
-plt.show()
-
-# %%
-energy_range_mev = np.linspace(2.5e3, 3.2e3, 100)  
+energy_range_mev = np.linspace(2.5e3, 3.2e3, 100)
 efficiency_results = []
 
-
 for e_mev in energy_range_mev:
-    p0c_test = e_mev * 1e6 
-   
+    p0c_test = e_mev * 1e6
     ring.particle_ref = xp.Particles(p0c=p0c_test, mass0=xp.ELECTRON_MASS_EV)
-    
     delta_test = (df_subset['p[MeV/c]'].values - e_mev) / e_mev
-    
 
     p_test = xp.Particles(
-        p0c=p0c_test,
-        mass0=xp.ELECTRON_MASS_EV,
-        x=x_matched, px=px_matched,
-        y=y_matched, py=py_matched,
-        delta=delta_test,
-        zeta=zeta
+        p0c=p0c_test, mass0=xp.ELECTRON_MASS_EV,
+        x=x_m, px=px_m, y=y_m, py=py_m,
+        delta=delta_test, zeta=zeta_m
     )
-    
-   
+
     ring.track(p_test, num_turns=100)
-    
     survived = np.sum(p_test.state > 0)
     efficiency = (survived / len(p_test.x)) * 100
     efficiency_results.append(efficiency)
-    
+
     print(f"Energy: {e_mev:.3f} MeV | Efficiency: {efficiency:.1f}%")
 
 best_idx = np.argmax(efficiency_results)
-best_energy = energy_range_mev[best_idx]
+best_energy_mev = energy_range_mev[best_idx]
 
-p0c_reference = df['p[MeV/c]'].mean() * 1e6 
+folder3 = mf.results_dir(design, config, phase, changes=changes,
+                          metric='InjectionEfficiency', sub=mode)
 
 plt.figure(figsize=(10, 6))
 plt.plot(energy_range_mev, efficiency_results, 'o-', color='teal', linewidth=2)
-plt.axvline(best_energy, color='red', linestyle='--', label=f'Best: {best_energy:.3f} MeV')
-plt.axvline(p0c_reference/1e6, color='blue', linestyle='--', label=f'Avg: {p0c_reference/1e6:.3f} MeV')
-
-folder3=mf.results_dir(design, config, phase, changes=changes, metric='InjectionEfficiency', sub=mode)
+plt.axvline(best_energy_mev, color='red', linestyle='--',
+            label=f'Optimal: {best_energy_mev:.3f} MeV')
+plt.axvline(p0c_avg_mev, color='blue', linestyle='--',
+            label=f'Average: {p0c_avg_mev:.3f} MeV')
 plt.title('Injection Efficiency vs. Beam Energy', fontsize=14)
 plt.xlabel('Energy [MeV]', fontsize=12)
 plt.ylabel('Survival Efficiency [%]', fontsize=12)
@@ -939,9 +699,139 @@ plt.legend()
 plt.savefig(f'{folder3}/MPD_energy_scan.png')
 plt.show()
 
-print(f"\nThe best injection efficiency is at {best_energy:.3f} MeV.")
+print(f"\nThe best injection efficiency is at {best_energy_mev:.3f} MeV.")
 
+# %%
+# =====================
+# COMPRESSOR PARAMETERS
+# =====================
+compressor_params = {
+    "RF_voltage": ring.element_dict['RFCav'].voltage,
+    "R_56": R56,
+    "V_deb": Vdeb,
+    "Phase_deb": Phasdeb,
+}
+with open(f'{folder3}/CompressorParams.json', 'w') as f:
+    json.dump(compressor_params, f, indent=4)
 
+# %%
+# ========================
+# FULL MULTI-TURN TRACKING 
+# ========================
+nominal_energy_mev = 2860.0   # design reference energy
 
+energies_to_track = {
+    'average': p0c_avg_mev,
+    'nominal': nominal_energy_mev,
+    'optimal': best_energy_mev,
+}
 
+turns_to_plot = [0, 1, 2, 3]
+trnplt = [1, 2000, 4000, 6000]
 
+col_labels = [
+    ("$x$ (mm)", "$x'$ (mrad)"),
+    ("$y$ (mm)", "$y'$ (mrad)"),
+    (r"$\zeta$ (mm)", r"$\delta$ ($10^{-3}$)"),
+    ("$x$ (mm)", "$y$ (mm)")
+]
+
+for label, e_mev in energies_to_track.items():
+    print(f"\n=== Tracking at {label} energy: {e_mev:.3f} MeV ===")
+
+    p0c_reference = e_mev * 1e6
+    ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
+
+    x_matched, px_matched, y_matched, py_matched, delta, zeta = match_coordinates(
+        df_copy, p0c_reference, ref_particle, dx, ddx, dy, ddy)
+
+    particles = xp.Particles(
+        p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV,
+        x=x_matched, px=px_matched, y=y_matched, py=py_matched,
+        zeta=zeta, delta=delta
+    )
+
+    n_track = len(particles.x)
+    ring.configure_radiation(model='quantum')
+    ring.track(particles, num_turns=6100, turn_by_turn_monitor=True, with_progress=True)
+    data = ring.record_last_track
+
+    folder2 = mf.results_dir(design, config, phase, changes=changes,
+                              metric='InjectionEfficiency', sub=mode,
+                              sub2=f'{label}_{int(e_mev)}MeV')
+
+    # --- phase-space snapshot at selected turns ---
+    fig, ax = plt.subplots(1, 3, figsize=(14, 4))
+    fig.subplots_adjust(wspace=0.4)
+
+    survival_count = np.sum(particles.state > 0)
+    fig.suptitle(f'Particle Survival ({label}, {e_mev:.1f} MeV): {survival_count} / {n_track}')
+
+    for i, (xl, yl) in enumerate(col_labels[:3]):
+        ax[i].set_xlabel(xl)
+        ax[i].set_ylabel(yl)
+
+    for ind, turn in enumerate(trnplt):
+        x_beta = 1000 * (data.x[:, turn] - ring_tw.dx[0] * data.delta[:, turn])
+        px_beta = 1000 * (data.px[:, turn] - ring_tw.dpx[0] * data.delta[:, turn])
+        ax[0].scatter(x_beta, px_beta, s=2, color=f'C{ind}', label=f'Turn {turn}', alpha=0.6)
+        ax[1].scatter(1000 * data.y[:, turn], 1000 * data.py[:, turn], s=2, color=f'C{ind}', alpha=0.6)
+        ax[2].scatter(1000 * data.zeta[:, turn], 1000 * data.delta[:, turn], s=2, color=f'C{ind}', alpha=0.6)
+
+    ax[0].legend(fontsize='small')
+    plt.savefig(f'{folder2}/injection_tracking_evolution_{rand_num}_{e_mev:.0f}MeV.png')
+    plt.show()
+
+    # --- early-turn phase space grid ---
+    fig, axes = plt.subplots(4, 3, figsize=(15, 18))
+    fig.subplots_adjust(hspace=0.4, wspace=0.35)
+
+    for row, turn in enumerate(turns_to_plot):
+        survived = np.sum(data.state[:, turn] > 0)
+
+        axes[row, 0].scatter(data.x[:, turn]*1000, data.px[:, turn]*1000, s=2, color='C0', alpha=0.6)
+        axes[row, 0].set_xlabel(col_labels[0][0])
+        axes[row, 0].set_ylabel(f"Turn {turn}\n\n{col_labels[0][1]}")
+
+        axes[row, 1].scatter(data.y[:, turn]*1000, data.py[:, turn]*1000, s=2, color='C1', alpha=0.6)
+        axes[row, 1].set_xlabel(col_labels[1][0])
+        axes[row, 1].set_ylabel(col_labels[1][1])
+        axes[row, 1].set_title(f"Survivors: {survived}")
+
+        axes[row, 2].scatter(data.zeta[:, turn]*1000, data.delta[:, turn]*1000, s=2, color='C2', alpha=0.6)
+        axes[row, 2].set_xlabel(col_labels[2][0])
+        axes[row, 2].set_ylabel(col_labels[2][1])
+
+    fig.suptitle(f'Phase Space Evolution at {label} energy ({e_mev:.2f} MeV)', fontsize=16, y=0.92)
+    plt.savefig(f'{folder2}/initial_turns_{rand_num}_{e_mev:.0f}MeV.png')
+    plt.show()
+
+    # --- survival vs turn number ---
+    survival_counts = np.sum(data.state > 0, axis=0)
+    turns = np.arange(len(survival_counts))
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(turns, survival_counts, color='firebrick', linewidth=2)
+    plt.title(f'Particle Survival over {len(turns)} Turns ({label}, {e_mev:.1f} MeV)', fontsize=14)
+    plt.xlabel('Turn Number', fontsize=12)
+    plt.ylabel('Number of Surviving Particles', fontsize=12)
+    plt.grid(True, which='both', linestyle=':', alpha=0.6)
+    plt.ylim(min(survival_counts) - 5, survival_counts[0] + 5)
+    plt.savefig(f'{folder2}/survival_vs_turns_{e_mev:.0f}MeV.png', bbox_inches='tight')
+    plt.show()
+
+    final_efficiency = (survival_counts[-1] / survival_counts[0]) * 100
+    print(f"[{label}] Final Survival: {survival_counts[-1]} / {survival_counts[0]} "
+          f"({final_efficiency:.2f}%)")
+
+    # --- initial x distribution ---
+    plt.figure(figsize=(8, 6))
+    plt.hist(data.x[:, 0] * 1000, bins=50, color='C0', edgecolor='black', alpha=0.7)
+    plt.xlabel('$x$ (mm)')
+    plt.ylabel('Number of Particles')
+    plt.title(f'Initial x Distribution ({label}, {e_mev:.1f} MeV)')
+    plt.grid(axis='y', alpha=0.3)
+    plt.savefig(f'{folder2}/initial_x_distribution_{e_mev:.0f}MeV.png')
+    plt.show()
+
+print("\nDone: tracked average, nominal, and optimal reference energies.")

@@ -371,10 +371,10 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
     })'''
     pdr.vars({
             'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4,
-            'dl_noben': 0.85,   'l_quad':   0.30,
+            'dl_noben': 0.95,   'l_quad':   0.30,
             'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
             'dl_drift': -0.0,   'dl_trans': 0.20,
-            'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
+            'l_doub':   0.25,   'l_tripl':  2.5,    'l_trips':  0.40,
             'l_sext':   0.20,
         })
 
