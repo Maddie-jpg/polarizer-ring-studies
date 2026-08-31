@@ -356,7 +356,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # Design 1 (more variations as this was created before pipeline optimisation)
 # ---------------------------------------------------------------------------
 
-def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,                                  betay_DS_target=None):
+def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None):
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -1034,7 +1034,7 @@ def two_fold_1straight(fringe_fields=True, matched=True,WP=constants.WP_D2, phas
 # Design 3
 #-------------
 
-def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.WP_D3, phase_advance=0.25):
+def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.WP_D3, phase_advance=0.25,betay_DS_target=True):
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = 2.86e9; VRF = 4.0e6
 
@@ -1162,6 +1162,8 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
     half_ring = makesextant('1R', 'right') + makesextant('2L', 'left')
     ring = half_ring + makesextant('2R', 'right') + makesextant('1L', 'left')
 
+    insert_DS_betay_quads(pdr, ring, period, arc1R)
+
     if not matched:
         pdr.lines['arc1R']    = arc1R
         pdr.lines['cell_arc'] = cell_arc
@@ -1173,7 +1175,7 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, WP, n_periods=4)
+                           arc1R, WP, n_periods=4,betay_DS_target=betay_DS_target)
 
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R_2')
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)

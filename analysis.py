@@ -24,8 +24,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',1))
+design=int(os.environ.get('DESIGN',3))
+config=int(os.environ.get('CONFIG',4))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
@@ -854,7 +854,7 @@ if mode=='perfect':
         particles.sort(interleave_lost_particles=True)
 
         return get_DA_boundary(particles, grid_details['num_r_y_points'],
-                                51,
+                                grid_details['num_theta_x_points'],
                                 grid_details['x_normalized'], grid_details['y_normalized'])
 
 
@@ -876,13 +876,35 @@ if mode=='perfect':
 
     # ---- run: misaligned seeds first, then corrected seeds ----
 
-    # ---- run: misaligned seeds first, then corrected seeds ----
+    # NOTE: don't reuse parameters['study_parameters'] here -- by this point in the
+    # script it's been overwritten (first by the polar-DA cell, then by the MA cell
+    # at ini_cond_type='grid_MA'), so grabbing it directly silently hands the DA scan
+    # an MA-shaped grid (fixed theta=45deg, x_normalized==y_normalized everywhere).
+    # Build both dicts explicitly and self-contained instead.
 
-    seeds = [111, 222, 333, 444, 555]
+    seeds = [100, 200, 300, 400, 500]
     colors = plt.cm.gist_rainbow(np.linspace(0, 0.95, len(seeds)))  # more spread than tab10
 
-    study_params_DA = dict(parameters['study_parameters'])  # ini_cond_type='grid_DA', as in analysis.py
-    study_params_MA = dict(study_params_DA); study_params_MA['ini_cond_type'] = 'grid_MA'
+    study_params_DA = {
+        'ini_cond_type': 'grid_DA',
+        'output_dir': 'out',
+        'number_of_turns': 5000,
+        'number_of_particles': 1000,
+        'inv1': 0,
+        'inv2': 0,
+        'start_element': 'QD1_R1',
+        'ini_cond_nemittance_x': n_emittancex,
+        'ini_cond_nemittance_y': n_emittancey,
+        'ini_cond_bunch_length': 4.8e-3,
+        'ini_cond_energy_spread': 2e-3,
+        'ini_cond_energy_offset': None,
+        'new_closed_orbit': None,
+        'covariance_dispertion_free': False,
+    }
+
+    study_params_MA = dict(study_params_DA)
+    study_params_MA['ini_cond_type'] = 'grid_MA'
+    study_params_MA['ini_cond_energy_spread'] = 6e-3  # matches the MA cell's value, not DA's
 
     fig_da_mis, ax_da_mis = plt.subplots(figsize=(8, 8))
     fig_da_cor, ax_da_cor = plt.subplots(figsize=(8, 8))
@@ -941,4 +963,3 @@ if mode=='perfect':
 # %%
 if pdf_run is True:
     pdf.close()
-
