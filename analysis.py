@@ -24,8 +24,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',3))
-config=int(os.environ.get('CONFIG',4))
+design=int(os.environ.get('DESIGN',1))
+config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
@@ -842,36 +842,34 @@ if mode=='perfect':
         return seed_line
 
 
-    def get_DA_for_seed(base_line, seed, apply_correction, study_params_DA):
+    # ---- combined DA+MA for one seed: prep the line ONCE (misalign + optional
+    #      correction), then run both studies on it, instead of prepping twice ----
+
+    def get_DA_and_MA_for_seed(base_line, seed, apply_correction, study_params_DA, study_params_MA):
         seed_line = prep_seed_line(base_line, seed, apply_correction)
         seed_line.discard_tracker()
         seed_line.build_tracker(_context=context_tracking)
         seed_line.configure_radiation(model='mean')
 
-        particles, grid_details = xutil.generate_particle_grid(seed_line, study_params_DA)
-        seed_line.track(particles, num_turns=study_params_DA['number_of_turns'],
-                        turn_by_turn_monitor=True, time=True, with_progress=10)
-        particles.sort(interleave_lost_particles=True)
+        # --- DA ---
+        particles_DA, grid_DA = xutil.generate_particle_grid(seed_line, study_params_DA)
+        seed_line.track(particles_DA, num_turns=study_params_DA['number_of_turns'],
+                         turn_by_turn_monitor=False, time=True, with_progress=10)
+        particles_DA.sort(interleave_lost_particles=True)
+        da_result = get_DA_boundary(particles_DA, grid_DA['num_r_y_points'],
+                                     grid_DA['num_theta_x_points'],
+                                     grid_DA['x_normalized'], grid_DA['y_normalized'])
 
-        return get_DA_boundary(particles, grid_details['num_r_y_points'],
-                                grid_details['num_theta_x_points'],
-                                grid_details['x_normalized'], grid_details['y_normalized'])
+        # --- MA ---
+        particles_MA, grid_MA = xutil.generate_particle_grid(seed_line, study_params_MA)
+        seed_line.track(particles_MA, num_turns=study_params_MA['number_of_turns'],
+                         turn_by_turn_monitor=False, time=True, with_progress=10)
+        particles_MA.sort(interleave_lost_particles=True)
+        ma_result = get_MA_boundary(particles_MA, grid_MA['num_r_y_points'], 51,
+                                     grid_MA['x_normalized'], grid_MA['y_normalized'],
+                                     grid_MA['delta_init'])
 
-
-    def get_MA_for_seed(base_line, seed, apply_correction, study_params_MA):
-        seed_line = prep_seed_line(base_line, seed, apply_correction)
-        seed_line.discard_tracker()
-        seed_line.build_tracker(_context=context_tracking)
-        seed_line.configure_radiation(model='mean')
-
-        particles, grid_details = xutil.generate_particle_grid(seed_line, study_params_MA)
-        seed_line.track(particles, num_turns=study_params_MA['number_of_turns'],
-                        turn_by_turn_monitor=True, time=True, with_progress=10)
-        particles.sort(interleave_lost_particles=True)
-
-        return get_MA_boundary(particles, grid_details['num_r_y_points'], 51,
-                                grid_details['x_normalized'], grid_details['y_normalized'],
-                                grid_details['delta_init'])
+        return da_result, ma_result
 
 
     # ---- run: misaligned seeds first, then corrected seeds ----
@@ -913,24 +911,22 @@ if mode=='perfect':
 
     # --- pass 1: misaligned ---
     for seed, c in zip(seeds, colors):
-        x_DA, y_DA, min_DA = get_DA_for_seed(ring, seed, apply_correction=False,
-                                            study_params_DA=study_params_DA)
+        (x_DA, y_DA, min_DA), (x_MA, delta_MA, min_MA) = get_DA_and_MA_for_seed(
+            ring, seed, apply_correction=False,
+            study_params_DA=study_params_DA, study_params_MA=study_params_MA)
+
         ax_da_mis.plot(x_DA, y_DA, '-', color=c,
                     label=f'seed {seed} (DA$_{{min}}$={min_DA:.1f}$\\sigma$)')
-
-        x_MA, delta_MA, min_MA = get_MA_for_seed(ring, seed, apply_correction=False,
-                                                study_params_MA=study_params_MA)
         ax_ma_mis.plot(delta_MA * 100, x_MA, '-', color=c, label=f'seed {seed}')
 
     # --- pass 2: corrected ---
     for seed, c in zip(seeds, colors):
-        x_DA, y_DA, min_DA = get_DA_for_seed(ring, seed, apply_correction=True,
-                                            study_params_DA=study_params_DA)
+        (x_DA, y_DA, min_DA), (x_MA, delta_MA, min_MA) = get_DA_and_MA_for_seed(
+            ring, seed, apply_correction=True,
+            study_params_DA=study_params_DA, study_params_MA=study_params_MA)
+
         ax_da_cor.plot(x_DA, y_DA, '-', color=c,
                     label=f'seed {seed} (DA$_{{min}}$={min_DA:.1f}$\\sigma$)')
-
-        x_MA, delta_MA, min_MA = get_MA_for_seed(ring, seed, apply_correction=True,
-                                                study_params_MA=study_params_MA)
         ax_ma_cor.plot(delta_MA * 100, x_MA, '-', color=c, label=f'seed {seed}')
 
     # ---- formatting + saving, one block per plot ----
