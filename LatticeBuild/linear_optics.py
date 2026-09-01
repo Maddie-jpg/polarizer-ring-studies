@@ -885,7 +885,7 @@ def two_fold_1straight(fringe_fields=True, matched=True,WP=constants.WP_D2, phas
     VRF = constants.VRF
  
     pdr.vars({
-        'l_cell':   3.0,    'l_bend':   0.40,   'l_bendDS': 0.55,
+        'l_cell':   3.0,    'l_bend':   0.40,   'l_bendDS': 0.4,
         'dl_noben': 0.25,   'l_quad':   0.30,
         'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
         'dl_drift': -0.1,   'dl_trans': 0.00,
@@ -1039,8 +1039,8 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
     E0 = 2.86e9; VRF = 4.0e6
 
     pdr.vars({
-        'l_cell':   3.0,    'l_bend':   0.40,   'l_bendDS': 0.55,
-        'dl_noben': 0.25,   'l_quad':   0.30,
+        'l_cell':   3.0,    'l_bend':   0.40,   'l_bendDS': 0.40,
+        'dl_noben': 0.27,   'l_quad':   0.30,
         'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
         'dl_drift': -0.1,   'dl_trans': 0.00,
         'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
@@ -1162,7 +1162,7 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
     half_ring = makesextant('1R', 'right') + makesextant('2L', 'left')
     ring = half_ring + makesextant('2R', 'right') + makesextant('1L', 'left')
 
-    insert_DS_betay_quads(pdr, ring, period, arc1R)
+    #insert_DS_betay_quads(pdr, ring, period, arc1R)
 
     if not matched:
         pdr.lines['arc1R']    = arc1R

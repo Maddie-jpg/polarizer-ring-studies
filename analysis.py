@@ -407,27 +407,31 @@ while r_max >= 1:
         print(f"Particles lost at r_max = {r_max}. Reducing amplitude...")
         r_max -= 1.0
 
-if fp0 is not None:
-    # get_footprint's internal FFT uses rfftfreq, which only ever resolves
-    # frequencies in [0, 0.5] (real-signal Nyquist limit). If the TRUE
-    # fractional tune on an axis is above 0.5, the FFT peak for it is
-    # indistinguishable from one at (1 - true_frac) and gets reported
-    # there instead -- i.e. it silently folds back into [0, 0.5]. Because
-    # of that fold, the raw fp0.qx/fp0.qy values can never actually reveal
-    # whether aliasing happened (they're always <= 0.5 by construction), so
-    # checking np.nanmax(fp0.qx) > 0.5 -- as this block used to -- can never
-    # fire and is not a real guard. The only reliable way to know is to look
-    # at the true fractional part of the known nominal WP itself, decided
-    # BEFORE trusting the FFT output, and unfold accordingly.
-    def _reconstruct_absolute_tune(frac_from_fft, wp_value):
-        n = np.floor(wp_value)
-        true_frac = wp_value - n
-        if true_frac > 0.5:
-            # rfftfreq folded the true peak back to (1 - true_frac); undo it.
-            return (n + 1) - frac_from_fft
-        else:
-            return n + frac_from_fft
+if fp0 is None:
+    print("Could not generate a stable footprint even at 1 sigma -- "
+          "plotting resonance diagram and chromatic shift without it.")
 
+# get_footprint's internal FFT uses rfftfreq, which only ever resolves
+# frequencies in [0, 0.5] (real-signal Nyquist limit). If the TRUE
+# fractional tune on an axis is above 0.5, the FFT peak for it is
+# indistinguishable from one at (1 - true_frac) and gets reported
+# there instead -- i.e. it silently folds back into [0, 0.5]. Because
+# of that fold, the raw fp0.qx/fp0.qy values can never actually reveal
+# whether aliasing happened (they're always <= 0.5 by construction), so
+# checking np.nanmax(fp0.qx) > 0.5 -- as this block used to -- can never
+# fire and is not a real guard. The only reliable way to know is to look
+# at the true fractional part of the known nominal WP itself, decided
+# BEFORE trusting the FFT output, and unfold accordingly.
+def _reconstruct_absolute_tune(frac_from_fft, wp_value):
+    n = np.floor(wp_value)
+    true_frac = wp_value - n
+    if true_frac > 0.5:
+        # rfftfreq folded the true peak back to (1 - true_frac); undo it.
+        return (n + 1) - frac_from_fft
+    else:
+        return n + frac_from_fft
+
+if fp0 is not None:
     if (WP[0] % 1) > 0.5 or (WP[1] % 1) > 0.5:
         print(f"NOTE: fractional tune above 0.5 detected from the nominal "
               f"WP directly (Qx frac={WP[0] % 1:.3f}, Qy frac={WP[1] % 1:.3f}) "
@@ -439,66 +443,68 @@ if fp0 is not None:
     fp0.qx = _reconstruct_absolute_tune(fp0.qx, WP[0])
     fp0.qy = _reconstruct_absolute_tune(fp0.qy, WP[1])
 
-    # NOTE: qx/qy (from twiss4d) and nominal_tw.qx/qy are ALREADY absolute
-    # tunes -- do not add the integer offset to them again.
-    # min_span widened from the default 0.02 -- with a tight 6-sigma
-    # footprint and a narrow chromatic sweep, the data-driven window alone
-    # was too small to show any resonance context (previous plot had only
-    # one or two lines barely clipping the edge).
-    Qx_range, Qy_range = integer_tune_ranges(ring_tw.qx, ring_tw.qy,half_width=0.25)
+# NOTE: qx/qy (from twiss4d) and nominal_tw.qx/qy are ALREADY absolute
+# tunes -- do not add the integer offset to them again.
+# min_span widened from the default 0.02 -- with a tight 6-sigma
+# footprint and a narrow chromatic sweep, the data-driven window alone
+# was too small to show any resonance context (previous plot had only
+# one or two lines barely clipping the edge).
+Qx_range, Qy_range = integer_tune_ranges(ring_tw.qx, ring_tw.qy, half_width=0.25)
+#Qx_range, Qy_range =(18.5,19),(19,19.5)
 
-    fig, ax = plt.subplots(figsize=(9, 9))
+fig, ax = plt.subplots(figsize=(9, 9))
 
-    # Layer 1 (back): the classic systematic (red) / non-systematic (blue)
-    # resonance grid -- same scheme used elsewhere in this file via
-    # resonance_lines().plot_resonance(), but reimplemented with tunable
-    # alpha/linewidth so it's actually visible here rather than the
-    # library's fixed alpha=0.3.
-    mf.plot_resonance_grid_red_blue(
-        ax, Qx_range, Qy_range, resonance_orders, 3,
-        alpha=0.6, lw_systematic=2.2, lw_nonsystematic=1.1)
+# Layer 1 (back): the classic systematic (red) / non-systematic (blue)
+# resonance grid -- same scheme used elsewhere in this file via
+# resonance_lines().plot_resonance(), but reimplemented with tunable
+# alpha/linewidth so it's actually visible here rather than the
+# library's fixed alpha=0.3.
+mf.plot_resonance_grid_red_blue(
+    ax, Qx_range, Qy_range, resonance_orders, 3,
+    alpha=0.6, lw_systematic=2.2, lw_nonsystematic=1.1)
 
-    # Layer 1b: proximity-to-WP danger tiers, back on top of the classic
-    # grid -- recolored (black/gray) so "close to WP" doesn't collide with
-    # "systematic" (red) from the layer above; those are two different
-    # pieces of information (structural type vs. distance to WP) and
-    # deserve visually distinct colors.
-    '''mf.plot_dangerous_resonances(
-        ring, ring_tw.qx, ring_tw.qy, max_order=(1, 2, 3, 4, 5),
-        ax=ax, qx_range=Qx_range, qy_range=Qy_range,
-        legend_tiers=(1, 2), tier_colors={1: 'black', 2: 'dimgray'},
-        draw_background_grid=False)'''
+# Layer 1b: proximity-to-WP danger tiers, back on top of the classic
+# grid -- recolored (black/gray) so "close to WP" doesn't collide with
+# "systematic" (red) from the layer above; those are two different
+# pieces of information (structural type vs. distance to WP) and
+# deserve visually distinct colors.
+'''mf.plot_dangerous_resonances(
+    ring, ring_tw.qx, ring_tw.qy, max_order=(1, 2, 3, 4, 5),
+    ax=ax, qx_range=Qx_range, qy_range=Qy_range,
+    legend_tiers=(1, 2), tier_colors={1: 'black', 2: 'dimgray'},
+    draw_background_grid=False)'''
 
-    # Layer 2 (middle): amplitude footprint -- the widest-reaching data on
-    # the plot, so give it a muted, translucent color that reads as a
-    # "region" rather than competing with the resonance lines for attention.
+# Layer 2 (middle): amplitude footprint -- the widest-reaching data on
+# the plot, so give it a muted, translucent color that reads as a
+# "region" rather than competing with the resonance lines for attention.
+# Skipped entirely if no stable footprint could be generated down to 1 sigma.
+if fp0 is not None:
     fp0.plot(ax=ax, color='tab:green', alpha=0.55,
              label=f'Amplitude Footprint ({r_max}$\\sigma$)')
 
-    # Layer 3 (front): chromatic footprint -- a single clean curve, the
-    # most important "how far do we move" indicator, drawn last so it
-    # stays visually on top.
-    ax.plot(qx, qy, '.-', lw=2, color='tab:purple', ms=4,
-            label=f'Chromatic shift ($\\delta$: {min(delta):.1e} to {max(delta):.1e})')
+# Layer 3 (front): chromatic footprint -- a single clean curve, the
+# most important "how far do we move" indicator, drawn last so it
+# stays visually on top.
+ax.plot(qx, qy, '.-', lw=2, color='tab:purple', ms=4,
+        label=f'Chromatic shift ($\\delta$: {min(delta):.1e} to {max(delta):.1e})')
 
-    # Nominal WP marker -- distinct from the Tier-1 red resonance lines,
-    # so use a black star rather than red.
-    ax.plot(nominal_tw.qx, nominal_tw.qy, 'ro',
-            label='Nominal ($\\delta=0$)')
+# Nominal WP marker -- distinct from the Tier-1 red resonance lines,
+# so use a black star rather than red.
+ax.plot(nominal_tw.qx, nominal_tw.qy, 'ro',
+        label='Nominal ($\\delta=0$)')
 
-    ax.set_xlim(Qx_range)
-    ax.set_ylim(Qy_range)
-    ax.set_xlabel('$Q_x$')
-    ax.set_ylabel('$Q_y$')
-    ax.set_title(f'Working point overview for {mode} lattice')
-    ax.legend(loc='best', fontsize=9, framealpha=0.9)
-    ax.grid(alpha=0.2)
+ax.set_xlim(Qx_range)
+ax.set_ylim(Qy_range)
+ax.set_xlabel('$Q_x$')
+ax.set_ylabel('$Q_y$')
+title_suffix = '' if fp0 is not None else ' (no stable amplitude footprint)'
+ax.set_title(f'Working point overview for {mode} lattice{title_suffix}')
+ax.legend(loc='best', fontsize=12, framealpha=0.9)
+ax.grid(alpha=0.2)
 
-    plt.tight_layout()
-    plt.savefig(f'{folder1}/momentum_dev_working_point_{mode}.png', dpi=200)
-    plt.show()
-else:
-    print("Could not generate a stable footprint even at 1 sigma.")
+plt.tight_layout()
+plt.savefig(f'{folder1}/momentum_dev_working_point_{mode}.png', dpi=200)
+plt.show()
 
 # %%
 tt=ring.get_table()
@@ -934,27 +940,29 @@ if mode=='perfect':
     for ax, title in [(ax_da_mis, 'DA — misaligned seeds'), (ax_da_cor, 'DA — corrected seeds')]:
         ax.set_xlabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
         ax.set_ylabel(r'$\hat{y}$ [$\sqrt{\varepsilon_y}$]')
-        ax.set_xlim(-16, 16); ax.set_ylim(0, 20)
+        ax.set_xlim(-16, 16); ax.set_ylim(0, 12)
         ax.set_title(title)
         ax.legend(fontsize='x-small', loc='best', ncol=2)
 
     for ax, title in [(ax_ma_mis, 'MA — misaligned seeds'), (ax_ma_cor, 'MA — corrected seeds')]:
         ax.set_xlabel(r'$\delta$ [%]')
         ax.set_ylabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')
-        ax.set_xlim(-5, 5)
+        ax.set_xlim(-7, 7)
+        ax.set_ylim(None,12)
         ax.set_title(title)
         ax.legend(fontsize='x-small', loc='best', ncol=2)
 
     fig_da_mis.tight_layout()
+    
     fig_da_mis.savefig(f'{folder2}/DA_overlay_misaligned.png')
 
     fig_da_cor.tight_layout()
     fig_da_cor.savefig(f'{folder2}/DA_overlay_corrected.png')
 
-    fig_ma_mis.tight_layout()
+    #fig_ma_mis.tight_layout()
     fig_ma_mis.savefig(f'{folder2}/MA_overlay_misaligned.png')
 
-    fig_ma_cor.tight_layout()
+    #fig_ma_cor.tight_layout()
     fig_ma_cor.savefig(f'{folder2}/MA_overlay_corrected.png')
 # %%
 if pdf_run is True:

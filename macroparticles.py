@@ -20,11 +20,11 @@ import my_functions as mf
 
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',9))
-mode=os.environ.get('MODE','corrected')
+design=int(os.environ.get('DESIGN',3))
+config=int(os.environ.get('CONFIG',2))
+mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES','DSchange')
+changes=os.environ.get('CHANGES',None)
 
 # %%
 #read in file
@@ -483,7 +483,7 @@ ax_right = fig.add_subplot(gs[1:4, 3], sharey=ax_main)
 cax      = fig.add_subplot(gs[1:4, 4])
 
 # =========================
-# Main longitudinal phase space
+# Main longitudinal phase space (density coloured)
 # =========================
 sc = density_scatter(ax_main, t, p, s=4, alpha=0.8)
 
@@ -644,7 +644,10 @@ ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
 
 def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
-
+    """Apply dispersion-based matching to raw beam coordinates for a given
+    reference momentum p0c_ref, returning arrays ready for xp.Particles().
+    Centralised here so the energy scan and the full tracking loop below
+    use the exact same matching logic instead of two separate copies."""
     delta = (df_in['p[MeV/c]'].values * 1e6 - p0c_ref) / p0c_ref
     x_matched  = df_in['x[mm]'].values  * 1e-3 + dx  * delta
     px_matched = df_in['xp[mrad]'].values * 1e-3 + ddx * delta
@@ -702,9 +705,10 @@ plt.show()
 print(f"\nThe best injection efficiency is at {best_energy_mev:.3f} MeV.")
 
 # %%
-# =====================
-# COMPRESSOR PARAMETERS
-# =====================
+# ============================================================
+# COMPRESSOR PARAMETERS — computed once, independent of which
+# reference energy is tracked below
+# ============================================================
 compressor_params = {
     "RF_voltage": ring.element_dict['RFCav'].voltage,
     "R_56": R56,
@@ -715,9 +719,11 @@ with open(f'{folder3}/CompressorParams.json', 'w') as f:
     json.dump(compressor_params, f, indent=4)
 
 # %%
-# ========================
-# FULL MULTI-TURN TRACKING 
-# ========================
+# ============================================================
+# FULL MULTI-TURN TRACKING — loop over average / nominal / optimal
+# reference energies (nominal = design energy; optimal = result of
+# the energy scan above)
+# ============================================================
 nominal_energy_mev = 2860.0   # design reference energy
 
 energies_to_track = {
@@ -743,7 +749,7 @@ for label, e_mev in energies_to_track.items():
     ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
 
     x_matched, px_matched, y_matched, py_matched, delta, zeta = match_coordinates(
-        df_copy, p0c_reference, ref_particle, dx, ddx, dy, ddy)
+        df_subset, p0c_reference, ref_particle, dx, ddx, dy, ddy)
 
     particles = xp.Particles(
         p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV,
