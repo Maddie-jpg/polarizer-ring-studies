@@ -28,10 +28,10 @@ SEED=123456789
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    '''pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=(18.635,19.15),phase_advance=1/3)
-    sc.config_D1_C1_120(pdr)'''
-    pdr=lo.two_fold_racetrack_3straight(fringe_fields=True,matched=True,WP=(13.65,13.23),phase_advance=0.25,betay_DS_target=False)
-    sc.config_D2_C1(pdr)
+    pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=(15.42,15.38),phase_advance=0.25)
+    sc.config_D1_C9(pdr)
+    '''pdr=lo.two_fold_racetrack_3straight(fringe_fields=True,matched=True,WP=(13.65,13.23),phase_advance=0.25,betay_DS_target=False)
+    sc.config_D2_C1(pdr)'''
 
 
 #Misalignments

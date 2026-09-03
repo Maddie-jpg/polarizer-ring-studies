@@ -46,6 +46,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6, MakePlot=Fals
             xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
             xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
             xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
+            xt.VaryList([''], step=1e-5,limits=(0.1,0.8))
         ],
         targets=[
             xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
