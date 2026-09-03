@@ -30,9 +30,9 @@ changes=os.environ.get('CHANGES',None)
 
 # %%
 if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json")
 else:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_perfect_{phase}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_perfect_{phase}.json")
 
 pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
 pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9

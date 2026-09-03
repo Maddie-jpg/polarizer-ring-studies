@@ -18,7 +18,7 @@ from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 from prettytable import PrettyTable
 import xutil_DA_CC.xsuite_plot_functions as my_xpf
 import xutil_DA_CC.xsuite_utilities as xutil
-import constants
+import LatticeBuild.constants as constants
 import my_functions as mf
 from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
@@ -47,9 +47,9 @@ if pdf_run is True:
 
 # %%
 if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
 else:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
 
 ring=pdr.lines['ring']
 print(ring.element_names)
@@ -57,7 +57,6 @@ period=pdr.lines['period']
 
 variable_name = f"WP_D{design}"
 
-current_wp = getattr(constants, variable_name)
 
 # %%
 E0 = constants.E0; VRF = constants.VRF
@@ -350,7 +349,7 @@ plt.ylabel('Fractional tune')
 plt.legend()
 plt.grid(True)
 plt.xlim(-max_dp*1.05,max_dp*1.05)
-plt.savefig(f'{folder1}/momentum_deviation{current_wp}_{mode}.png')
+plt.savefig(f'{folder1}/momentum_deviation_{mode}.png')
 
 
 
@@ -370,7 +369,7 @@ resonances.plot_resonance(fig)
 ax.set_xlim(Qx_range)
 ax.set_ylim(Qy_range)
 plt.tight_layout()
-plt.savefig(f'{folder1}/momentum_dev_working_point{current_wp}_{mode}.png')
+plt.savefig(f'{folder1}/momentum_dev_working_point_{mode}.png')
 
 
 
@@ -603,13 +602,13 @@ if mode=='perfect':
 
     folder2=mf.results_dir(design, config, phase, changes=changes, metric='DA_MA', sub=None)
 
-    plt.savefig(f"{folder2}/DA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{folder2}/DA_plot_{mode}_full.png", dpi=300, bbox_inches='tight')
 
     ax.relim(); ax.autoscale_view()          
     (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
     ax.set_xlim(-15, 15)
     ax.set_ylim(None, 12)
-    plt.savefig(f"{folder2}/DA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{folder2}/DA_plot_{mode}_zoom.png", dpi=300, bbox_inches='tight')
 
     
     #%matplotlib widget
@@ -751,13 +750,13 @@ if mode=='perfect':
 
     ax = plt.gca()
 
-    plt.savefig(f"{folder2}/MA_plot_{mode}_WP{current_wp}_full.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{folder2}/MA_plot_{mode}_full.png", dpi=300, bbox_inches='tight')
 
     ax.relim(); ax.autoscale_view()          
     (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
     ax.set_xlim(-7, 7)
     ax.set_ylim(None, 12)
-    plt.savefig(f"{folder2}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{folder2}/MA_plot_{mode}_zoom.png", dpi=300, bbox_inches='tight')
 
    
     import numpy as np

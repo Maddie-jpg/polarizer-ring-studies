@@ -561,9 +561,9 @@ with open(f'{folder}/TwissResults.json', 'w') as f:
 
 
 if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
 else:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
     
 ring=pdr.lines['ring']
 ring.element_dict['RFCav'].voltage = 20e6
