@@ -47,9 +47,9 @@ if pdf_run is True:
 
 # %%
 if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
 else:
-    pdr= xt.Environment.from_json(f"JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
 
 ring=pdr.lines['ring']
 print(ring.element_names)
