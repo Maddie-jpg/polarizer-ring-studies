@@ -9,7 +9,6 @@ import xtrack as xt
 import numpy as np
 import constants
 
-
 # ----------------------
 # Module-level helpers
 # ----------------------
@@ -179,6 +178,76 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
 # ----------------
 # Shared Builders
 # ----------------
+def get_bshape4(L, bb0, bp0, bbL, bpL, bint):
+    t1 = np.array([1, 0, -18,  32, -15 ])  # p(0)=1
+    t2 = np.array([0, 1, -9/2, 6,  -5/2])  # p'(0)=1
+    t3 = np.array([0, 0, -12,  28, -15 ])  # p(L)=1
+    t4 = np.array([0, 0, 3/2,  -4,  5/2])  # p'(L)=1
+    t5 = np.array([0, 0, 30,   -60, 30 ])  # int_0^1 dx p(x)=1
+    return (bb0*t1 + L*bp0*t2 + bbL*t3 + L*bpL*t4 + bint/L*t5) * L**np.arange(0, -5, -1)
+
+def make_fringe_bend(pdr, name, length, angle, gap, fringe_frac=3,
+                      nstep=10, ny=5):
+    """
+    Build a soft-edge dipole (5 FieldExpansion slices, smooth entrance/exit
+    fringe + flat body) sized to a real magnet, and register it as a named
+    sub-line `name` in the Environment `pdr`.
+ 
+    Parameters
+    ----------
+    pdr    : xt.Environment your lattice is built in
+    name   : str, name to register the sub-line under
+    length : float, physical magnet length (e.g. pdr['l_bend'])
+    angle  : float, total design bend angle (e.g. pdr['hBarc']*pdr['l_bend'])
+    gap    : float, physical magnet gap -- sets the fringe extent
+    fringe_frac : how many gaps wide each fringe region is (example used 3)
+    nstep, ny   : FieldExpansion integration-accuracy knobs (unchanged
+                  meaning from the example)
+ 
+    length and angle must be plain numbers -- evaluate any knob
+    expressions before calling this (e.g. pdr['l_bend'], not 'l_bend').
+ 
+    Once built, place it into a line exactly like any other component:
+        pdr.place(name)
+    """
+    h = angle / length          # curvature = field, as in the example
+    bmax = h
+ 
+    fringe_length = fringe_frac * gap
+    body_length = length - fringe_length
+    assert body_length >= 0, (
+        f"{name}: length={length} is too short for gap={gap} "
+        f"(fringe alone needs {fringe_length}); this magnet needs a "
+        f"different fringe model or a smaller fringe_frac.")
+ 
+    b_in   = get_bshape4(fringe_length, 0, 0, bmax, 0, fringe_length*bmax/2)
+    b_body = np.array([bmax])
+    b_out  = get_bshape4(fringe_length, bmax, 0, 0, 0, fringe_length*bmax/2)
+ 
+    # NOTE: FieldExpansion is not in Environment.new()'s allowed-class
+    # whitelist, so it must be added directly via pdr.elements[...] = ...
+    # (this is what the ValueError from env.new() tells you to do).
+    pdr.elements[f'{name}_e0'] = xt.FieldExpansion(length=fringe_length/2,
+            b=np.array([b_in]), a=0*np.array([b_in]), bs=0*b_in,
+            ny=ny, nstep=nstep)
+    pdr.elements[f'{name}_e1'] = xt.FieldExpansion(length=fringe_length/2,
+            b=np.array([b_in]), a=0*np.array([b_in]), bs=0*b_in,
+            ny=ny, nstep=nstep, h=h)
+    pdr.elements[f'{name}_e2'] = xt.FieldExpansion(length=body_length,
+            b=np.array([b_body]), a=0*np.array([b_body]), bs=0*b_body,
+            ny=ny, nstep=nstep, h=h)
+    pdr.elements[f'{name}_e3'] = xt.FieldExpansion(length=fringe_length/2,
+            b=np.array([b_out]), a=0*np.array([b_out]), bs=0*b_out,
+            ny=ny, nstep=nstep, h=h)
+    pdr.elements[f'{name}_e4'] = xt.FieldExpansion(length=fringe_length/2,
+            b=np.array([b_out]), a=0*np.array([b_out]), bs=0*b_out,
+            ny=ny, nstep=nstep)
+ 
+    return pdr.new_line(
+        name=name,
+        components=[f'{name}_e0', f'{name}_e1', f'{name}_e2',
+                    f'{name}_e3', f'{name}_e4'])
+ 
 
 def _make_env(fringe_fields):
     pdr = xt.Environment()
@@ -187,17 +256,11 @@ def _make_env(fringe_fields):
     return pdr, fringe_fields, 'full' if fringe_fields else 'linear'
 
 
-def _make_base_elements(pdr, quad_edge, bend_edge):
-    pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend',
-            k0_from_h=True,
-            edge_entry_angle='hBarc*l_bend/2',
-            edge_exit_angle='hBarc*l_bend/2',
-            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
-    pdr.new('BendDS', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS',
-            k0_from_h=True,
-            edge_entry_angle='hBarc*l_bendDS/2',
-            edge_exit_angle='hBarc*l_bendDS/2',
-            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+def _make_base_elements(pdr, quad_edge, bend_edge,gap=0.05):
+    make_fringe_bend(pdr, 'Bend',   pdr['l_bend'],
+                      pdr['hBarc']*pdr['l_bend'],   gap=gap)
+    make_fringe_bend(pdr, 'BendDS', pdr['l_bendDS'],
+                      pdr['hBarc']*pdr['l_bendDS'], gap=gap)
     pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc',
             edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc',
@@ -236,9 +299,9 @@ def _make_base_elements(pdr, quad_edge, bend_edge):
 def _make_reference_cells(pdr):
     cell_arc = pdr.new_line(components=[
         pdr.new('QF_cell_arcH1',   'QFarcH'), pdr.place('Drarc'),
-        pdr.new('Bend1_cell_arcH', 'Bend'),   pdr.place('Drarc'),
+        pdr.place('Bend'),                    pdr.place('Drarc'),
         pdr.new('QD_cell_arcH',    'QDarc'),  pdr.place('Drarc'),
-        pdr.new('Bend2_cell_arcH', 'Bend'),   pdr.place('Drarc'),
+        pdr.place('Bend'),                    pdr.place('Drarc'),
         pdr.new('QF_cell_arcH2',   'QFarcH'),
     ])
     cell_tr = pdr.new_line(components=[
@@ -397,18 +460,18 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
     def makesextant(name, fall):
         comps = []
         for ind in range(int(pdr['N_cells_S']) - 1):
-            comps += [pdr.place('Drarc'), pdr.new(f'Bend1_{name}{ind+1}', 'Bend'),
+            comps += [pdr.place('Drarc'), pdr.place('Bend'),
                       pdr.place('Drarc'), pdr.new(f'QDA_{name}{ind+1}',   'QDarc'),
-                      pdr.place('Drarc'), pdr.new(f'Bend2_{name}{ind+1}', 'Bend'),
+                      pdr.place('Drarc'), pdr.place('Bend'),
                       pdr.place('Drarc'), pdr.new(f'QFA_{name}{ind+1}',   'QFarc')]
         n = int(pdr['N_cells_S'])
         comps[-1] = pdr.new(f'QFA_M{name}{n-1}', 'QFarcM')
-        comps += [pdr.place('Drarc'),  pdr.new(f'Bend1_{name}{n}', 'Bend'),
+        comps += [pdr.place('Drarc'),  pdr.place('Bend'),
                   pdr.place('Drarc'),  pdr.new(f'QDA_M{name}{n}',  'QDarcM'),
-                  pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend'),
+                  pdr.place('Drarc'),  pdr.place('Bend'),
                   pdr.place('DrarcS'), pdr.new(f'QFDS_{name}',     'QFDS'),
                   pdr.place('DrDSL'),  pdr.new(f'QDDS_{name}',     'QDDS'),
-                  pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
+                  pdr.place('Drarc'),  pdr.place('BendDS'),
                   pdr.place('DrTrans'),pdr.new(f'QFDoub_{name}',   'QFDoub'),
                   pdr.place('DrDoub'), pdr.new(f'QDDoub_{name}',   'QDDoub'),
                   pdr.place('DrTripl'),pdr.new(f'QDTrip_{name}1',  'QDtr')]
@@ -428,9 +491,9 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
     arc1R = makesextant('xR', 'symm')
     arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
                  at='(l_tripl+l_quad)/2', from_='QDDoub_xR')
-    arc1R_sliced = _sliced(arc1R)
+    #arc1R_sliced = _sliced(arc1R)
     period       = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
-    period_sliced = _sliced(period)
+    #period_sliced = _sliced(period)
     ring = (makesextant('1R', 'right') + makesextant('2L', 'left') +
             makesextant('2R', 'right') + makesextant('3L', 'left') +
             makesextant('3R', 'right') + makesextant('1L', 'left'))
