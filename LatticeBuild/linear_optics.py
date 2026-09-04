@@ -46,7 +46,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6, MakePlot=Fals
             xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
             xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
             xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
-            xt.VaryList([''], step=1e-5,limits=(0.1,0.8))
+            xt.VaryList(['l_trans','l_doub'], step=1e-5,limits=(0.05,0.9))
         ],
         targets=[
             xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
@@ -227,8 +227,8 @@ def _make_base_elements(pdr, quad_edge, bend_edge):
             edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('Drarc',  xt.Drift, length='l_drift')
     pdr.new('DrarcS', xt.Drift, length='l_drift + dl_drift')
-    pdr.new('DrDSL',  xt.Drift, length='2*l_drift + l_bend + dl_noben')
-    pdr.new('DrTrans',xt.Drift, length='l_drift + dl_trans')
+    pdr.new('DrDSL',  xt.Drift, length='l_DSL')
+    pdr.new('DrTrans',xt.Drift, length='l_trans')
     pdr.new('DrDoub', xt.Drift, length='l_doub')
     pdr.new('DrTripl',xt.Drift, length='l_tripl')
     pdr.new('DrTrips',xt.Drift, length='l_trips')
@@ -371,12 +371,12 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
         'l_sext':   0.20,
     })'''
     pdr.vars({
-            'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4,
+            'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4, 
             'dl_noben': 0.95,   'l_quad':   0.30,
-            'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
+            'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.', 
             'dl_drift': -0.0,   'dl_trans': 0.20,
             'l_doub':   0.25,   'l_tripl':  2.5,    'l_trips':  0.40,
-            'l_sext':   0.20,
+            'l_sext':   0.20, 'l_trans': 'l_drift+dl_trans', 'l_DSL':'2*l_drift + l_bend + dl_noben'
         })
 
 
@@ -476,7 +476,7 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True, WP
                 'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
                 'dl_drift': -0.0,   'dl_trans': 0.20,
                 'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
-                'l_sext':   0.20,
+                'l_sext':   0.20, 'l_DSL':'2*l_drift + l_bend + dl_noben'
             })
     pdr.vars({
         'N_cells_S': 8,

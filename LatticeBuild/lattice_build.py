@@ -17,8 +17,8 @@ from pathlib import Path
 
 #%%
 
-design=3
-config=2
+design=1
+config=9
 mode='perfect' # 'perfect', 'misaligned', or 'corrected'
 phase=90
 changes=None
@@ -28,7 +28,7 @@ SEED=123456789
 
 if mode == 'perfect':
     #Linear optics - uncomment desired optics
-    pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=(15.42,15.38),phase_advance=0.25)
+    pdr=lo.three_fold_periodicity(fringe_fields=True,matched=True,WP=(15.58,15.38),phase_advance=0.25)
     sc.config_D1_C9(pdr)
     '''pdr=lo.two_fold_racetrack_3straight(fringe_fields=True,matched=True,WP=(13.65,13.23),phase_advance=0.25,betay_DS_target=False)
     sc.config_D2_C1(pdr)'''
@@ -72,9 +72,9 @@ elif mode=='corrected':
 #%%
 #Save json file
 if changes is not None:
-    file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json'
+    file_path_str = f'../JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json'
 else:
-    file_path_str = f'../JSON Files/D{design}/C{config}/pdr_{mode}_{phase}.json'
+    file_path_str = f'../JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json'
 
 output_file = Path(file_path_str)
 

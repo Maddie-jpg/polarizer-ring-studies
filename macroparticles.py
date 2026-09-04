@@ -1,9 +1,7 @@
 # %%
-#imports
 import sys
 import os
 
-# Adds the parent directory to the search path
 parent_dir = os.path.abspath('..')
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
@@ -18,19 +16,21 @@ import xobjects as xo
 from scipy.stats import gaussian_kde
 import my_functions as mf
 
-
 # %%
-design=int(os.environ.get('DESIGN',3))
-config=int(os.environ.get('CONFIG',2))
+design=int(os.environ.get('DESIGN',1))
+config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
 
-# %%
-#read in file
-df = pd.read_csv('PositronBeam_2p86GeV/Beam_3GHzOption_2.86GeV_20260421.dat', sep=r'\s+')
-print(list(df.columns))
+# Energy Compressor System (ECS) on/off switch. Set the env var to
+# '0'/'false'/'off' to bypass the R56/Vdeb/Phasdeb transform below and run
+# on the raw (uncompressed) beam distribution instead.
+ENERGY_COMPRESSOR_ON = os.environ.get('ENERGY_COMPRESSOR', 'false').strip().lower() not in ('0', 'false', 'off', 'no')
 
+# %%
+df = pd.read_csv('PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat', sep=r'\s+')
+print(list(df.columns))
 
 # %%
 
@@ -42,19 +42,37 @@ def filter_beam_core(df_raw, n_sigma=4):
     cols = ['x[mm]', 'xp[mrad]', 'y[mm]', 'yp[mrad]', 't[mm/c]', 'p[MeV/c]']
     df_centered = df_raw[cols] - df_raw[cols].mean()
     
-    # Calculate the covariance matrix and its inverse for the 6D ellipsoid
     cov_matrix = df_centered.cov()
     inv_cov_matrix = np.linalg.inv(cov_matrix.values)
     
-    # Calculate Mahalanobis distance squared for each particle
-    # This acts as a multi-dimensional sigma measure
     distances_sq = np.sum(np.dot(df_centered.values, inv_cov_matrix) * df_centered.values, axis=1)
     
-    # Keep particles where distance is less than n_sigma^2
     is_core = distances_sq <= (n_sigma ** 2)
     
     print(f"--> Filtering Beam Core ({n_sigma} sigma): Retained {np.sum(is_core)} / {len(df_raw)} particles.")
     return df_raw[is_core].copy()
+
+def select_main_bunch(df_in, t_col='t[mm/c]', mad_k=10):
+    """Isolates the main bunch in time and discards any distant satellite
+    population, WITHOUT assuming a fixed absolute t value. Different beam
+    files put the bunch at very different t[mm/c] centers (and the Energy
+    Compressor's z*1e-3 rescale shifts it again), so a hardcoded cutoff
+    like '< 278540' silently breaks -- or empties out entirely -- on any
+    other file. This centers on the median and uses a robust
+    Median-Absolute-Deviation window instead, which adapts automatically
+    to whatever file/units are actually loaded."""
+    t_vals = np.asarray(df_in[t_col].values, dtype=float)
+    med = np.median(t_vals)
+    mad = np.median(np.abs(t_vals - med))
+    if mad == 0:
+        return df_in.copy()
+    window = mad_k * mad * 1.4826  # scale MAD to an approx-sigma equivalent
+    mask = np.abs(t_vals - med) < window
+    if mask.sum() < 2:
+        # Window ended up too tight to be useful -- fall back to
+        # everything rather than handing an empty/singleton set downstream.
+        return df_in.copy()
+    return df_in[mask].copy()
 
 def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles=500, num_turns=100, seed=74):
     """
@@ -68,13 +86,11 @@ def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles
     k = 2 * np.pi * freq / c
     fixed_e_mev = p0c_ref / 1e6
 
-    # Sample a subset for fast tracking (consistent with Cell 16)
     
     df_subset = df_raw.sample(n=n_particles, random_state=seed)
     
-    # 1. Apply the ECS equations to the initial uncompressed coordinates
-    z_i = df_subset['t[mm/c]'].values * 1e-3  # metres
-    p_i = df_subset['p[MeV/c]'].values        # MeV/c
+    z_i = df_subset['t[mm/c]'].values * 1e-3
+    p_i = df_subset['p[MeV/c]'].values
     Eref = np.mean(p_i)
     delta_i = p_i / Eref - 1
 
@@ -82,10 +98,8 @@ def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles
     delta_f = delta_i + Vdeb * np.sin(k * z_f + Phasdeb)
     p_f = Eref * (1 + delta_f)
 
-    # Calculate relative RMS momentum spread (%)
     rms_spread = (np.std(p_f) / np.mean(p_f)) * 100
 
-    # 2. Map coordinates to Xtrack Particles with dispersion matching
     x_in = df_subset['x[mm]'].values / 1000.0
     px_in = df_subset['xp[mrad]'].values / 1000.0
     y_in = df_subset['y[mm]'].values / 1000.0
@@ -108,13 +122,11 @@ def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles
         zeta=zeta_in
     )
 
-    # 3. Track through the ring to measure injection efficiency
     ring.track(p_test, num_turns=num_turns)
     survived = np.sum(p_test.state > 0)
     efficiency = (survived / n_particles) * 100
 
     return rms_spread, efficiency
-
 
 def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
     """
@@ -122,7 +134,6 @@ def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
     """
     np.random.seed(42)
     
-    # Define search bounds centered around your current best region
     R56_samples = np.random.uniform(0.20, 0.45, n_samples)
     Vdeb_samples = np.random.uniform(-0.15, 0.0, n_samples)
     Phasdeb_samples = np.random.uniform(0.10, 0.45, n_samples)
@@ -152,70 +163,64 @@ def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
             
     df_res = pd.DataFrame(scan_results)
     
-    # Sort first by highest injection efficiency, then by lowest momentum spread
     df_res = df_res.sort_values(by=['Efficiency_%', 'RMS_Spread_%'], ascending=[False, True])
     return df_res
 
-# Run the scan
 df_raw=filter_beam_core(df, n_sigma=4)
-
 
 # %%
 '''
 scan_df = run_multi_objective_scan(df_raw, ring, ring_tw, p0c_reference, n_samples=150)
 
-# Display the top 10 best configurations
 print("\nTop 10 configurations (Highest Efficiency + Lowest Spread):")
 display(scan_df.head(10))'''
 
 # %%
 df_copy = df_raw.copy()
 
-
 Eref = np.mean(df['p[MeV/c]'])
 R56= 0.352963
 Vdeb= -0.048365
 Phasdeb= 0.29229
 
-V_int=abs(Vdeb)*Eref
-print(f'{V_int} MeV')
-
-# Relative momentum deviation
-delta_i = df_copy['p[MeV/c]']/Eref - 1
-
-# Convert z to meters
-z_i = df_copy['t[mm/c]']*1e-3
-
-# Compressor
-z_f = z_i + R56*delta_i
-
-# RF wave number
 c = 299792458
 freq = 3e9
 k = 2*np.pi*freq/c
 
-# RF kick
-delta_f = delta_i + Vdeb*np.sin(k*z_f + Phasdeb)
+main_bunch = select_main_bunch(df)
 
-# Final momentum
-p_f = Eref*(1+delta_f)
+if ENERGY_COMPRESSOR_ON:
+    V_int=abs(Vdeb)*Eref
+    print(f'{V_int} MeV')
 
-# Store
-df_copy['t[mm/c]'] = z_f
-df_copy['delta_final'] = delta_f
-df_copy['p[MeV/c]'] = p_f
+    delta_i = df_copy['p[MeV/c]']/Eref - 1
 
-main_bunch = df[df['t[mm/c]'] < 278540]
-main_bunch_copy = df_copy[df_copy['t[mm/c]'] < 278.540]
+    z_i = df_copy['t[mm/c]']*1e-3
 
-plt.scatter(main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'], s=0.2)
-plt.show()
+    z_f = z_i + R56*delta_i
 
-plt.scatter(main_bunch_copy['t[mm/c]'], main_bunch_copy['p[MeV/c]'], s=0.2)
+    delta_f = delta_i + Vdeb*np.sin(k*z_f + Phasdeb)
 
-plt.show()
+    p_f = Eref*(1+delta_f)
 
+    df_copy['t[mm/c]'] = z_f
+    df_copy['delta_final'] = delta_f
+    df_copy['p[MeV/c]'] = p_f
 
+    main_bunch_copy = select_main_bunch(df_copy)
+
+    plt.scatter(main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'], s=0.2)
+    plt.title('Before Energy Compressor')
+    plt.show()
+
+    plt.scatter(main_bunch_copy['t[mm/c]'], main_bunch_copy['p[MeV/c]'], s=0.2)
+    plt.title('After Energy Compressor')
+    plt.show()
+else:
+    print('Energy Compressor OFF -- using raw beam distribution unchanged.')
+    plt.scatter(main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'], s=0.2)
+    plt.title('Beam Distribution (Energy Compressor OFF)')
+    plt.show()
 
 # %%
 df=df_copy
@@ -241,9 +246,7 @@ def CalcEmittanceAuto(df, position, angle):
     emittance = np.sqrt(np.linalg.det(cov))
     return emittance
 
-
 def NormalisedEmittance(emittance, E_total_mev):
-    # Electron/Positron rest mass in MeV
     m0 = 0.510998 
     
     gamma_rel = E_total_mev / m0
@@ -256,7 +259,6 @@ def get_twiss(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0):
     pos = df[position].values
     ang = df[angle].values
     
-    # Calculate emittance 
     eps = CalcEmittanceAuto(df, position, angle)
     
     cov_matrix = np.cov(pos, ang, ddof=0)
@@ -265,14 +267,11 @@ def get_twiss(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0):
     alpha = -cov_matrix[0, 1] / eps
     gamma = (1 + alpha**2) / beta
     
-    # Dispersion calculation
     delta = (df[p_col].values - p0_mev) / p0_mev
     dispersion_x = np.cov(pos, delta, ddof=0)[0, 1] / np.var(delta)
     disp_prime_x = np.cov(ang, delta, ddof=0)[0, 1] / np.var(delta)
     
     return alpha, beta, gamma, dispersion_x, disp_prime_x
-
-
 
 def plot_twiss_ellipse(beta, alpha, beta2, alpha2, emittance,ax):
     gamma = (1 + alpha**2) / beta
@@ -283,9 +282,8 @@ def plot_twiss_ellipse(beta, alpha, beta2, alpha2, emittance,ax):
     x2 = np.sqrt(emittance * beta2) * np.cos(theta)
     xp2 = -np.sqrt(emittance / beta2) * (alpha2 * np.cos(theta) - np.sin(theta))
     
-    #ax.figure(figsize=(6,6))
-    ax.plot(x1, xp1, label=f'Particle distribution',color='blue')#: α={alpha:.2f}, β={beta:.2f} m',color='blue')
-    ax.plot(x2, xp2, label=f'Initial ring parameters',color='red')#: α={alpha2:.2f}, β={beta2:.2f} m',color='red')
+    ax.plot(x1, xp1, label=f'Particle distribution',color='blue')
+    ax.plot(x2, xp2, label=f'Initial ring parameters',color='red')
     ax.axhline(0, color='black', lw=0.5, ls='--')
     ax.axvline(0, color='black', lw=0.5, ls='--')
     ax.grid(True, linestyle=':', alpha=0.6)
@@ -326,7 +324,6 @@ def plot_twiss_ellipse_normalised(beta_l,alpha_l,beta_r, alpha_r,disp,ddisp,delt
     x = np.sqrt(emittance * beta_l) * np.cos(phi)
     xp = - (np.sqrt(emittance / beta_l)) * (alpha_l * np.cos(phi) + np.sin(phi))
 
-
     zeta=(1/(np.sqrt(beta_l)))*x
     zeta_prime=np.sqrt(beta_l)*xp+(alpha_l/np.sqrt(beta_l))*x
 
@@ -338,7 +335,6 @@ def plot_twiss_ellipse_normalised(beta_l,alpha_l,beta_r, alpha_r,disp,ddisp,delt
 
     print(disp*delta)
 
-
     zeta_r_d=(1/(np.sqrt(beta_r)))*x_b
     zeta_prime_r_d=np.sqrt(beta_r)*xp_b+(alpha_r/np.sqrt(beta_r))*x_b
 
@@ -347,8 +343,6 @@ def plot_twiss_ellipse_normalised(beta_l,alpha_l,beta_r, alpha_r,disp,ddisp,delt
     ax.axis('equal') 
     ax.grid(True, linestyle=':')
     ax.legend()
-
-
 
 def plot_twiss_with_particles(df, pos_col, ang_col, alpha, beta, emittance):
     gamma = (1 + alpha**2) / beta
@@ -375,18 +369,22 @@ def plot_twiss_with_particles(df, pos_col, ang_col, alpha, beta, emittance):
     
     plt.show()
 
-
-
 def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     x = np.asarray(x)
     y = np.asarray(y)
 
-    # Estimate density
+    if len(x) < 2 or np.ptp(x) == 0 or np.ptp(y) == 0:
+        # gaussian_kde needs >=2 points with some spread in both dimensions;
+        # fall back to a plain (undensity-colored) scatter rather than
+        # crashing when a cut upstream leaves too little data.
+        print(f"[density_scatter] Only {len(x)} point(s) after filtering -- "
+              f"skipping KDE coloring, plotting plain scatter instead.")
+        return ax.scatter(x, y, s=s, **kwargs)
+
     xy = np.vstack([x, y])
     z = gaussian_kde(xy)(xy)
     z = z / z.max()
 
-    # Sort so densest points are plotted last (on top)
     idx = z.argsort()
     x, y, z = x[idx], y[idx], z[idx]
 
@@ -396,19 +394,13 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
 
 emittance_x=CalcEmittanceAuto(df, 'x[mm]', 'xp[mrad]')
 m_emittance_x=CalcEmittanceManual(df, 'x[mm]', 'xp[mrad]')
-#nemitt_x=NormalisedEmittance(df['x[mm]'],df['xp[mrad]'],emittance_x)
-#print(nemitt_x)
 print(f'Horizontal geometric emittance:{emittance_x} um, {m_emittance_x}um' )
 
 emittance_y=CalcEmittanceAuto(df, 'y[mm]', 'yp[mrad]')
 m_emittance_y=CalcEmittanceManual(df, 'y[mm]', 'yp[mrad]')
 print(f'Vertical geometric emittance:{emittance_y} um, {m_emittance_y}um' )
-#nemitt_y=NormalisedEmittance(df['x[mm]'],df['xp[mrad]'],emittance_y)
-#print(nemitt_y)
 
-# Correct way to call it:
 ax, bx, gx, dx, ddx = get_twiss(df, 'x[mm]', 'xp[mrad]')
-# Correct way to call it:
 ay, by, gy, dy, ddy = get_twiss(df, 'y[mm]', 'yp[mrad]')
 print(f"Beam Twiss: alpha_x={ax:.3f}, beta_x={bx:.3f} m, dx={dx:.3f} m,ddx={ddx:.3f} m")
 print(f"Beam Twiss: alpha_y={ay:.3f}, beta_y={by:.3f} m, dy={dx:.3f} m,ddy={ddx:.3f} m")
@@ -420,7 +412,6 @@ rms_spread = np.std(p_array)
 relative_spread = (rms_spread / p_avg) *100
 
 print(f"RMS Momentum Spread: {relative_spread} %")
-
 
 # %%
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
@@ -437,7 +428,7 @@ axes[0, 1].set_ylabel('yp [mrad]')
 axes[0, 1].set_title('Vertical Phase Space')
 fig.colorbar(sc1, ax=axes[0, 1], label='Relative Density')
 
-main_bunch = df[df['t[mm/c]'] < 278.540]
+main_bunch = select_main_bunch(df)
 sc2 = density_scatter(axes[1, 0], main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'])
 axes[1, 0].set_xlabel('t [mm/c]')
 axes[1, 0].set_ylabel('p [MeV/c]')
@@ -457,45 +448,34 @@ plt.savefig(f'{folder}/phase_space_plots.png')
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 
-# Apply mask consistently
-mask = df['t[mm/c]'] < 278.540
+main_bunch_hist = select_main_bunch(df)
 
-t = df.loc[mask, 't[mm/c]']
-p = df.loc[mask, 'p[MeV/c]']
+t = main_bunch_hist['t[mm/c]']
+p = main_bunch_hist['p[MeV/c]']
 
-# Style
 plt.style.use('ggplot')
 
-# Figure layout — extra slim column (4) reserved for the colorbar
 fig = plt.figure(figsize=(8,9))
 gs = GridSpec(
     4, 6,
-    width_ratios=[1, 1, 1, 0.9, 0.3, 0.08],  # last real col + gap + colorbar
+    width_ratios=[1, 1, 1, 0.9, 0.3, 0.08],
     height_ratios=[0.8, 1, 1, 1], 
     hspace=0.08,
     wspace=0.15
 )
 
-# Axes
 ax_main  = fig.add_subplot(gs[1:4, 0:3])
 ax_top   = fig.add_subplot(gs[0, 0:3], sharex=ax_main)
 ax_right = fig.add_subplot(gs[1:4, 3], sharey=ax_main)
 cax      = fig.add_subplot(gs[1:4, 4])
 
-# =========================
-# Main longitudinal phase space (density coloured)
-# =========================
 sc = density_scatter(ax_main, t, p, s=4, alpha=0.8)
 
 ax_main.set_xlabel(r'$t$ [mm/c]')
 ax_main.set_ylabel(r'$p$ [MeV/c]')
-#ax_main.set_title('Longitudinal Phase Space')
 
 fig.colorbar(sc, cax=cax, label='Relative Density')
 
-# =========================
-# Top histogram
-# =========================
 ax_top.hist(
     t,
     bins=100,
@@ -505,9 +485,6 @@ ax_top.hist(
 ax_top.set_ylabel('Counts')
 ax_top.tick_params(axis='x', labelbottom=False)
 
-# =========================
-# Right histogram
-# =========================
 ax_right.hist(
     p,
     bins=100,
@@ -528,7 +505,6 @@ plot_twiss_with_particles(df, 'y[mm]', 'yp[mrad]', ay, by, emittance_y)
 
 # %%
 
-# Save twiss results
 beam_results = {
     "x": {
         "alpha": float(ax),
@@ -556,9 +532,7 @@ beam_results = {
 with open(f'{folder}/TwissResults.json', 'w') as f:
     json.dump(beam_results, f, indent=4)
 
-
 # %%
-
 
 if changes is not None:
     pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
@@ -569,13 +543,10 @@ ring=pdr.lines['ring']
 ring.element_dict['RFCav'].voltage = 20e6
 ring.element_dict['RFCav_1'].voltage = 20e6
 
-#ring twiss values
 ring_tw=ring.twiss6d()
 print(ring_tw.cols)
-# Initial values
 initial_twiss = ring_tw.rows[0]
 
-#Horizontal
 betx0 = initial_twiss['betx'][0]
 alfx0 = initial_twiss['alfx'][0]
 dx0   = initial_twiss['dx'][0]
@@ -583,8 +554,6 @@ ddx0   = initial_twiss['ddx'][0]
 x     = initial_twiss['x'][0]
 xp_v    = initial_twiss['px'][0]
 
-
-#Vertical
 bety0 = initial_twiss['bety'][0]
 alfy0 = initial_twiss['alfy'][0]
 dy0   = initial_twiss['dy'][0]
@@ -616,7 +585,6 @@ axes[0, 1].set_title("Horizontal: Normalized Phase Space")
 axes[0, 1].set_xlabel(r"$\zeta_x$")
 axes[0, 1].set_ylabel(r"$\zeta'_x$")
 
-
 axes[1, 0].set_title("Vertical: Physical Phase Space")
 axes[1, 0].set_xlabel("y [mm]")
 axes[1, 0].set_ylabel("yp [mrad]")
@@ -629,19 +597,14 @@ plt.tight_layout()
 plt.savefig(f'{folder}/twiss_ellipses.png')
 plt.show()
 
-
 # %%
-# ============================================================
-# ENERGY SCAN — run first, to find the optimal reference energy
-# ============================================================
 rand_num = 74
 n_subset = 500
 df_subset = df.sample(n=n_subset, random_state=rand_num)
 
-p0c_avg_mev = df['p[MeV/c]'].mean()          # average measured beam momentum
+p0c_avg_mev = df['p[MeV/c]'].mean()
 p0c_avg = p0c_avg_mev * 1e6
 ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
-
 
 def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
     """Apply dispersion-based matching to raw beam coordinates for a given
@@ -656,7 +619,6 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
     t_mm = df_in['t[mm/c]'].values
     zeta = (np.mean(t_mm) - t_mm) * 1e-3 * ref_particle.beta0[0]
     return x_matched, px_matched, y_matched, py_matched, delta, zeta
-
 
 x_m, px_m, y_m, py_m, _, zeta_m = match_coordinates(
     df_subset, p0c_avg, ref_particle_avg, dx, ddx, dy, ddy)
@@ -705,26 +667,18 @@ plt.show()
 print(f"\nThe best injection efficiency is at {best_energy_mev:.3f} MeV.")
 
 # %%
-# ============================================================
-# COMPRESSOR PARAMETERS — computed once, independent of which
-# reference energy is tracked below
-# ============================================================
 compressor_params = {
     "RF_voltage": ring.element_dict['RFCav'].voltage,
-    "R_56": R56,
-    "V_deb": Vdeb,
-    "Phase_deb": Phasdeb,
+    "energy_compressor_enabled": ENERGY_COMPRESSOR_ON,
+    "R_56": R56 if ENERGY_COMPRESSOR_ON else None,
+    "V_deb": Vdeb if ENERGY_COMPRESSOR_ON else None,
+    "Phase_deb": Phasdeb if ENERGY_COMPRESSOR_ON else None,
 }
 with open(f'{folder3}/CompressorParams.json', 'w') as f:
     json.dump(compressor_params, f, indent=4)
 
 # %%
-# ============================================================
-# FULL MULTI-TURN TRACKING — loop over average / nominal / optimal
-# reference energies (nominal = design energy; optimal = result of
-# the energy scan above)
-# ============================================================
-nominal_energy_mev = 2860.0   # design reference energy
+nominal_energy_mev = 2860.0
 
 energies_to_track = {
     'average': p0c_avg_mev,
@@ -766,7 +720,6 @@ for label, e_mev in energies_to_track.items():
                               metric='InjectionEfficiency', sub=mode,
                               sub2=f'{label}_{int(e_mev)}MeV')
 
-    # --- phase-space snapshot at selected turns ---
     fig, ax = plt.subplots(1, 3, figsize=(14, 4))
     fig.subplots_adjust(wspace=0.4)
 
@@ -788,7 +741,6 @@ for label, e_mev in energies_to_track.items():
     plt.savefig(f'{folder2}/injection_tracking_evolution_{rand_num}_{e_mev:.0f}MeV.png')
     plt.show()
 
-    # --- early-turn phase space grid ---
     fig, axes = plt.subplots(4, 3, figsize=(15, 18))
     fig.subplots_adjust(hspace=0.4, wspace=0.35)
 
@@ -812,7 +764,6 @@ for label, e_mev in energies_to_track.items():
     plt.savefig(f'{folder2}/initial_turns_{rand_num}_{e_mev:.0f}MeV.png')
     plt.show()
 
-    # --- survival vs turn number ---
     survival_counts = np.sum(data.state > 0, axis=0)
     turns = np.arange(len(survival_counts))
 
@@ -830,7 +781,6 @@ for label, e_mev in energies_to_track.items():
     print(f"[{label}] Final Survival: {survival_counts[-1]} / {survival_counts[0]} "
           f"({final_efficiency:.2f}%)")
 
-    # --- initial x distribution ---
     plt.figure(figsize=(8, 6))
     plt.hist(data.x[:, 0] * 1000, bins=50, color='C0', edgecolor='black', alpha=0.7)
     plt.xlabel('$x$ (mm)')
@@ -841,3 +791,127 @@ for label, e_mev in energies_to_track.items():
     plt.show()
 
 print("\nDone: tracked average, nominal, and optimal reference energies.")
+
+# %%
+if mode == 'perfect':
+    import LatticeBuild.misalignments_corrections as mc
+
+    seeds = [100, 200, 300, 400, 500]
+    misalignment_val = 0.25e-3
+    seed_energy_mev = best_energy_mev
+
+    context_tracking = xo.ContextCpu(omp_num_threads=0)
+
+    if design == 1 and config == 1:
+        mc.insert_BPMs_all_as_markers(pdr)
+        mc.insert_correctors_var2(pdr)
+    else:
+        mc.insert_BPMs_all_as_markers(pdr)
+        mc.insert_correctors(pdr)
+
+    def prep_seed_line(base_line, seed, apply_correction):
+        """One misaligned (optionally corrected) realization of base_line."""
+        seed_line = base_line.copy()
+        seed_line.configure_radiation(model='mean')
+        seed_line.build_tracker(_context=context_tracking)
+        seed_line = mc.misalignments(seed_line, misalignment_val, seed=seed)
+
+        if apply_correction:
+            tw = seed_line.twiss(method='6d', radiation_integrals=True,
+                                  eneloss_and_damping=True)
+            mc.misalignments_correctors(seed_line, misalignment_val, seed + 1)
+            try:
+                mc.orbit_correction(seed_line, tw, threading=False, seed=seed)
+            except Exception as e:
+                print(f"  [seed {seed}] orbit_correction(threading=False) raised: {e}")
+                mc.orbit_correction(seed_line, tw, threading=True, seed=seed)
+
+        return seed_line
+
+    def track_seed_line(seed_line, e_mev):
+        """Same matching + 6100-turn tracking as the baseline loop above,
+        applied to one seed's line. Returns just what the overlay plots
+        need: the survival curve and the seed line's initial optics."""
+        p0c_ref = e_mev * 1e6
+        ref_particle = xp.Particles(p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV)
+        x_m, px_m, y_m, py_m, delta_m, zeta_m = match_coordinates(
+            df_subset, p0c_ref, ref_particle, dx, ddx, dy, ddy)
+
+        particles = xp.Particles(
+            p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV,
+            x=x_m, px=px_m, y=y_m, py=py_m, zeta=zeta_m, delta=delta_m
+        )
+
+        seed_tw = seed_line.twiss6d()
+        seed_line.configure_radiation(model='quantum')
+        seed_line.track(particles, num_turns=6100,
+                         turn_by_turn_monitor=True, with_progress=False)
+        data_seed = seed_line.record_last_track
+        survival_counts_seed = np.sum(data_seed.state > 0, axis=0)
+
+        
+        t0 = seed_tw.rows[0]
+        seed_line.configure_radiation(model='mean')
+        return survival_counts_seed, t0['betx'][0], t0['alfx'][0], t0['bety'][0], t0['alfy'][0]
+
+    folder_seeds = mf.results_dir(design, config, phase, changes=changes,
+                                   metric='InjectionEfficiency', sub='SeedStudy')
+
+    fig_surv_mis, ax_surv_mis = plt.subplots(figsize=(10, 6))
+    fig_surv_cor, ax_surv_cor = plt.subplots(figsize=(10, 6))
+    fig_ell_mis, axs_ell_mis = plt.subplots(1, 2, figsize=(13, 6))
+    fig_ell_cor, axs_ell_cor = plt.subplots(1, 2, figsize=(13, 6))
+
+    colors = plt.cm.viridis(np.linspace(0, 1, len(seeds)))
+    theta = np.linspace(0, 2 * np.pi, 200)
+
+    for apply_correction, ax_surv, axs_ell, tag in [
+        (False, ax_surv_mis, axs_ell_mis, 'misaligned'),
+        (True, ax_surv_cor, axs_ell_cor, 'corrected'),
+    ]:
+        for seed, c in zip(seeds, colors):
+            print(f"\n=== Seed {seed} ({tag}) ===")
+            seed_line = prep_seed_line(ring, seed, apply_correction)
+            survival_counts_seed, betx0_s, alfx0_s, bety0_s, alfy0_s = \
+                track_seed_line(seed_line, seed_energy_mev)
+
+            turns_seed = np.arange(len(survival_counts_seed))
+            final_eff = 100 * survival_counts_seed[-1] / survival_counts_seed[0]
+            ax_surv.plot(turns_seed, survival_counts_seed, color=c,
+                         label=f'Seed {seed} ({final_eff:.1f}%)')
+
+            for ax_e, beta0_s, alfa0_s, eps in [
+                (axs_ell[0], betx0_s, alfx0_s, emittance_x),
+                (axs_ell[1], bety0_s, alfy0_s, emittance_y),
+            ]:
+                xs = np.sqrt(eps * beta0_s) * np.cos(theta)
+                xps = -np.sqrt(eps / beta0_s) * (alfa0_s * np.cos(theta) - np.sin(theta))
+                ax_e.plot(xs, xps, color=c, label=f'Seed {seed}')
+
+        ax_surv.set_title(f'Particle Survival over Turns -- {tag} seeds, '
+                           f'{seed_energy_mev:.1f} MeV')
+        ax_surv.set_xlabel('Turn Number')
+        ax_surv.set_ylabel('Number of Surviving Particles')
+        ax_surv.grid(True, which='both', linestyle=':', alpha=0.6)
+        ax_surv.legend(fontsize='small')
+
+        for ax_e, plane_name in zip(axs_ell, ['Horizontal', 'Vertical']):
+            ax_e.axhline(0, color='black', lw=0.5, ls='--')
+            ax_e.axvline(0, color='black', lw=0.5, ls='--')
+            ax_e.set_title(f'{plane_name} ring ellipse -- {tag} seeds')
+            ax_e.axis('equal')
+            ax_e.grid(True, linestyle=':', alpha=0.6)
+            ax_e.legend(fontsize='small')
+
+    fig_surv_mis.tight_layout()
+    fig_surv_mis.savefig(f'{folder_seeds}/survival_vs_turns_overlay_misaligned.png')
+    fig_surv_cor.tight_layout()
+    fig_surv_cor.savefig(f'{folder_seeds}/survival_vs_turns_overlay_corrected.png')
+    fig_ell_mis.tight_layout()
+    fig_ell_mis.savefig(f'{folder_seeds}/twiss_ellipse_overlay_misaligned.png')
+    fig_ell_cor.tight_layout()
+    fig_ell_cor.savefig(f'{folder_seeds}/twiss_ellipse_overlay_corrected.png')
+    plt.show()
+
+    print("\nSeed study done: overlaid survival-vs-turns and ring ellipses "
+          "across misaligned and corrected realizations.")
