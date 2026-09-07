@@ -547,6 +547,42 @@ def plot_dangerous_resonances(line, qx, qy, max_order=(1, 2, 3, 4, 5),
         return fig, ax
     return ax
 
+def calculate_lifetime(survival_counts, ring, ref_particle, fit_start_turn=500):
+    """Fits N(t) = N0 * exp(-t/tau) to a survival curve and returns tau in seconds.
+
+    Only fits from fit_start_turn onward, to exclude the fast dynamic-aperture
+    cull at the start of tracking (a one-time transient, not a steady decay
+    rate) from contaminating the fitted slope.
+    """
+    c_light = 299792458
+    T_rev = ring.get_length() / (ref_particle.beta0[0] * c_light)
+
+    turns = np.arange(len(survival_counts))
+    mask = (survival_counts > 0) & (turns >= fit_start_turn)
+
+    if mask.sum() < 2:
+        print(f"Not enough surviving turns past fit_start_turn={fit_start_turn} to fit.")
+        return None
+
+    t_fit = turns[mask] * T_rev
+    log_N_fit = np.log(survival_counts[mask])
+
+    slope, intercept = np.polyfit(t_fit, log_N_fit, 1)
+    if slope >= 0:
+        print("Survival isn't decaying over this window -- lifetime isn't meaningful here.")
+        return None
+
+    tau = -1 / slope
+
+    # R^2 as a goodness-of-fit check on the exponential assumption
+    fit_line = slope * t_fit + intercept
+    ss_res = np.sum((log_N_fit - fit_line) ** 2)
+    ss_tot = np.sum((log_N_fit - np.mean(log_N_fit)) ** 2)
+    r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else float('nan')
+
+    print(f"tau = {tau:.4g} s  ({tau / T_rev:.1f} turns)  R^2 = {r_squared:.4f}")
+    return tau
+
 #---------------------------------------
 # FUNCTIONS FOR spin_tracking.py SCRIPT
 #---------------------------------------

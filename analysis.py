@@ -24,8 +24,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',9))
+design=int(os.environ.get('DESIGN',4))
+config=int(os.environ.get('CONFIG',0))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
@@ -57,7 +57,7 @@ period=pdr.lines['period']
 
 variable_name = f"WP_D{design}"
 
-current_wp = getattr(constants, variable_name)
+current_wp = (23.38,21.33)
 
 # %%
 E0 = constants.E0; VRF = constants.VRF
@@ -184,6 +184,8 @@ def calc_damping_time_constant(m):
     den=ring_tw.partition_numbers[m]*U0
     tau=num/den
     return tau
+
+tau=mf.calculate_lifetime(survival_counts, ring, ref_particle, fit_start_turn=500)
 
 # Initialize the table
 brho = ring.particle_ref.p0c[0] / 299792458.0 

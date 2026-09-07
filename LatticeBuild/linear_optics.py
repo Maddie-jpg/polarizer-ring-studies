@@ -1181,3 +1181,106 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R_2')
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
     return pdr
+
+#------------------------
+# DESIGN 4 - Longer ring
+#------------------------
+
+
+def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None):
+    
+    pdr, quad_edge, bend_edge = _make_env(fringe_fields)
+    E0 = constants.E0; VRF = constants.VRF
+
+    '''pdr.vars({
+        'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.55,
+        'dl_noben': 0.25,   'l_quad':   0.30,
+        'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
+        'dl_drift': -0.1,   'dl_trans': 0.00,
+        'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
+        'l_sext':   0.20,
+    })'''
+    pdr.vars({
+    'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.40,
+    'dl_noben': 0.85,   'l_quad':   0.30,
+    'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
+    'dl_drift': -0.0,   'dl_trans': 0.20,
+    'l_doub':   0.25,   'l_tripl':  9.9,   
+    'l_trips':  0.40,   'l_sext':   0.20,'l_trans': 'l_drift+dl_trans', 'l_DSL':'2*l_drift + l_bend + dl_noben'
+    })
+
+
+
+    pdr.vars({
+        'N_cells_S': 12,
+        'hBarc': '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
+        'kQFarc':  2.9478,  'kQDarc':  -2.9231,
+        'kQFarcM': 2.8846,  'kQDarcM': -2.7567,
+        'kQFDS':   2.8042,  'kQDDS':   -2.2858,
+        'kQFDoub': 3.9170,  'kQDDoub': -2.5190,
+        'kQFtr':   4.4429,  'kQDtr':   -2.4723,
+    })
+    U0 = (0.88463e-31)*E0**4*(2.*np.pi) / (
+        6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']))
+
+    _make_base_elements(pdr, quad_edge, bend_edge)
+    cell_arc, cell_tr = _make_reference_cells(pdr)
+
+    def makesextant(name, fall):
+        comps = []
+        for ind in range(int(pdr['N_cells_S']) - 1):
+            comps += [pdr.place('Drarc'), pdr.new(f'Bend1_{name}{ind+1}', 'Bend'),
+                      pdr.place('Drarc'), pdr.new(f'QDA_{name}{ind+1}',   'QDarc'),
+                      pdr.place('Drarc'), pdr.new(f'Bend2_{name}{ind+1}', 'Bend'),
+                      pdr.place('Drarc'), pdr.new(f'QFA_{name}{ind+1}',   'QFarc')]
+        n = int(pdr['N_cells_S'])
+        comps[-1] = pdr.new(f'QFA_M{name}{n-1}', 'QFarcM')
+        comps += [pdr.place('Drarc'),  pdr.new(f'Bend1_{name}{n}', 'Bend'),
+                  pdr.place('Drarc'),  pdr.new(f'QDA_M{name}{n}',  'QDarcM'),
+                  pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend'),
+                  pdr.place('DrarcS'), pdr.new(f'QFDS_{name}',     'QFDS'),
+                  pdr.place('DrDSL'),  pdr.new(f'QDDS_{name}',     'QDDS'),
+                  pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
+                  pdr.place('DrTrans'),pdr.new(f'QFDoub_{name}',   'QFDoub'),
+                  pdr.place('DrDoub'), pdr.new(f'QDDoub_{name}',   'QDDoub'),
+                  pdr.place('DrTripl'),pdr.new(f'QDTrip_{name}1',  'QDtr')]
+        if fall == 'symm':
+            comps = [pdr.new(f'QFA_{name}CH', 'QFarcH')] + comps + \
+                    [pdr.place('DrTrips'), pdr.new(f'QFTripC_{name}2H', 'QFtrH')]
+        elif fall == 'right':
+            comps = [pdr.new(f'QFA_{name}C', 'QFarc')] + comps + \
+                    [pdr.place('DrTrips')]
+        elif fall == 'left':
+            comps += [pdr.place('DrTrips'), pdr.new(f'QFTripC_{name}2', 'QFtr')]
+            comps = list(reversed(comps))
+        else:
+            raise ValueError(f'Unknown fall value: {fall!r}')
+        return pdr.new_line(components=comps)
+
+    arc1R = makesextant('xR', 'symm')
+    arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
+                 at='(l_tripl+l_quad)/2', from_='QDDoub_xR')
+    arc1R_sliced = _sliced(arc1R)
+    period       = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
+    period_sliced = _sliced(period)
+    ring = (makesextant('1R', 'right') + makesextant('2L', 'left') +
+            makesextant('2R', 'right') + makesextant('3L', 'left') +
+            makesextant('3R', 'right') + makesextant('1L', 'left'))
+
+    # arc1R included so the extra DS quad is present where matching runs.
+    # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
+    # the existing doublet quad automatically.
+    insert_DS_betay_quads(pdr, ring, period, arc1R)
+
+    _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
+
+    if not matched:
+        return pdr
+
+    cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
+                                                    mu_cell=phase_advance)
+    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+                           arc1R, WP, betay_DS_target=betay_DS_target)
+    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc_opt, cell_tr_opt,
+                          period, U0, VRF, bend_edge)
+    return pdr
