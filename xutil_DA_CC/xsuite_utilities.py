@@ -20,6 +20,7 @@ from contextlib import redirect_stdout, redirect_stderr, contextmanager
 import numpy as np
 import pandas as pd
 import math
+import random
 
 import scipy
 import scipy.constants as sp_co
@@ -60,7 +61,7 @@ import h5py
 # =========================
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from matplotlib.ticker import LinearLocator
+from matplotlib.ticker import LinearLocator, ScalarFormatter, FuncFormatter
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 # =========================
@@ -1020,17 +1021,48 @@ def element_selection_from_line(line, selection_criteria, get_thin_element_paren
 
     return df
 
-def add_misalignment_error (line, element_familys, error_class='systimatic', seeds=201,
-                    shift_x=0,shift_y=0,shift_s=0,rot_s_rad=0, girder_misalignment=False, knob_name=None):
-    
-    '''
-    loop over the element_familys entris and add erros
-    for evry entry an error knob is generated 
-    
-    element_familys: 'Dipole', 'Quadrupole', ... or 'sf.*', 'sd.*', ...
-    error_class: 'systimatic', 'random' (in 3sigma)
-    seeds: seed number for each shift or rotation.
-    '''
+def add_misalignment_error (line, parameters):
+    """
+    Applies misalignment and rotation errors to elements in the lattice based on a parameter dictionary.
+    Supports both direct element misalignments (dipoles, quadrupoles, sextupoles etc.), BPM-specific alignment errors and Girder structures.
+    A girder contains quadrupoles, sextupoles, orbit/optics correctors and markers in between two consecutive arc dipoles.
+
+    line: xtrack Line object to which misalignments will be applied.
+
+    parameters: dictionary containing configuration for the misalignments. Expected keys:
+        - 'error_element_familys': element types or regex patterns (e.g. 'Quadrupole', 'sf.*', 'bpm')
+        - 'error_class': 'systematic' or 'random' (default: 'systematic')
+        - 'error_seed': seed for reproducibility (default: 201)
+        - 'misalignment_shift_x': horizontal shift STD
+        - 'misalignment_shift_y': vertical shift STD
+        - 'misalignment_shift_s': longitudinal shift STD
+        - 'misalignment_rot_s_rad': rotation around s-axis
+        - 'switch': optional knob name(s) to control activation of misalignment
+        - 'is_girder': if True, applies girder-type misalignments (shared offsets across elements)
+
+    Behavior:
+        - For BPMs:
+            Returns a dictionary of BPM misalignments from the element they are attached to, and the alignment error with said element. 
+            Assumes the naming of BPM's follows "bpm_{element}", with element being the element the BPM is attached to
+        - For other elements:
+            Applies misalignments directly to the line elements and optionally creates a knob
+            to scale/turn off the applied errors.
+
+    returns:
+        misalignment_dict: dictionary containing applied misalignments for each affected element.
+    """
+    element_familys = parameters.get('error_element_familys')
+    error_class = parameters.get('error_class', 'systematic')
+    seeds = parameters.get('error_seed', 201)
+
+    shift_x = parameters.get('misalignment_shift_x', 0)
+    shift_y = parameters.get('misalignment_shift_y', 0)
+    shift_s = parameters.get('misalignment_shift_s', 0)
+    rot_s_rad = parameters.get('misalignment_rot_s_rad', 0)
+
+    knob_name = parameters.get('switch', None)
+    is_girder = parameters.get('is_girder', None)
+
     #make a dictionary with the errors for BPM's, to be given to the orbit correction function
     if element_familys== 'bpm':
 
@@ -1046,23 +1078,12 @@ def add_misalignment_error (line, element_familys, error_class='systimatic', see
             match = re.search(rf"^{element_familys}_(.*)$", BPM)
 
             element_name = match.group(1)
+            #the bpm: bpm_qd12f is placed at the s coordinate that match with qd12fa. qd12f is not present
+            #and qd12fa, qd12fb, qd12f.0 are all present (different s)
+            if element_name =='qd12f':
+                element_name = 'qd12fa'
 
-            # Try element_name, or element_name+'a', or element_name+'b'
-            try:
-                _ = line[element_name]
-            except KeyError:
-                # If that fails, try element_name + 'a'
-                try:
-                    _ = line[element_name + 'a']
-                    element_name += 'a'
-                except KeyError:
-                    # If that fails, try element_name + 'b'
-                    try:
-                        _ = line[element_name + 'b']
-                        element_name += 'b'
 
-                    except KeyError:
-                        continue  # Skip if none exist
             misalignment_dict[BPM] = {}
 
             #find the misalignment of the element the BPM is attached to 
@@ -1084,14 +1105,19 @@ def add_misalignment_error (line, element_familys, error_class='systimatic', see
                     y1 = misalignments['shift_y'][0].item()
                     y1_array[jj]=y1
                     y2=shift_y*truncnorm.rvs(lower_bound, upper_bound, loc=mean, scale=std_dev, size=size)
+		        #the rad_s_no_frame is not available for BPM's (xtrack/trajectory_correction line250)
                 elif name == 'rs':
                     np.random.seed(seeds2[ii])
                     el = line[element_name]
-                    r1 = float(el._rot_s_rad_no_frame)
+                    r1 = float(el.rot_s_rad_no_frame)
                     r1_array[jj]=r1
                     r2=rot_s_rad*truncnorm.rvs(lower_bound, upper_bound, loc=mean, scale=std_dev, size=size)
+            if error_class == 'systematic':
+                x2 = np.full(shift_x, size)
+                y2 = np.full(shift_y, size)
+                r2 = np.full(rot_s_rad, size)        
         for jj, BPM in enumerate(BPMs):
-                #add the element misalignment and the random BPM beam based alignment error to obtain the total BPM position error
+                #add the element misalignnamement and the random BPM beam based alignment error to obtain the total BPM position error
                 misalignment_dict[BPM]['shift_x']=float(x1_array[jj]+x2[jj])
                 misalignment_dict[BPM]['shift_y']=float(y1_array[jj]+y2[jj])
                 misalignment_dict[BPM]['rot_s_rad']=float(r1_array[jj]+r2[jj])
@@ -1106,6 +1132,7 @@ def add_misalignment_error (line, element_familys, error_class='systimatic', see
 
         element_family_list = ensure_list(element_familys)
         elements_with_types = [(name, line.element_dict[name].__class__.__name__) for name in line.element_names]
+
 
 
         for ii,element_family in enumerate(element_family_list):
@@ -1137,7 +1164,7 @@ def add_misalignment_error (line, element_familys, error_class='systimatic', see
 
             size = len(element_names)
 
-            if error_class == 'systimatic':
+            if error_class == 'systematic':
                 shift_values_x = np.full(shift_x, size)
                 shift_values_y = np.full(shift_y, size)
                 shift_values_s = np.full(shift_s, size)
@@ -1162,9 +1189,38 @@ def add_misalignment_error (line, element_familys, error_class='systimatic', see
                     elif name == 'rs':
                         np.random.seed(seeds2[ii])
                         rot_values_s = rot_s_rad*truncnorm.rvs(lower_bound, upper_bound, loc=mean, scale=std_dev, size=size)
-            
-            if girder_misalignment:
 
+            if is_girder== None:
+                misalignment_dict={}
+                #for all other element types the misalignment is simply the value obtained
+                for ii, name in enumerate(element_names):
+                    all_names = [name]
+                    hcor_name = f'hcor_{name}'
+                    vcor_name = f'vcor_{name}'
+                    if hcor_name in line.element_names:
+                        all_names.append(hcor_name)
+                    if vcor_name in line.element_names:
+                        all_names.append(vcor_name)                    
+
+                    s=tt.rows[name].s
+                    misalignment_dict[name]={}
+                    misalignment_dict[name]['shift_x']=shift_values_x[ii]
+                    misalignment_dict[name]['shift_y']=shift_values_y[ii]
+                    misalignment_dict[name]['shift_s']=shift_values_s[ii]
+                    misalignment_dict[name]['rot_s_rad_no_frame']=rot_values_s[ii]
+                    for elem_name in all_names:
+                        line[elem_name].shift_x = line.ref[mis_switch_name]*shift_values_x[ii]
+                        line[elem_name].shift_y = line.ref[mis_switch_name]*shift_values_y[ii]
+                        line[elem_name].shift_s = line.ref[mis_switch_name]*shift_values_s[ii]
+                        if line[elem_name].rot_s_rad !=0:
+                            line[elem_name].rot_s_rad_no_frame = line.ref[mis_switch_name]*rot_values_s[ii]
+                        elif line[elem_name].rot_s_rad==0:
+                            line[elem_name].rot_s_rad = 0.0 
+                            line[elem_name].rot_s_rad_no_frame = line.ref[mis_switch_name]*rot_values_s[ii]
+
+
+            if is_girder is not None:
+                misalignment_dict={}
                 #for girders the total element missalignment is the misalignment of the element plus the misalignment of the girder on which the element is placed
                 for ii, name in enumerate(element_names):
                     idx = line.element_names.index(name)
@@ -1183,104 +1239,32 @@ def add_misalignment_error (line, element_familys, error_class='systimatic', see
 
                     all_of_them = [elements_with_types[i][0] 
                             for i in range(i_left + 1, i_right) 
-                            if elements_with_types[i][1] not in ("Drift", "Marker")]
+                            if elements_with_types[i][1] not in ("Drift", "Marker", 'Multipole')]
                     for aa,el in enumerate(all_of_them):
+                        s=tt.rows[el].s
+                        # if not any((smin <= s <= smax) for smin, smax in ir_ranges):
+                        misalignment_dict[el]={}
+                        misalignment_dict[el]['shift_x']=shift_values_x[ii]
+                        misalignment_dict[el]['shift_y']=shift_values_y[ii]
+                        misalignment_dict[el]['shift_s']=shift_values_s[ii]
+                        misalignment_dict[el]['rot_s_rad_no_frame']=rot_values_s[ii]
                         line[el].shift_x = line.ref[mis_switch_name]*line[el].shift_x+line.ref[mis_switch_name]*shift_values_x[ii]
                         line[el].shift_y = line.ref[mis_switch_name]*line[el].shift_y+line.ref[mis_switch_name]*shift_values_y[ii]
                         line[el].shift_s = line.ref[mis_switch_name]*line[el].shift_s+line.ref[mis_switch_name]*shift_values_s[ii]
-                        line[el]._rot_s_rad_no_frame =line.ref[mis_switch_name]*line[el].rot_s_rad_no_frame+ line.ref[mis_switch_name]*rot_values_s[ii]
-            
-            else:
-
-                 #for all other element types the misalignment is simply the value obtained
-                for ii, name in enumerate(element_names):
-                    line[name].shift_x = line.ref[mis_switch_name]*shift_values_x[ii]
-                    line[name].shift_y = line.ref[mis_switch_name]*shift_values_y[ii]
-                    line[name].shift_s = line.ref[mis_switch_name]*shift_values_s[ii]
-                    line[name]._rot_s_rad_no_frame = line.ref[mis_switch_name]*rot_values_s[ii]
-
-    return
-
-
-# def add_misalignment_error (line, element_familys, error_class='systimatic', seeds=[201,202,203,204],
-#                     shift_x=0,shift_y=0,shift_s=0,rot_s_rad=0):
+                        line[el].rot_s_rad = 0.0
+                        line[el].rot_s_rad_no_frame =line.ref[mis_switch_name]*line[el].rot_s_rad_no_frame+ line.ref[mis_switch_name]*rot_values_s[ii]
     
-#     '''
-#     loop over the element_familys entris and add erros
-#     for evry entry an error knob is generated 
-    
-#     element_familys: 'Dipole', 'Quadrupole', ... or 'sf.*', 'sd.*', ...
-#     error_class: 'systimatic', 'random' (in 3sigma)
-#     seeds: seed number for each shift or rotation
-#     '''
-    
-#     tt = line.get_table(attr=True)
-#     tt_no_parent_elem = tt.rows[tt.parent_name==None]
-#     tt_no_marker_no_parent_elem = tt_no_parent_elem.rows[tt_no_parent_elem.element_type!='Marker']
-
-#     element_family_list = ensure_list(element_familys)
-
-#     for element_family in element_family_list:
-
-#         mis_switch_name = 'mis_'+element_family+'_'+error_class[:3]+'_'+str(seeds)
-#         line[mis_switch_name] = 1
-
-#         ## in order to includ the parent elements if the line has thin element
-#         parent_names = [item for item in tt.parent_name if item is not None]
-#         if len(parent_names)>0:
-#             parent_types = [line[parent_names[ii]].__class__.__name__ for ii in range(len(parent_names))]
-#         else:
-#             parent_types = []
-
-#         if element_family in np.unique(np.append(tt.element_type,parent_types)):
-#             parent_type_names = [name for ii, name in enumerate(parent_names) if parent_types[ii] == element_family]
-#             element_names = np.append(tt_no_marker_no_parent_elem.rows[tt_no_marker_no_parent_elem.element_type==element_family].name,parent_type_names)
-#         else:
-#             parent_type_names = [name for name in parent_names if re.match(element_family, name)] 
-#             element_names = np.append(tt_no_marker_no_parent_elem.rows[element_family].name,parent_type_names)
-
-#         size = len(element_names)
-
-#         if error_class == 'systimatic':
-#             shift_values_x = np.full(shift_x, size)
-#             shift_values_y = np.full(shift_y, size)
-#             shift_values_s = np.full(shift_s, size)
-#             rot_values_s = np.full(rot_s_rad, size)
-#         elif error_class == 'random':
-#             mean = 0
-#             std_dev = 1
-#             lower_bound = -3 # in sigma
-#             upper_bound = 3 # in sigma
-#             for ii, name in enumerate(['sx','sy','ss','rs']):
-#                 if name == 'sx':
-#                     np.random.seed(seeds[ii])
-#                     shift_values_x = shift_x*truncnorm.rvs(lower_bound, upper_bound, loc=mean, scale=std_dev, size=size)
-#                 elif name == 'sy':
-#                     np.random.seed(seeds[ii])
-#                     shift_values_y = shift_y*truncnorm.rvs(lower_bound, upper_bound, loc=mean, scale=std_dev, size=size)
-#                 elif name == 'ss':
-#                     np.random.seed(seeds[ii])
-#                     shift_values_s = shift_s*truncnorm.rvs(lower_bound, upper_bound, loc=mean, scale=std_dev, size=size)
-#                 elif name == 'rs':
-#                     np.random.seed(seeds[ii])
-#                     rot_values_s = rot_s_rad*truncnorm.rvs(lower_bound, upper_bound, loc=mean, scale=std_dev, size=size)
-
-#         for ii, name in enumerate(element_names):
-#             line[name].shift_x = line.ref[mis_switch_name]*shift_values_x[ii]
-#             line[name].shift_y = line.ref[mis_switch_name]*shift_values_y[ii]
-#             line[name].shift_s = line.ref[mis_switch_name]*shift_values_s[ii]
-#             line[name].rot_s_rad = line.ref[mis_switch_name]*rot_values_s[ii]
-            
-#     return
+    return misalignment_dict
 
 
-def add_optics_correctors(line, corector_names, corector_type=None):
+
+def add_optics_correctors(line, corrector_names, corector_type=None):
     '''
     Similar to add_steering_correctors. This function adds any order correctors (dipole, quadrupole, sextupole ....) through the {knl,ksl} funcitonality of the elements.
     X and Y planes can have separate correctors.
 
     line: the line the correctors will be added to
-    corector_names: the names of the elements the correctors will be added to
+    corrector_names: the names of the elements the correctors will be added to, add as lists (eg. ['Sextupole'])
     corector_type:defines the order and plane of the correctors added. eg. for a corrector names input of ['qf2a:.*','sf1a:.*'] the corrector type input will be 
     [['ksl1','knl1', knl2], ['ksl3','knl4']] which adds quadrupole correctors in x, y plane and sextupole correctors in the x plane, all placed on the 'qf2a:.*' family.
     On the 'sf1a:.*' family octupole correctors are placed on the y plane, and decapole correctors on th x plane.
@@ -1292,13 +1276,13 @@ def add_optics_correctors(line, corector_names, corector_type=None):
     knl_elements = []
     ksl_elements = []
 
-    for jj, name in enumerate(corector_names):
+    for jj, name in enumerate(corrector_names):
         if name in ['Bend','RBend','Quadrupole','Sextupole']:
             tt_name = tt.rows[tt.element_type==name]
         else:
             tt_name = tt.rows[name]
-        if len(corector_names) != len(corector_type):
-            corector_type = [corector_type[0] for _ in corector_names]
+        if len(corrector_names) != len(corector_type):
+            corector_type = [corector_type[0] for _ in corrector_names]
         expanded_names = tt_name.name.tolist()
         element_groups1.extend(expanded_names)
         corector_groups1.extend([corector_type[jj]] * len(expanded_names))
@@ -1350,22 +1334,22 @@ def off_switch(element_list, switch_rate):
     return new_element_list, removed_element_list
 
 
-def add_steering_correctors(line, corector_names, corrector_plane='hv'):
+def add_steering_correctors(line, corrector_names, corrector_prefix,corrector_plane='hv'):
     '''
     Similar to add_optics_correctors. This function only returns dipole correctors, with an option to have them only in the x or y plane.
     Adds new elements to the line rather than using the {knl,ksl} funcitonality contrary to add_optics_correctors.
 
     line: the line the correctors will be added to
-    corector_names: the names of the elements the correctors will be added to
+    corrector_names: the names of the elements the correctors will be added to
     corrector_plane: the plane on which the correctors will act.
+    corrector_prefix: list containing the prefix for the horizontal and vertical correctors e.g. ['hcor_', 'vcor_']
     '''
     tt = line.get_table(attr=True)
     element_groups1 = []
-    knl_elements = []
-    ksl_elements = []
 
-    for jj, name in enumerate(corector_names):
-        if name in ['Bend','RBend','Quadrupole','Sextupole', 'Octupole']:
+
+    for jj, name in enumerate(corrector_names):
+        if name in ['Bend','RBend','Quadrupole','Sextupole']:
             tt_name = tt.rows[tt.element_type==name]
         else:
             tt_name = tt.rows[name]
@@ -1375,34 +1359,83 @@ def add_steering_correctors(line, corector_names, corrector_plane='hv'):
     for i, element in enumerate(element_groups1):
         line.vars['knl' + f'{element}'] = 0
         line.vars['ksl' + f'{element}'] = 0
-
+        vcor_name = f"{corrector_prefix[1]}{element}"
+        hcor_name = f"{corrector_prefix[0]}{element}"
         if corrector_plane == 'hv':
-            line.insert_element("xsteering_corector_"+ f'{element}', xt.Multipole(knl=np.array([0])), at=f'{element}')
-            line.insert_element("ysteering_corector_"+ f'{element}', xt.Multipole(ksl=np.array([0])), at=f'{element}')
-            line["xsteering_corector_"+ f'{element}'].knl = line.vars['knl' + f'{element}']
-            line["ysteering_corector_"+ f'{element}'].ksl = line.vars['ksl' + f'{element}']
-            if element not in knl_elements:
-                knl_elements.append(element)
-            if element not in ksl_elements:
-                ksl_elements.append(element)
-            line.steering_correctors_x=knl_elements
-            line.steering_correctors_y=knl_elements 
+            if hcor_name not in line.element_names: 
+                line.insert_element(hcor_name, xt.Multipole(knl=np.array([0])), at=f'{element}')
+                line[hcor_name].knl = line.vars['knl' + f'{element}']
+
+            if vcor_name not in line.element_names:
+                line.insert_element(vcor_name, xt.Multipole(ksl=np.array([0])), at=f'{element}')
+                line[vcor_name].ksl = line.vars['ksl' + f'{element}']
 
         elif corrector_plane == 'h':
-            line.insert_element("xsteering_corector_"+ f'{element}', xt.Multipole(knl=np.array([0])), at=f'{element}')
-            line["xsteering_corector_"+ f'{element}'].knl = line.vars['knl' + f'{element}']
-            if element not in knl_elements:
-                knl_elements.append(element)
-            line.steering_correctors_x=knl_elements
+            if hcor_name not in line.element_names:
+                line.insert_element(hcor_name, xt.Multipole(knl=np.array([0])), at=f'{element}')
+                line[hcor_name].knl = line.vars['knl' + f'{element}']
 
         elif corrector_plane == 'v': 
-            line.insert_element("ysteering_corector_"+ f'{element}', xt.Multipole(ksl=np.array([0])), at=f'{element}')
-            line["ysteering_corector_"+ f'{element}'].ksl = line.vars['ksl' + f'{element}']
-            if element not in ksl_elements:
-                ksl_elements.append(element)
-            line.steering_correctors_y=knl_elements 
+            if vcor_name not in line.element_names:
+                line.insert_element(vcor_name, xt.Multipole(ksl=np.array([0])), at=f'{element}')
+                line[vcor_name].ksl = line.vars['ksl' + f'{element}']
 
     return
+
+
+# def add_steering_correctors(line, corector_names, corrector_plane='hv'):
+#     '''
+#     Similar to add_optics_correctors. This function only returns dipole correctors, with an option to have them only in the x or y plane.
+#     Adds new elements to the line rather than using the {knl,ksl} funcitonality contrary to add_optics_correctors.
+
+#     line: the line the correctors will be added to
+#     corector_names: the names of the elements the correctors will be added to
+#     corrector_plane: the plane on which the correctors will act.
+#     '''
+#     tt = line.get_table(attr=True)
+#     element_groups1 = []
+#     knl_elements = []
+#     ksl_elements = []
+
+#     for jj, name in enumerate(corector_names):
+#         if name in ['Bend','RBend','Quadrupole','Sextupole', 'Octupole']:
+#             tt_name = tt.rows[tt.element_type==name]
+#         else:
+#             tt_name = tt.rows[name]
+#         expanded_names = tt_name.name.tolist()
+#         element_groups1.extend(expanded_names)
+    
+#     for i, element in enumerate(element_groups1):
+#         line.vars['knl' + f'{element}'] = 0
+#         line.vars['ksl' + f'{element}'] = 0
+
+#         if corrector_plane == 'hv':
+#             line.insert_element("xsteering_corector_"+ f'{element}', xt.Multipole(knl=np.array([0])), at=f'{element}')
+#             line.insert_element("ysteering_corector_"+ f'{element}', xt.Multipole(ksl=np.array([0])), at=f'{element}')
+#             line["xsteering_corector_"+ f'{element}'].knl = line.vars['knl' + f'{element}']
+#             line["ysteering_corector_"+ f'{element}'].ksl = line.vars['ksl' + f'{element}']
+#             if element not in knl_elements:
+#                 knl_elements.append(element)
+#             if element not in ksl_elements:
+#                 ksl_elements.append(element)
+#             line.steering_correctors_x=knl_elements
+#             line.steering_correctors_y=knl_elements 
+
+#         elif corrector_plane == 'h':
+#             line.insert_element("xsteering_corector_"+ f'{element}', xt.Multipole(knl=np.array([0])), at=f'{element}')
+#             line["xsteering_corector_"+ f'{element}'].knl = line.vars['knl' + f'{element}']
+#             if element not in knl_elements:
+#                 knl_elements.append(element)
+#             line.steering_correctors_x=knl_elements
+
+#         elif corrector_plane == 'v': 
+#             line.insert_element("ysteering_corector_"+ f'{element}', xt.Multipole(ksl=np.array([0])), at=f'{element}')
+#             line["ysteering_corector_"+ f'{element}'].ksl = line.vars['ksl' + f'{element}']
+#             if element not in ksl_elements:
+#                 ksl_elements.append(element)
+#             line.steering_correctors_y=knl_elements 
+
+#     return
 
 
 def add_markers(line, marker_placement, marker_name=None):
@@ -1538,7 +1571,7 @@ def add_field_error (line, element_familys, error_class='systimatic', seed=0,
                     main_order = knl_max_index + 1
                     main_k_value = line[name].knl[main_order-1]
 
-            Brho = (line.particle_ref.p0c/sp_co.c)/line.particle_ref.q0
+            Brho = ((line.particle_ref.p0c/sp_co.c)/line.particle_ref.q0)[0]
             
             if error_category == 'relative':
                 if B_ref is None or np.abs(main_k_value) == 0:
@@ -1594,6 +1627,64 @@ def magnet_sign_switch (ismag=0, isrot = 0, isb4 = 0, order_N = 0, order_n = 0, 
 
     return signs
 
+def RDTs( rdts, ref_twiss, line_table, observation_point, source_elements):
+
+    tt = line_table
+
+    Qx = ref_twiss.qx
+    Qy = ref_twiss.qy
+    mu0_x = ref_twiss.rows[observation_point].mux[0]*2*np.pi
+    mu0_y = ref_twiss.rows[observation_point].muy[0]*2*np.pi
+
+    final_rdts = {}
+    
+    for rdt in rdts:
+        final_rdts[rdt] = 0.0 + 0.0j
+
+        pqrt = rdt[1:]
+        if len(pqrt) > 4:
+            if '_'  in pqrt:
+                pqrt_split = pqrt.split('_')
+                p, q, r, t = int(pqrt_split[0]), int(pqrt_split[1]), int(pqrt_split[2]), int(pqrt_split[3])
+            else:
+                raise ValueError("RDT key must look like 'f1020' (one letter f + four digits) or 'f11_0_2_0' (one letter f + more than four digits separated by '_').")            
+        elif len(pqrt) == 4:
+            p, q, r, t = int(pqrt[0]), int(pqrt[1]), int(pqrt[2]), int(pqrt[3])
+
+        for elem in source_elements:
+            try:
+                if tt.rows[elem].element_type[0] in ['Marker','Drift']:
+                    continue
+                else:
+                    n = p + q + r + t
+                    beta_x = ref_twiss.rows[elem].betx[0]
+                    beta_y = ref_twiss.rows[elem].bety[0]
+                    mu_x = ref_twiss.rows[elem].mux[0]*2*np.pi
+                    mu_y = ref_twiss.rows[elem].muy[0]*2*np.pi
+                    delta_mu_x = mu0_x - mu_x
+                    if delta_mu_x < 0:
+                        delta_mu_x += Qx*2*np.pi
+                    delta_mu_y = mu0_y - mu_y
+                    if delta_mu_y < 0:
+                        delta_mu_y += Qy*2*np.pi
+
+                    knl = getattr(tt.rows[elem], f'k{n-1}l', 0)[0] 
+                    ksl = getattr(tt.rows[elem], f'k{n-1}sl', 0)[0]
+
+                    k = np.real(1j**(r+t)*(knl + 1j*ksl))
+                    factorial_prod = (math.factorial(p) * math.factorial(q) * math.factorial(r) * math.factorial(t))
+                    h = -k*(beta_x**((p+q)/2) * beta_y**((r+t)/2))/(factorial_prod*2**n)
+
+                    denom = 1 - np.exp(2j * np.pi * ((p-q)*Qx + (r-t)*Qy))
+                    phase = np.exp(1j * ((p-q)*delta_mu_x + (r-t)*delta_mu_y))
+                    
+                    final_rdts[rdt] += h * phase / denom
+
+            except (IndexError, ValueError):
+                continue
+
+    return final_rdts
+
 def set_integrator (line):
 
     tt = line.get_table()
@@ -1609,7 +1700,7 @@ def set_integrator (line):
 
     line.set(tt_bend, integrator='uniform', num_multipole_kicks=3, model='mat-kick-mat') #'drift-kick-drift-exact')
     line.set(tt_wigg, integrator='teapot', num_multipole_kicks=11, model='mat-kick-mat')
-    line.set(tt_quad, integrator='uniform', num_multipole_kicks=7, model='mat-kick-mat')
+    line.set(tt_quad, integrator='uniform', num_multipole_kicks=3, model='mat-kick-mat')
     line.set(tt_sext, integrator='yoshida4', num_multipole_kicks=1)
 
     # line.set(tt_bend, integrator='yoshida4', num_multipole_kicks=1)
@@ -1773,136 +1864,442 @@ def install_phase_trombone(line, locations, delta_phases_x=None, delta_phases_y=
     return
 
 
-# def sextupoles_strength_edit (line, family_name=all, error_strength=1, optics_type=None):
+def sextupoles_strength_edit (line, family_name=all, error_strength=1, custom=False):
+    '''
+    Modifies the strength of sextupoles in the lattice by scaling their k2 component.
+    Pre-determined arc/ir families for LCC_106.2.0. Sextupole names can be user-defined.
 
-#     tt = line.get_table(attr=True)
+    line: the line containing the sextupole elements to be modified
 
-#     if optics_type is None:
-#         if len(tt.rows['sy.*'].name) == 0:
-#             optics_type = 'LCC'
-#         else:
-#             optics_type = 'GHC'
-
-#     line.vars['k2n.weight'] = error_strength
-#     tt_sext = tt.rows[tt.element_type=='Sextupole']
-
-
-#     if family_name == 'all':
-#         for ii in tt_sext.name:
-#             line.element_refs[ii].k2 = line.vars['k2n.weight']*line.element_refs[ii].k2._expr
-    
-#     elif family_name == 'ir':
-#         if optics_type == 'LCC':
-#             for ii in tt_sext.rows['scrab.*|sdm.*|sdy.*|sfm.*|sfx.*'].name:
-#                 line.element_refs[ii].k2 = line.vars['k2n.weight']*line.element_refs[ii].k2._expr
-#         elif optics_type == 'GHC':
-#             for ii in tt_sext.rows['sy.*'].name:
-#                 line.element_refs[ii].k2 = line.vars['k2n.weight']*line.element_refs[ii].k2._expr
-    
-#     elif family_name == 'arc':
-#         if optics_type == 'LCC':
-#             for ii in tt_sext.rows['sf[12]a.*|sd[12]a.*'].name:
-#                 line.element_refs[ii].k2 = line.vars['k2n.weight']*line.element_refs[ii].k2._expr
-#         elif optics_type == 'GHC':
-#             for ii in tt_sext.rows['sf.*|sd.*'].name:
-#                 line.element_refs[ii].k2 = line.vars['k2n.weight']*line.element_refs[ii].k2._expr
-
-#     return
+    family_name: 
+        - if custom=False:
+            (for LCC_106.2.0)
+            'all' → scales both arc and IR sextupoles  
+            'arc' → scales arc sextupoles only  
+            'ir'  → scales IR sextupoles only  
+            The strengths of the sextupoles can then be modified by accessing the generated knob. (line.vars['k2n.weight_ir'], line.vars['k2n.weight_arc']=i)
 
 
-def sextupoles_strength_edit (line, family_name=all, error_strength=1, optics_type=None):
+        - if custom=True:
+            interpreted as a regex/string selector for sextupole names (e.g. 'S[FD].*')
+            The strengths of the sextupoles can then be modified by accessing the generated knob. (line.vars[f'k2n.weight_{family_name}']).
 
+
+    error_strength: multiplicative factor applied to the sextupole strength (k2)
+
+    custom:
+        - False → uses predefined sextupole families (arc/ir/all)
+        - True  → applies scaling only to sextupoles matching the user-defined family_name
+
+    The function updates the sextupole strengths through line.vars knobs and directly
+    modifies the corresponding element_refs.
+
+    returns: None
+    '''
     tt = line.get_table(attr=True)
+    if custom==False:
+        if family_name == 'all':
+            line.vars['k2n.weight_ir'] = error_strength
+            line.vars['k2n.weight_arc'] = error_strength
 
-    if optics_type is None:
-        if len(tt.rows['sy.*'].name) == 0:
-            optics_type = 'LCC'
-        else:
-            optics_type = 'GHC'
-    if family_name == 'all':
-        line.vars['k2n.weight_ir'] = error_strength
-        line.vars['k2n.weight_arc'] = error_strength
+        elif family_name == 'ir':
+            line.vars['k2n.weight_ir'] = error_strength
 
-    elif family_name == 'ir':
-        line.vars['k2n.weight_ir'] = error_strength
+        elif family_name == 'arc':
+            line.vars['k2n.weight_arc'] = error_strength
 
-    elif family_name == 'arc':
-        line.vars['k2n.weight_arc'] = error_strength
-
-
-    line.vars['k2n.weight'] = error_strength
-    tt_sext = tt.rows[tt.element_type=='Sextupole']
-
-
-    if family_name == 'all':
-        for ii in tt_sext.rows['scrab.*|sdm.*|sdy.*|sfm.*|sfx.*'].name:
-            line.element_refs[ii].k2 = line.vars['k2n.weight_ir']*line.element_refs[ii].k2._expr
-        for ii in tt_sext.rows['sf[12]a.*|sd[12]a.*'].name:
-            line.element_refs[ii].k2 = line.vars['k2n.weight_arc']*line.element_refs[ii].k2._expr
-    elif family_name == 'ir':
-        if optics_type == 'LCC':
-            for ii in tt_sext.rows['scrab.*|sdm.*|sdy.*|sfm.*|sfx.*'].name:
+        line.vars['k2n.weight'] = error_strength
+        tt_sext = tt.rows[tt.element_type=='Sextupole']
+        if family_name == 'all':
+            for ii in tt_sext.rows['SCRAB[LR].*|S[FD][MXY][12][LR].*|S[FD][12][AB].*|S[FD][1234][CIJDFM][LR].*'].name:
                 line.element_refs[ii].k2 = line.vars['k2n.weight_ir']*line.element_refs[ii].k2._expr
-        elif optics_type == 'GHC':
-            for ii in tt_sext.rows['sy.*'].name:
+        elif family_name == 'ir':
+            for ii in tt_sext.rows['SCRAB[LR].*|S[FD][MXY][12][LR].*'].name:
                 line.element_refs[ii].k2 = line.vars['k2n.weight_ir']*line.element_refs[ii].k2._expr
-    
-    elif family_name == 'arc':
-        if optics_type == 'LCC':
-            for ii in tt_sext.rows['sf[12]a.*|sd[12]a.*'].name:
-                line.element_refs[ii].k2 = line.vars['k2n.weight_arc']*line.element_refs[ii].k2._expr
-        elif optics_type == 'GHC':
-            for ii in tt_sext.rows['sf.*|sd.*'].name:
-                line.element_refs[ii].k2 = line.vars['k2n.weight_arc']*line.element_refs[ii].k2._expr
 
+        elif family_name == 'arc':
+            for ii in tt_sext.rows['S[FD][12][AB].*|S[FD][1234][CIJDFM][LR].*'].name:
+                line.element_refs[ii].k2 = line.vars['k2n.weight_arc']*line.element_refs[ii].k2._expr
+    elif custom:
+        line.vars[f'k2n.weight_{family_name}'] = error_strength
+        tt_sext = tt.rows[tt.element_type=='Sextupole']
+
+        for ii in tt_sext.rows[family_name].name:
+            line.element_refs[ii].k2 = line.vars[f'k2n.weight_{family_name}']*line.element_refs[ii].k2._expr
     return
 
 
-def responce_matrix(line,dk, observables, obs_points, corr_elements, reference_twiss, bipolar=True):
+def pseudo_inverse(responce_matrix, Tikhonov_lambda=None):
+    '''
+    Evaluates the pseudo inverse of the responce matrix using Tikhonov Regularisation.
+    '''
+    U, S, Vt = np.linalg.svd(responce_matrix, full_matrices=False)
+
+    if Tikhonov_lambda is not None:
+        S_reg = np.array([s / (s**2 + Tikhonov_lambda) for s in S])
+        S_inv = np.diag(S_reg)
+    else:
+        S_inv = np.diag([1/s for s in S])
+
+    p_inverse = Vt.T @ S_inv @ U.T
+    return p_inverse
+
+
+def optics_corrections(line, reference_twiss, observables, 
+                       observation_points, correctors, p_inverse, 
+                       Delta_mu=False, rdt=False, radiation=False,weight=1):
+    '''
+    Evaluates and applies neccessary corrections.     
+    line: Line with misalignments
+    reference_twiss: Unperturbed line twiss
+    observables: ['mux', 'muy', 'dx], ['c_minus_re', 'c_minus_im', 'dy'] or ['f1001_real', 'f1001_imag','f1010_real', 'f1010_imag', 'dy']
+    observation_points: Points at which the responce matrix was evaluated (BPMs)
+    correctors: Correctors for provided observables. Quadrupoles for phase, beta and dx and skew quadrupoles for coupling and dy
+    p_inverse: Pseudoinverse for responce matrix
+    # Delta_mu: If true, the phase observables become the phase difference between consecutive BPMs
+    weight: Incase the full solution cannot be applied, the weight defines what part is (eg. weight=0.7 is 70%)
+    '''
+    if radiation:
+        twiss = line.twiss(coupling_edw_teng=True,eneloss_and_damping=True)
+    else:
+        twiss = line.twiss4d(coupling_edw_teng=True)
+    # Prepare ideal and measured values
+    if rdt:
+        ideal_values = {'f1001_real': reference_twiss.rows['bpm.*']['f1001'].real,
+                        'f1001_imag': reference_twiss.rows['bpm.*']['f1001'].imag,
+                        'f1010_real': reference_twiss.rows['bpm.*']['f1010'].real,
+                        'f1010_imag': reference_twiss.rows['bpm.*']['f1010'].imag,
+                        'dy': reference_twiss.rows['bpm.*']['dy']}
+        measured_values = {'f1001_real': twiss.rows['bpm.*']['f1001'].real,
+                        'f1001_imag': twiss.rows['bpm.*']['f1001'].imag,
+                        'f1010_real': twiss.rows['bpm.*']['f1010'].real,
+                        'f1010_imag': twiss.rows['bpm.*']['f1010'].imag,
+                        'dy': twiss.rows['bpm.*']['dy']}
+
+    else:
+        ideal_values = {o: reference_twiss.rows['bpm.*'][o] for o in observables}
+        measured_values = {o: twiss.rows['bpm.*'][o] for o in observables}
+
+    # Compute difference vector
+    delta_y = {o: np.array(ideal_values[o]) - np.array(measured_values[o]) for o in observables}
+    delta_y_vec = np.concatenate([delta_y[o] for o in observables]) 
+    # Compute corrections
+    delta_p = p_inverse @ delta_y_vec
+    dp = delta_p.flatten()             
+
+    # Apply corrections
+    assert len(correctors) == len(dp), f"Length mismatch: {len(correctors)} knobs, {len(dp)} deltas"
+    for name, magnet_shift in zip(correctors, dp):
+        line.vars[name] += weight * magnet_shift
+
+    if radiation:
+        tw_corr = line.twiss(coupling_edw_teng=True,eneloss_and_damping=True)
+    elif rdt: 
+        tw_corr = line.twiss4d(coupling_edw_teng=True)
+    else: 
+        tw_corr = line.twiss4d()
+
+    return tw_corr
+
+
+def response_matrix(line,observables, obs_points, corr_elements, dk=1e-5,rdt=None, bipolar=True):
+    '''
+    line: Unperturbed line
+    observables: ['mux', 'muy', 'dx], ['c_minus_re', 'c_minus_im', 'dy'] or ['f1001_real', 'f1001_imag','f1010_real', 'f1010_imag', 'dy']
+    observation_points: Points at which the responce matrix will be evaluated (BPMs)
+
+    corr_elements:  Correctors for provided observables. Quadrupoles for phase, beta and dx and skew quadrupoles for coupling and dy
+    dk: Step size
+    bipolar: Includes postive and negative steps
+    '''
+    tw_ref=line.twiss4d(coupling_edw_teng=True)
     response = {oo: np.zeros((len(obs_points), len(corr_elements)))
                 for oo in observables}
 
-
+    #positive step
     for ii, cc in enumerate(corr_elements):
         nn = cc
-        print(f'Processing {ii}/{len(corr_elements)}')
+        print(f'Processing Positive {ii}/{len(corr_elements)}')
         line.vars[nn]+= dk
-        twp = line.twiss4d()
+        twp = line.twiss4d(coupling_edw_teng=True)
 
         line.vars[nn] -= dk
-
-#
-        for observable in observables:
-            response[observable][:, ii] = (
-                twp.rows[obs_points][observable] - reference_twiss.rows[obs_points][observable])  / dk
+        if rdt:
+            response['f1001_real'][:, ii] = (twp.rows[obs_points].f1001.real-tw_ref.rows[obs_points].f1001.real)/dk
+            response['f1001_imag'][:, ii] = (twp.rows[obs_points].f1001.imag-tw_ref.rows[obs_points].f1001.imag)/dk
+            response['f1010_real'][:, ii] = (twp.rows[obs_points].f1010.real-tw_ref.rows[obs_points].f1010.real)/dk
+            response['f1010_imag'][:, ii] = (twp.rows[obs_points].f1010.imag-tw_ref.rows[obs_points].f1010.imag)/dk
+            response['dy'][:, ii] = (twp.rows[obs_points]['dy'] - tw_ref.rows[obs_points]['dy'])  / dk            
+        else: 
+            for observable in observables:
+                response[observable][:, ii] = (
+                    twp.rows[obs_points][observable] - tw_ref.rows[obs_points][observable])  / dk
     response_array1 = np.vstack([response[obs] for obs in observables])
 
+    if bipolar:
+        #negative step
+        dk =-dk
+        response2 = {oo: np.zeros((len(obs_points), len(corr_elements)))
+                    for oo in observables}
 
+        for ii, cc in enumerate(corr_elements):
+            nn = cc
+            print(f'Processing Negative {ii}/{len(corr_elements)}')
+            line.vars[nn]+= dk
+            twp = line.twiss4d(coupling_edw_teng=True)
 
-    response2 = {oo: np.zeros((len(obs_points), len(corr_elements)))
-                for oo in observables}
+            line.vars[nn] -= dk
 
-    dk =-1e-4
-    for ii, cc in enumerate(corr_elements):
-        nn = cc
-        print(f'Processing {ii}/{len(corr_elements)}')
-        line.vars[nn]+= dk
-        twp = line.twiss4d()
+            if rdt:
+                response2['f1001_real'][:, ii] = (twp.rows[obs_points].f1001.real-tw_ref.rows[obs_points].f1001.real)/dk
+                response2['f1001_imag'][:, ii] = (twp.rows[obs_points].f1001.imag-tw_ref.rows[obs_points].f1001.imag)/dk
+                response2['f1010_real'][:, ii] = (twp.rows[obs_points].f1010.real-tw_ref.rows[obs_points].f1010.real)/dk
+                response2['f1010_imag'][:, ii] = (twp.rows[obs_points].f1010.imag-tw_ref.rows[obs_points].f1010.imag)/dk
+                response2['dy'][:, ii] = (twp.rows[obs_points]['dy'] - tw_ref.rows[obs_points]['dy'])  / dk            
+            else: 
+                for observable in observables:
+                    response2[observable][:, ii] = (
+                        twp.rows[obs_points][observable] - tw_ref.rows[obs_points][observable])  / dk
+        response_array2 = np.vstack([response2[obs] for obs in observables])
 
-        line.vars[nn] -= dk
-
-
-        for observable in observables:
-            response2[observable][:, ii] = (
-                twp.rows[obs_points][observable] - reference_twiss.rows[obs_points][observable])  / dk
-    response_array2 = np.vstack([response2[obs] for obs in observables])
-
-    if bipolar == True:
+    if bipolar:
         response_array=(response_array2+response_array1)/2
-    if bipolar== False:
+    else:
         response_array=response_array1
 
     return response_array
+
+
+def phase_advance_between_consecutive_BPMs(twiss, observable):
+    '''
+    Returns an array with the phase difference between consecutive BPMs.
+    '''
+    if observable in ['mux', 'muy']:
+        mu = np.array(twiss.rows['bpm.*'][observable])
+        dmu = []
+    twiss.rows['bpm.*']['name']
+    N = len(twiss.rows['bpm.*']['name'])
+
+    for ii in range(N):
+        mu1 = mu[ii]
+        mu2 = mu[(ii + 1) % N]    # wraps around automatically
+        dmu.append((mu2 - mu1) % 1.0)
+    
+    return np.array(dmu) 
+
+
+def get_delta_vec(twiss, reference_twiss, observables, rdt=False,Delta_mu=False):
+    '''
+    Returns the difference between values in two lines. Used between the unperturbed and misaligned lattice.  
+    twiss: Twiss of the observed line 
+    reference_twiss: Description
+    observation_points: Points at which the vector should be evaluated
+    observables: For what quantities should it be evaluated
+    Delta_mu: If true, the phase observables become the phase difference between consecutive BPMs
+    '''
+    if rdt:
+        ideal_values = {'f1001_real': reference_twiss.rows['bpm.*']['f1001'].real,
+                        'f1001_imag': reference_twiss.rows['bpm.*']['f1001'].imag,
+                        'f1010_real': reference_twiss.rows['bpm.*']['f1010'].real,
+                        'f1010_imag': reference_twiss.rows['bpm.*']['f1010'].imag,
+                        'dy': reference_twiss.rows['bpm.*']['dy']}
+        measured_values = {'f1001_real': twiss.rows['bpm.*']['f1001'].real,
+                        'f1001_imag': twiss.rows['bpm.*']['f1001'].imag,
+                        'f1010_real': twiss.rows['bpm.*']['f1010'].real,
+                        'f1010_imag': twiss.rows['bpm.*']['f1010'].imag,
+                        'dy': twiss.rows['bpm.*']['dy']}
+
+    elif Delta_mu:
+        phase_obs = ['mux', 'muy']
+        other_obs = [o for o in observables if o not in phase_obs]
+        ideal_values = {o: phase_advance_between_consecutive_BPMs(reference_twiss, o) for o in phase_obs}
+        measured_values = {o: phase_advance_between_consecutive_BPMs(twiss, o) for o in phase_obs}
+        ideal_values.update({o: reference_twiss.rows['bpm.*'][o] for o in other_obs})
+        measured_values.update({o: twiss.rows['bpm.*'][o] for o in other_obs})
+    # if coupling_rdt:
+        
+    else:
+        ideal_values = {o: reference_twiss.rows['bpm.*'][o] for o in observables}
+        measured_values = {o: twiss.rows['bpm.*'][o] for o in observables}
+
+    delta_y = {o: np.array(ideal_values[o]) - np.array(measured_values[o]) for o in observables}
+    delta_y_vec = np.concatenate([delta_y[o] for o in observables])
+
+    return delta_y_vec
+
+
+def tikhonov_lcurve(M, b, min_slope_condition=20, lambdas=None, plot=True, title=None):
+    """
+    Computes the Tikhonov-regularized solution of a system using the L-curve method
+    and automatically selects the optimal regularization parameter.
+
+    M: response matrix.
+    b: observable deviations
+    min_slope_condition: a minimum slope condition for the selection of the optimal lambda.
+    lambdas: array of regularization parameters to scan (default: logspace from 1e-1 to 1e15).
+    plot: if True, displays the L-curve and selected corner point.
+    title: optional title for the plot.
+
+    """
+    U, s, Vt = np.linalg.svd(M, full_matrices=False)
+    UTb = U.T @ b
+
+    if lambdas is None:
+        lambdas = np.logspace(-1, 15, 2000)
+
+    rnorms = np.empty(len(lambdas))
+    snorms = np.empty(len(lambdas))
+    solutions = []
+
+    for i, lam in enumerate(lambdas):
+        filt = s / (s**2 + lam)
+        c = Vt.T @ (filt * UTb)
+        solutions.append(c)
+
+        res = M @ c - b
+        rnorms[i] = np.linalg.norm(res)
+        snorms[i] = np.linalg.norm(c)
+
+    # log-log curve
+    log_r = np.log10(rnorms)
+    log_s = np.log10(snorms)
+    t = np.log10(lambdas)
+
+    # derivatives
+    d1r = np.gradient(log_r, t)
+    d1s = np.gradient(log_s, t)
+    d2r = np.gradient(d1r, t)
+    d2s = np.gradient(d1s, t)
+
+    # curvature
+    num = np.abs(d1r * d2s - d1s * d2r)
+    den = (d1r**2 + d1s**2)**1.5
+    curvature = num / (den + 1e-30)
+
+    # ---- secondary slope condition ----
+    slope = d1s / (d1r + 1e-30)
+    abs_s = np.abs(slope)
+
+    mask = np.zeros_like(curvature, dtype=bool)
+
+    #Applies a minimum slope threshold for the selected optimal lambda. Ensures the elbow
+    #point is selected. Value to be adjusted, depends on system optics.
+    slope_threshold = min_slope_condition   
+
+    mask = np.zeros_like(curvature, dtype=bool)
+
+    # require large slope BEFORE the candidate point
+    mask[1:] = abs_s[:-1] > slope_threshold
+
+    # keep curvature only where condition holds
+    curvature_filtered = np.where(mask, curvature, 0)
+
+    idx_corner = np.argmax(curvature_filtered)
+
+    # fallback if nothing passes threshold
+    if curvature_filtered[idx_corner] == 0:
+        idx_corner = np.argmax(curvature)
+
+    lambda_opt = lambdas[idx_corner]
+    c_opt = solutions[idx_corner]
+    if plot:
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        sc = ax.scatter(log_r, log_s, c=t, cmap='viridis', s=30)
+        ax.plot(log_r, log_s, '-', color='black', linewidth=1)
+
+        exp = int(np.floor(np.log10(lambda_opt)))
+        mant = lambda_opt / 10**exp
+
+        label = rf'corner $\lambda = {mant:.2f}\times 10^{{{exp}}}$'
+        ax.scatter(log_r[idx_corner], log_s[idx_corner], c='red', s=100, label=label)
+        cbar = plt.colorbar(sc)
+        cbar.set_label(r'$\log_{10}(\lambda)$', fontsize=24)
+        cbar.ax.tick_params(labelsize=22)
+
+        ax.set_xlabel(r'$\log_{10} \| M c - b \|$', fontsize=24)
+        ax.set_ylabel(r'$\log_{10} \| c \|$', fontsize=24)
+
+        # if title:
+        #     ax.set_title(f'L-curve (log-log) {title}', fontsize=30)
+        # else:
+        #     ax.set_title('L-curve (log-log)', fontsize=30)
+
+        ax.tick_params(axis='both', which='major', labelsize=22)
+        ax.legend(fontsize=22, loc='best')
+        ax.grid()
+
+        fig.tight_layout()
+        plt.show()
+
+    return lambda_opt, c_opt
+
+
+def remove_element_from_list(element_list, switch_rate):
+    ''' 
+    Given the list of elements affected it will remove elements randomly. Used for correctors and BPM's to see how stable the solution is.
+
+    element_list: list of elements to be treated. Accepts nested lists eg. [[family10, family11],[family20, family21]]
+    switch_rate: the rate at which the element will be removed, maximum value 1, minimum 0.
+
+    returns the lists in the order and format provided with the modifications.
+    '''
+    kept = []
+    removed = []
+
+    for e in element_list:
+        if random.random() < switch_rate:
+            removed.append(e)
+        else:
+            kept.append(e)
+
+    return kept, removed
+
+
+def extract_misalignments(line, name, only_nonzero=True):
+    '''
+    name: name of elements of interest within brackets, eg. for arc quadrupoles ['q[fd].*a.*'] and ['Quadrupole'] for all quadrupoles
+    only_nonzero: if True, includes only the elements with non zero misalignment values
+    '''
+    name=name[0]
+    misalignment_dict={}
+    tt = line.get_table(attr=True)
+    if name in ['Bend','RBend','Quadrupole','Sextupole']:
+        tt_name = tt.rows[tt.element_type==name]
+    else:
+        tt_name = tt.rows[name]
+    elements = tt_name.name.tolist()
+    for el_name in elements:
+        try:
+            el = line[el_name]  
+        except KeyError:
+            continue  
+
+        if hasattr(el, "shift_x") or hasattr(el, "shift_y") \
+        or hasattr(el, "shift_s") or hasattr(el, "rot_s_rad_no_frame"):
+
+            sx = float(el.shift_x)
+            sy = float(el.shift_y)
+            ss = float(el.shift_s)
+            rs = float(el.rot_s_rad_no_frame)
+            if only_nonzero==True:
+                if any([sx, sy, ss, rs]):  # only add if at least one is non-zero
+                    misalignment_dict[el_name] = {
+                        'shift_x': sx,
+                        'shift_y': sy,
+                        'rot_s_rad_no_frame': rs,
+                        'shift_s': ss
+                    }
+            else:
+                misalignment_dict[el_name] = {
+                    'shift_x': sx,
+                    'shift_y': sy,
+                    'rot_s_rad_no_frame': rs,
+                    'shift_s': ss
+                }
+        else:
+            continue
+    return misalignment_dict
 
 
 def apply_optics_correction(line, responce_matrix, reference_twiss, observables, observation_points, correctors, correction_weight=1):
@@ -5369,3 +5766,4 @@ def thick_slicing(line, scen_path):
     ])
 
     return line
+

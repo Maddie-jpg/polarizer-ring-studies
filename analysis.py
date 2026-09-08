@@ -185,7 +185,6 @@ def calc_damping_time_constant(m):
     tau=num/den
     return tau
 
-tau=mf.calculate_lifetime(survival_counts, ring, ref_particle, fit_start_turn=500)
 
 # Initialize the table
 brho = ring.particle_ref.p0c[0] / 299792458.0 

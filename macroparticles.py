@@ -333,13 +333,14 @@ def plot_twiss_ellipse_normalised(beta_l,alpha_l,beta_r, alpha_r,disp,ddisp,delt
     x_b=x+disp*delta
     xp_b=xp+ddisp*delta
 
-    print(disp*delta)
-
     zeta_r_d=(1/(np.sqrt(beta_r)))*x_b
     zeta_prime_r_d=np.sqrt(beta_r)*xp_b+(alpha_r/np.sqrt(beta_r))*x_b
 
     ax.plot(zeta, zeta_prime, color='blue', label='Particle distribution')
     ax.plot(zeta_r, zeta_prime_r, color='red', label='Initial ring parameters')
+    if delta != 0:
+        ax.plot(zeta_r_d, zeta_prime_r_d, color='green', linestyle='--',
+                label=f'Ring parameters (shifted by beam-ring $\\delta$={delta:.4f})')
     ax.axis('equal') 
     ax.grid(True, linestyle=':')
     ax.legend()
@@ -403,7 +404,7 @@ print(f'Vertical geometric emittance:{emittance_y} um, {m_emittance_y}um' )
 ax, bx, gx, dx, ddx = get_twiss(df, 'x[mm]', 'xp[mrad]')
 ay, by, gy, dy, ddy = get_twiss(df, 'y[mm]', 'yp[mrad]')
 print(f"Beam Twiss: alpha_x={ax:.3f}, beta_x={bx:.3f} m, dx={dx:.3f} m,ddx={ddx:.3f} m")
-print(f"Beam Twiss: alpha_y={ay:.3f}, beta_y={by:.3f} m, dy={dx:.3f} m,ddy={ddx:.3f} m")
+print(f"Beam Twiss: alpha_y={ay:.3f}, beta_y={by:.3f} m, dy={dy:.3f} m,ddy={ddy:.3f} m")
 
 p_array=df['p[MeV/c]']
 
@@ -561,21 +562,25 @@ ddy0   = initial_twiss['ddy'][0]
 y     = initial_twiss['y'][0]
 yp    = initial_twiss['py'][0]
 
-delta= initial_twiss['delta'][0]
-
-plot_twiss_ellipse(bx,ax,betx0, alfx0, emittance_x,axes[0, 0])
-plot_twiss_ellipse(by,ay,bety0, alfy0, emittance_y,axes[1, 0])
-
-plot_twiss_ellipse_normalised(bx*1e-3,ax,betx0, alfx0,dx0,ddx0,delta, emittance_x,axes[0,1])
-plot_twiss_ellipse_normalised(by*1e-3,ay,bety0, alfy0,dy0,ddy0,delta, emittance_y,axes[1, 1])
+delta_ring_ref = initial_twiss['delta'][0]
+# The ring's OWN on-axis delta from an on-momentum twiss calculation is ~0
+# by construction, so passing it into plot_twiss_ellipse_normalised's
+# dispersion-shift term makes that curve a permanent no-op. What actually
+# matters for "does this beam sit at the ring's reference energy" is the
+# beam's mean momentum relative to the ring's reference momentum:
+p0_ring_mev = ring.particle_ref.p0c[0] / 1e6
+p0_beam_mev = df['p[MeV/c]'].mean()
+delta_beam_vs_ring = (p0_beam_mev - p0_ring_mev) / p0_ring_mev
+print(f"Beam mean momentum: {p0_beam_mev:.2f} MeV vs ring reference: "
+      f"{p0_ring_mev:.2f} MeV  ->  delta_beam_vs_ring = {delta_beam_vs_ring:.5f}")
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
 plot_twiss_ellipse(bx,ax,betx0, alfx0, emittance_x,axes[0, 0])
 plot_twiss_ellipse(by,ay,bety0, alfy0, emittance_y,axes[1, 0])
 
-plot_twiss_ellipse_normalised(bx,ax,betx0, alfx0,dx0,ddx0,delta, emittance_x,axes[0,1])
-plot_twiss_ellipse_normalised(by,ay,bety0, alfy0,dy0,ddy0,delta, emittance_y,axes[1, 1])
+plot_twiss_ellipse_normalised(bx,ax,betx0, alfx0,dx0,ddx0,delta_beam_vs_ring, emittance_x,axes[0,1])
+plot_twiss_ellipse_normalised(by,ay,bety0, alfy0,dy0,ddy0,delta_beam_vs_ring, emittance_y,axes[1, 1])
 
 axes[0, 0].set_title("Horizontal: Physical Phase Space")
 axes[0, 0].set_xlabel("x [mm]")
@@ -610,7 +615,17 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
     """Apply dispersion-based matching to raw beam coordinates for a given
     reference momentum p0c_ref, returning arrays ready for xp.Particles().
     Centralised here so the energy scan and the full tracking loop below
-    use the exact same matching logic instead of two separate copies."""
+    use the exact same matching logic instead of two separate copies.
+
+    dx/ddx/dy/ddy must be the RING's dispersion at the injection point
+    (e.g. ring_tw.dx[0], ring_tw.dpx[0]), NOT the beam's own measured
+    x-vs-energy correlation from get_twiss(df,...). The raw x[mm]/y[mm]
+    columns already contain whatever real dispersive correlation the beam
+    itself has; shifting by the beam's own dispersion on top of that
+    double-applies it. evaluate_ecs_performance() below does this the
+    correct way (ring_tw.dx[0]/ring_tw.dpx[0]) -- this function should
+    always be called the same way.
+    """
     delta = (df_in['p[MeV/c]'].values * 1e6 - p0c_ref) / p0c_ref
     x_matched  = df_in['x[mm]'].values  * 1e-3 + dx  * delta
     px_matched = df_in['xp[mrad]'].values * 1e-3 + ddx * delta
@@ -621,7 +636,8 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
     return x_matched, px_matched, y_matched, py_matched, delta, zeta
 
 x_m, px_m, y_m, py_m, _, zeta_m = match_coordinates(
-    df_subset, p0c_avg, ref_particle_avg, dx, ddx, dy, ddy)
+    df_subset, p0c_avg, ref_particle_avg,
+    ring_tw.dx[0], ring_tw.dpx[0], ring_tw.dy[0], ring_tw.dpy[0])
 
 energy_range_mev = np.linspace(2.5e3, 3.2e3, 100)
 efficiency_results = []
@@ -646,6 +662,15 @@ for e_mev in energy_range_mev:
 
 best_idx = np.argmax(efficiency_results)
 best_energy_mev = energy_range_mev[best_idx]
+
+# The loop above overwrites ring.particle_ref on every one of its 100
+# iterations and never puts it back -- without this, it's left pointing at
+# 3200 MeV (the top of energy_range_mev) for every tracking run after this,
+# including average/nominal/optimal below. RF cavities typically use
+# line.particle_ref (not each particle's own p0c) to set the synchronous
+# phase/frequency reference, so leaving this at an arbitrary scan energy
+# could silently mis-set the RF bucket for all the "real" tracking that follows.
+ring.particle_ref = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
 folder3 = mf.results_dir(design, config, phase, changes=changes,
                           metric='InjectionEfficiency', sub=mode)
@@ -703,7 +728,8 @@ for label, e_mev in energies_to_track.items():
     ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
 
     x_matched, px_matched, y_matched, py_matched, delta, zeta = match_coordinates(
-        df_subset, p0c_reference, ref_particle, dx, ddx, dy, ddy)
+        df_subset, p0c_reference, ref_particle,
+        ring_tw.dx[0], ring_tw.dpx[0], ring_tw.dy[0], ring_tw.dpy[0])
 
     particles = xp.Particles(
         p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV,
@@ -767,6 +793,9 @@ for label, e_mev in energies_to_track.items():
     survival_counts = np.sum(data.state > 0, axis=0)
     turns = np.arange(len(survival_counts))
 
+    tau=mf.calculate_lifetime(survival_counts, ring, ref_particle, fit_start_turn=500)
+    print(f"Beam lifetime:{tau} Seconds")
+
     plt.figure(figsize=(10, 6))
     plt.plot(turns, survival_counts, color='firebrick', linewidth=2)
     plt.title(f'Particle Survival over {len(turns)} Turns ({label}, {e_mev:.1f} MeV)', fontsize=14)
@@ -780,6 +809,20 @@ for label, e_mev in energies_to_track.items():
     final_efficiency = (survival_counts[-1] / survival_counts[0]) * 100
     print(f"[{label}] Final Survival: {survival_counts[-1]} / {survival_counts[0]} "
           f"({final_efficiency:.2f}%)")
+
+    # Save the raw survival curve so analysis.py (which has no tracked real
+    # beam population of its own -- only a synthetic DA/MA scan grid) can
+    # reuse THIS actual beam's decay curve for calculate_lifetime() instead
+    # of fitting something that isn't beam-density-weighted.
+    c_light = 299792458
+    T_rev0 = ring.get_length() / (ref_particle.beta0[0] * c_light)
+    with open(f'{folder2}/survival_curve.json', 'w') as f:
+        json.dump({
+            "label": label,
+            "energy_mev": float(e_mev),
+            "survival_counts": survival_counts.tolist(),
+            "T_rev0": float(T_rev0),
+        }, f, indent=4)
 
     plt.figure(figsize=(8, 6))
     plt.hist(data.x[:, 0] * 1000, bins=50, color='C0', edgecolor='black', alpha=0.7)
@@ -834,15 +877,21 @@ if mode == 'perfect':
         need: the survival curve and the seed line's initial optics."""
         p0c_ref = e_mev * 1e6
         ref_particle = xp.Particles(p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV)
+
+        # This seed's own twiss (misalignment/correction shifts dispersion
+        # away from the baseline ring's) -- computed BEFORE matching so we
+        # match against THIS line's actual dispersion, not the baseline's.
+        seed_tw = seed_line.twiss6d()
+
         x_m, px_m, y_m, py_m, delta_m, zeta_m = match_coordinates(
-            df_subset, p0c_ref, ref_particle, dx, ddx, dy, ddy)
+            df_subset, p0c_ref, ref_particle,
+            seed_tw.dx[0], seed_tw.dpx[0], seed_tw.dy[0], seed_tw.dpy[0])
 
         particles = xp.Particles(
             p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV,
             x=x_m, px=px_m, y=y_m, py=py_m, zeta=zeta_m, delta=delta_m
         )
 
-        seed_tw = seed_line.twiss6d()
         seed_line.configure_radiation(model='quantum')
         seed_line.track(particles, num_turns=6100,
                          turn_by_turn_monitor=True, with_progress=False)
