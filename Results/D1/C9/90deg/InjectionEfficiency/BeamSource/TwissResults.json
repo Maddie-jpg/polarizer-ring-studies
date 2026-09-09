@@ -1,23 +1,23 @@
 {
     "x": {
-        "alpha": -2.1462404971770326,
-        "beta": 41.41402780314986,
-        "gamma": 0.13537317109968014,
-        "dispersion": 9.792052379078157,
-        "dispersion_prime": 1.436409576077057,
-        "emittance_geo": 3.2454777144233873
+        "alpha": -0.6739719544328193,
+        "beta": 13.765947152705643,
+        "gamma": 0.10564025702192018,
+        "dispersion": 3.599247963679162,
+        "dispersion_prime": 0.3565506520834446,
+        "emittance_geo": 9.370656287825724
     },
     "y": {
-        "alpha": 4.901339935195299,
-        "beta": 21.369151752736432,
-        "gamma": 1.1709932827416003,
-        "dispersion": -1.7473116099863681,
-        "dispersion_prime": 0.7335602465727,
-        "emittance_geo": 1.3381848420263134
+        "alpha": 3.9677085963759064,
+        "beta": 16.732368290646132,
+        "gamma": 1.0006181560750678,
+        "dispersion": -5.3801754342924655,
+        "dispersion_prime": 1.4270046975418793,
+        "emittance_geo": 3.3267343547031603
     },
     "metadata": {
         "particle_type": "positron",
         "design_energy_mev": 2860.0,
-        "n_particles": 21954
+        "n_particles": 23119
     }
 }

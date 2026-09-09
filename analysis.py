@@ -24,8 +24,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',4))
-config=int(os.environ.get('CONFIG',0))
+design=int(os.environ.get('DESIGN',1))
+config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
@@ -534,6 +534,22 @@ except NameError:
 mf.plot_dangerous_resonances(ring, ring_tw.qx, ring_tw.qy, max_order=(1,2,3,4,5), tune_range=0.1)
 plt.savefig(f'{folder1}/dangerous_resonances_{mode}.png')
 
+
+Jx, qx_vs_Jx, qy_cross_x, Jy, qy_vs_Jy, qx_cross_y = mf.detuning_scan(
+    ring, nemitt_x=nemitt_x, nemitt_y=nemitt_y, num_turns=256, a_max=1.0, n_amplitudes=15)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
+
+ax1.plot(Jx, qx_vs_Jx - qx_vs_Jx[0], 'o-', label=r'$\Delta Q_x$ (direct, det$_{xx}$)')
+ax1.plot(Jx, qy_cross_x - qy_cross_x[0], 's--', label=r'$\Delta Q_y$ (cross, det$_{yx}$)')
+ax1.set_xlabel(r'$J_x$ [m]'); ax1.set_ylabel(r'$\Delta Q$'); ax1.legend(); ax1.set_title('Horizontal scan')
+
+ax2.plot(Jy, qy_vs_Jy - qy_vs_Jy[0], 'o-', label=r'$\Delta Q_y$ (direct, det$_{yy}$)')
+ax2.plot(Jy, qx_cross_y - qx_cross_y[0], 's--', label=r'$\Delta Q_x$ (cross, det$_{xy}$)')
+ax2.set_xlabel(r'$J_y$ [m]'); ax2.set_ylabel(r'$\Delta Q$'); ax2.legend(); ax2.set_title('Vertical scan')
+
+fig.tight_layout()
+fig.savefig(f'{folder1}/amplitude_detuning_curves.png')
 # %%
 if mode=='perfect':
     line=ring

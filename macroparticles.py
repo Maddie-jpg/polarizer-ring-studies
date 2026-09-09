@@ -176,7 +176,7 @@ print("\nTop 10 configurations (Highest Efficiency + Lowest Spread):")
 display(scan_df.head(10))'''
 
 # %%
-df_copy = df_raw.copy()
+df_copy = df.copy()
 
 Eref = np.mean(df['p[MeV/c]'])
 R56= 0.352963

@@ -11,6 +11,7 @@ from xutil_DA_CC.xsuite_plot_functions import DA_vs_turns
 import xpart as xp
 from scipy.optimize import curve_fit
 import csv
+import nafflib as nl
 
 pdr=xt.Environment()
 
@@ -582,6 +583,39 @@ def calculate_lifetime(survival_counts, ring, ref_particle, fit_start_turn=500):
 
     print(f"tau = {tau:.4g} s  ({tau / T_rev:.1f} turns)  R^2 = {r_squared:.4f}")
     return tau
+
+def detuning_scan(line, nemitt_x, nemitt_y, num_turns=256,
+                   a_min=0.05, a_max=1.0, n_amplitudes=15, a0_sigmas=0.01):
+    amps = np.linspace(a_min, a_max, n_amplitudes)
+
+    gemitt_x = nemitt_x / line.particle_ref._xobject.beta0[0] / line.particle_ref._xobject.gamma0[0]
+    gemitt_y = nemitt_y / line.particle_ref._xobject.beta0[0] / line.particle_ref._xobject.gamma0[0]
+
+    # --- horizontal scan: vary x amplitude, y held tiny/fixed ---
+    Jx = amps**2 * gemitt_x / 2
+    particles_x = line.build_particles(method='4d', zeta=0, delta=0,
+                                        x_norm=amps, y_norm=a0_sigmas,
+                                        nemitt_x=nemitt_x, nemitt_y=nemitt_y)
+    line.track(particles_x, num_turns=num_turns, time=True, turn_by_turn_monitor=True)
+    mon_x = line.record_last_track
+    mon_x.x -= mon_x.x.mean(axis=1, keepdims=True)
+    mon_x.y -= mon_x.y.mean(axis=1, keepdims=True)
+    qx_scan = np.array([np.abs(nl.get_tune(mon_x.x[i, :])) for i in range(n_amplitudes)])
+    qy_scan_from_x = np.array([np.abs(nl.get_tune(mon_x.y[i, :])) for i in range(n_amplitudes)])
+
+    # --- vertical scan: vary y amplitude, x held tiny/fixed ---
+    Jy = amps**2 * gemitt_y / 2
+    particles_y = line.build_particles(method='4d', zeta=0, delta=0,
+                                        x_norm=a0_sigmas, y_norm=amps,
+                                        nemitt_x=nemitt_x, nemitt_y=nemitt_y)
+    line.track(particles_y, num_turns=num_turns, time=True, turn_by_turn_monitor=True)
+    mon_y = line.record_last_track
+    mon_y.x -= mon_y.x.mean(axis=1, keepdims=True)
+    mon_y.y -= mon_y.y.mean(axis=1, keepdims=True)
+    qy_scan = np.array([np.abs(nl.get_tune(mon_y.y[i, :])) for i in range(n_amplitudes)])
+    qx_scan_from_y = np.array([np.abs(nl.get_tune(mon_y.x[i, :])) for i in range(n_amplitudes)])
+
+    return Jx, qx_scan, qy_scan_from_x, Jy, qy_scan, qx_scan_from_y
 
 #---------------------------------------
 # FUNCTIONS FOR spin_tracking.py SCRIPT

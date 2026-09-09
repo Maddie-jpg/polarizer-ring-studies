@@ -549,43 +549,65 @@ def _overlay_resonance_lines(ax, qx_range, qy_range, max_order=4):
                         ax.axvline(qx_line, ls=style, color='gray', alpha=alpha, lw=0.8)
 
 
-def plot_rdt_working_point_map(QX, QY, maps, qx_range, qy_range, max_resonance_order=4,
-                                current_qx=None, current_qy=None):
-    """One subplot per RDT: log10|f_pqrt| as a heatmap, resonance lines
-    overlaid in gray, and (optionally) your current working point marked."""
-    n = len(maps)
-    fig, axes = plt.subplots(1, n, figsize=(6 * n, 5.5), squeeze=False)
-    axes = axes[0]
+def plot_rdt_lines_combined(QX, QY, maps, qx_range, qy_range,
+                             current_qx=None, current_qy=None, cmap='inferno'):
+    """Single combined diagram for all scanned RDTs, replacing the old
+    one-subplot-per-RDT layout:
+      - background: log10 of the STRONGEST RDT at each grid point (max
+        across whichever RDTs were scanned), so you still see where any
+        of them gets dangerous
+      - foreground: each RDT's own specific resonance line(s)
+        (p-q)*Qx + (r-t)*Qy = integer, drawn in its own color with one
+        legend entry -- so you can tell exactly which term is responsible
+        for a given stopband, all on one (Qx, Qy) plot.
+    """
+    fig, ax = plt.subplots(figsize=(9, 8))
 
-    for ax, (rdt, grid) in zip(axes, maps.items()):
-        # Clip to a robust percentile range rather than raw min/max: a
-        # single near-exact resonance hit (denom -> 0, magnitude -> huge
-        # or inf) otherwise saturates the colour scale and makes every
-        # other point look like a flat, solid block by comparison.
-        log_grid = np.log10(grid + 1e-12)
-        finite = log_grid[np.isfinite(log_grid)]
-        if finite.size == 0:
-            print(f"[plot_rdt_working_point_map] '{rdt}': no finite values to plot.")
-            continue
-        vmin, vmax = np.percentile(finite, [2, 98])
-        if vmin == vmax:
-            print(f"[plot_rdt_working_point_map] '{rdt}': all values identical "
-                  f"({vmin:.3g}) -- see the precompute_rdt_elements warning above "
-                  f"if h.size was 0 for this RDT.")
-        im = ax.pcolormesh(QX, QY, log_grid, shading='auto', cmap='inferno',
-                            vmin=vmin, vmax=vmax)
-        fig.colorbar(im, ax=ax, label=fr'$\log_{{10}}|f_{{{rdt[1:]}}}|$')
-        _overlay_resonance_lines(ax, qx_range, qy_range, max_resonance_order)
-        if current_qx is not None:
-            ax.plot(current_qx, current_qy, 'o', color='cyan', ms=10,
-                    mec='black', label='Current working point')
-            ax.legend(loc='upper right', fontsize='small')
-        ax.set_xlabel('$Q_x$')
-        ax.set_ylabel('$Q_y$')
-        ax.set_title(f'$f_{{{rdt[1:]}}}$')
-        ax.set_xlim(qx_range)
-        ax.set_ylim(qy_range)
+    combined = np.max([np.log10(grid + 1e-12) for grid in maps.values()], axis=0)
+    finite = combined[np.isfinite(combined)]
+    vmin, vmax = np.percentile(finite, [2, 98]) if finite.size > 0 else (None, None)
+    im = ax.pcolormesh(QX, QY, combined, shading='auto', cmap=cmap, vmin=vmin, vmax=vmax)
+    fig.colorbar(im, ax=ax, label=r'$\log_{10}|f|$ (strongest RDT at each point)')
 
+    colors = plt.cm.tab10(np.linspace(0, 1, max(len(maps), 2)))
+    qx_vals = np.array(qx_range)
+
+    for rdt, color in zip(maps.keys(), colors):
+        p, q, r, t = _parse_rdt_key(rdt)
+        a, b = p - q, r - t
+        # Sweep exactly the range of integer c that can actually cross
+        # this window -- computed from the rectangle's corners, so it
+        # works regardless of how large |a| or |b| happens to be (a fixed
+        # guess would either miss lines for large a/b or waste time for
+        # small ones).
+        corner_vals = [a * cx + b * cy for cx in qx_range for cy in qy_range]
+        c_lo, c_hi = int(np.floor(min(corner_vals))), int(np.ceil(max(corner_vals)))
+
+        label_used = False
+        for c in range(c_lo, c_hi + 1):
+            if b != 0:
+                qy_vals = (c - a * qx_vals) / b
+                if np.any((qy_vals >= qy_range[0]) & (qy_vals <= qy_range[1])):
+                    ax.plot(qx_vals, qy_vals, '-', color=color, lw=1.3,
+                            label=(f'$f_{{{rdt[1:]}}}$' if not label_used else None))
+                    label_used = True
+            elif a != 0:
+                qx_line = c / a
+                if qx_range[0] <= qx_line <= qx_range[1]:
+                    ax.axvline(qx_line, color=color, lw=1.3,
+                               label=(f'$f_{{{rdt[1:]}}}$' if not label_used else None))
+                    label_used = True
+
+    if current_qx is not None:
+        ax.plot(current_qx, current_qy, 'o', color='cyan', ms=11, mec='black',
+                zorder=5, label='Current working point')
+
+    ax.set_xlim(qx_range)
+    ax.set_ylim(qy_range)
+    ax.set_xlabel('$Q_x$')
+    ax.set_ylabel('$Q_y$')
+    ax.set_title('Resonance driving terms: combined working-point diagram')
+    ax.legend(loc='upper right', fontsize='small', framealpha=0.9)
     plt.tight_layout()
     return fig
 
@@ -601,34 +623,34 @@ def find_best_working_point(QX, QY, maps, weight=None):
     idx = np.unravel_index(np.argmin(combined), combined.shape)
     return QX[idx], QY[idx], combined
 
-tt = ring.get_table()
+def two_integer_range(q):
+    """Returns (lo, hi) spanning a full 2-integer window around q, e.g.
+    q=15.46 -> (14, 16). Both the RDT scan and the DA tune scan use this
+    same helper so their windows always stay consistent with each other."""
+    base = np.floor(q)
+    return base - 1, base + 1
 
-# One-shot diagnostic on a real, confirmed-present sextupole -- run this
-# once before the full scan so any failure shows up immediately with a
-# real traceback/reason instead of being silently absorbed by the scan's
-# broad except and just showing up as "found ZERO elements" later.
-_debug_sext_candidates = tt.rows[tt.element_type == 'Sextupole'].name
-if len(_debug_sext_candidates) > 0:
-    debug_rdt_element(ref_twiss, ring, line_table, _debug_sext_candidates[0])
-else:
-    print("[debug] No elements with element_type=='Sextupole' found via "
-          "tt.rows[tt.element_type == 'Sextupole'] -- unexpected given the "
-          "lattice JSON has 96 of them; the table filter itself may be the issue.")
+
+tt = ring.get_table()
 
 rdts_of_interest = ['f3000', 'f2100', 'f1020', 'f1011', 'f1002']  # 3rd-order, sextupole-driven
 current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
+qx_range = two_integer_range(current_qx)
+qy_range = two_integer_range(current_qy)
 
+# n_points bumped up from 120: the window just grew from +-0.15 (0.3 wide)
+# to a full 2 integers wide -- roughly 7x wider per axis, ~44x more area.
+# RDT evaluation is cheap (vectorized per grid point, no tracking), so
+# more points here costs seconds, not the hours a DA scan would.
 QX, QY, maps = scan_working_point(
 rdts_of_interest, ref_twiss, ring, line_table,
     observation_point=tt.name[0], source_elements=line_table.name,
-    qx_range=(current_qx - 0.15, current_qx + 0.15),
-    qy_range=(current_qy - 0.15, current_qy + 0.15),
-    n_points=120,
+    qx_range=qx_range, qy_range=qy_range,
+    n_points=400,
     )
     
-plot_rdt_working_point_map(QX, QY, maps, (current_qx-0.15, current_qx+0.15),
-                               (current_qy-0.15, current_qy+0.15),
-                               current_qx=current_qx, current_qy=current_qy)
+plot_rdt_lines_combined(QX, QY, maps, qx_range, qy_range,
+                        current_qx=current_qx, current_qy=current_qy)
 plt.show()
     
 best_qx, best_qy, combined_score = find_best_working_point(QX, QY, maps)
@@ -811,27 +833,49 @@ def performance_at_tune(line, qx_target, qy_target, tune_knobs,
  
  
 def tune_scan(line, qx_range, qy_range, tune_knobs, n_emittancex, n_emittancey,
-              start_element, n_points=10, scan_turns=1000, scan_particles=200):
+              start_element, n_points=10, scan_turns=1000, scan_particles=200,
+              sanity_qx=None, sanity_qy=None):
     """Coarse performance tune scan over a grid of (Qx, Qy). Returns
-    (QX, QY, DA_map). Operates on a COPY of `line` -- your original line
-    object is never modified."""
+    (QX, QY, DA_map), with DA_map[i,j] = np.nan wherever the tune match or
+    DA tracking failed at that point -- that's expected and normal near
+    integer/half-integer resonances, not something to treat as fatal.
+    Operates on a COPY of `line` -- your original line object is never
+    modified.
+
+    sanity_qx/sanity_qy: pass your REAL, currently-valid working point
+    here for the pre-flight check. With a full 2-integer-wide window, the
+    window's geometric CENTER sits exactly on an integer tune in BOTH
+    planes simultaneously -- a genuinely resonant, often-unreachable
+    point, not a meaningful "this should definitely work" test anymore.
+    Testing your actual current tune instead is the only pre-flight check
+    that can reliably distinguish "real setup bug" from "yes, some grid
+    points are supposed to fail."
+    """
     scan_line = line.copy()
     context_tracking = xo.ContextCpu(omp_num_threads=0)
     scan_line.build_tracker(_context=context_tracking)
  
-    # Sanity check BEFORE burning time on the whole grid: try matching to
-    # the center of the requested window. If even this fails, something
-    # about method/knobs/targets is wrong -- better to find out in one
-    # attempt than after 100 identical failures.
-    qx_center = 0.5 * (qx_range[0] + qx_range[1])
-    qy_center = 0.5 * (qy_range[0] + qy_range[1])
-    if not match_tune(scan_line, qx_center, qy_center, tune_knobs):
-        raise RuntimeError(
-            "Tune match failed at the CENTER of the scan window -- this points to a "
-            "setup problem (wrong tune_knobs, or method mismatch with how this ring "
-            "is configured), not an unreachable tune. Fix this before scanning the "
-            "full grid, or every point will fail the same way."
-        )
+    if sanity_qx is not None and sanity_qy is not None:
+        if not match_tune(scan_line, sanity_qx, sanity_qy, tune_knobs):
+            raise RuntimeError(
+                f"Tune match failed at the KNOWN CURRENT WORKING POINT "
+                f"(Qx={sanity_qx:.4f}, Qy={sanity_qy:.4f}) -- since this is a "
+                f"real, already-valid tune, failing here means a genuine setup "
+                f"problem (wrong tune_knobs, or a method/radiation mismatch), "
+                f"not an unreachable point. Fix this before trusting the scan."
+            )
+    else:
+        qx_center = 0.5 * (qx_range[0] + qx_range[1])
+        qy_center = 0.5 * (qy_range[0] + qy_range[1])
+        if not match_tune(scan_line, qx_center, qy_center, tune_knobs):
+            print(f"[tune_scan] NOTE: sanity check at the window's geometric "
+                  f"center (Qx={qx_center:.4f}, Qy={qy_center:.4f}) failed. "
+                  f"With a 2-integer-wide window that center sits exactly on "
+                  f"an integer tune in both planes -- often GENUINELY "
+                  f"unreachable, not a setup bug. Continuing with the full "
+                  f"scan; pass sanity_qx/sanity_qy (your real current working "
+                  f"point) for a pre-flight check that can actually tell the "
+                  f"two apart.")
  
     # Reduced-resolution study params -- this is a fast screening pass,
     # not a publication-quality DA study. Re-run at full resolution
@@ -860,21 +904,34 @@ def tune_scan(line, qx_range, qy_range, tune_knobs, n_emittancex, n_emittancey,
  
     total = n_points * n_points
     done = 0
+    n_failed = 0
     for i in range(n_points):
         for j in range(n_points):
             DA_map[i, j] = performance_at_tune(
                 scan_line, QX[i, j], QY[i, j], tune_knobs, study_params_DA, context_tracking)
             done += 1
+            if np.isnan(DA_map[i, j]):
+                n_failed += 1
             print(f"[{done}/{total}] Qx={QX[i, j]:.4f} Qy={QY[i, j]:.4f} "
                   f"-> min_DA={DA_map[i, j]}")
  
+    print(f"[tune_scan] Done: {total - n_failed}/{total} points succeeded, "
+          f"{n_failed} failed/unreachable (shown as 0 DA in the plot).")
+
     return QX, QY, DA_map
  
  
 def plot_tune_scan(QX, QY, DA_map, current_qx=None, current_qy=None):
+    # Failed/unreachable points are NaN in DA_map (so best_from_map can
+    # correctly exclude them from "best point" consideration) but plotted
+    # as 0 -- the worst possible DA, on the SAME colour scale as everything
+    # else -- rather than left blank, which pcolormesh would otherwise
+    # render as an easy-to-miss gap rather than an obviously bad point.
+    plot_data = np.nan_to_num(DA_map, nan=0.0)
+
     fig, ax = plt.subplots(figsize=(8, 7))
-    im = ax.pcolormesh(QX, QY, DA_map, shading='auto', cmap='viridis')
-    fig.colorbar(im, ax=ax, label=r'Minimum DA [$\sigma$]')
+    im = ax.pcolormesh(QX, QY, plot_data, shading='auto', cmap='viridis')
+    fig.colorbar(im, ax=ax, label=r'Minimum DA [$\sigma$] (0 = failed/unreachable)')
     if current_qx is not None:
         ax.plot(current_qx, current_qy, 'o', color='red', ms=10, mec='black',
                 label='Current working point')
@@ -906,40 +963,17 @@ def best_from_map(QX, QY, DA_map):
 
 
 current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
-
-# Minimal isolation: 'mean' vs radiation-off both failed identically on a
-# copy, and Step A doesn't even use a target tune -- so the only variable
-# left is .copy() itself. Compare the ORIGINAL ring (unmodified, right
-# here, right now) against a bare .copy() with NOTHING else changed.
-print("--- minimal isolation: original ring vs a bare .copy(), nothing else changed ---")
-try:
-    tw_orig = ring.twiss6d()
-    print(f"ring.twiss6d() (ORIGINAL, no copy) SUCCEEDED: qx={tw_orig.qx:.6f}")
-except Exception as e:
-    print(f"ring.twiss6d() (ORIGINAL, no copy) FAILED: {type(e).__name__}: {e}")
-
-try:
-    ring_copy_bare = ring.copy()
-    tw_copy = ring_copy_bare.twiss6d()
-    print(f"ring.copy().twiss6d() (bare copy, no other changes) SUCCEEDED: qx={tw_copy.qx:.6f}")
-except Exception as e:
-    print(f"ring.copy().twiss6d() (bare copy, no other changes) FAILED: {type(e).__name__}: {e}")
-print("--- end minimal isolation ---")
-
-# Run the debug version ONCE, targeting the line's OWN current tune, on a
-# throwaway copy -- if matching to where it already is fails, that proves
-# it's not about reachability and gives the real traceback instead of the
-# "Invalid n1" one-liner.
-debug_tune_match(ring.copy(), current_qx, current_qy, tune_knobs=['kQFarcM', 'kQDarcM'])
+qx_range = two_integer_range(current_qx)
+qy_range = two_integer_range(current_qy)
 
 QX, QY, DA_map = tune_scan(
         ring,
-        qx_range=(current_qx - 0.1, current_qx + 0.1),
-        qy_range=(current_qy - 0.1, current_qy + 0.1),
-        tune_knobs=['kQFarcM', 'kQDarcM'],   # CONFIRM this is your global tune knob
+        qx_range=qx_range, qy_range=qy_range,
+        tune_knobs=['kQFarcM', 'kQDarcM','kQFDS','kQDDS','kQFDoub','kQDDoub'],
         n_emittancex=n_emittancex, n_emittancey=n_emittancey,
         start_element='QD1_R1',
-        n_points=10, scan_turns=1000, scan_particles=200,
+        n_points=25, scan_turns=1000, scan_particles=200,
+        sanity_qx=current_qx, sanity_qy=current_qy,
     )
 plot_tune_scan(QX, QY, DA_map, current_qx=current_qx, current_qy=current_qy)
 plt.show()
