@@ -187,7 +187,7 @@ def get_bshape4(L, bb0, bp0, bbL, bpL, bint):
     return (bb0*t1 + L*bp0*t2 + bbL*t3 + L*bpL*t4 + bint/L*t5) * L**np.arange(0, -5, -1)
 
 def make_fringe_bend(pdr, name, length, angle, gap, fringe_frac=3,
-                      nstep=10, ny=5):
+                      nstep=5, ny=5):
     """
     Build a soft-edge dipole (5 FieldExpansion slices, smooth entrance/exit
     fringe + flat body) sized to a real magnet, and register it as a named

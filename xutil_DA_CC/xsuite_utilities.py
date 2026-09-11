@@ -61,7 +61,7 @@ import h5py
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+#from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 # =========================
 # Progress / utilities
