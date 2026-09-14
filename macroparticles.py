@@ -15,6 +15,7 @@ import xpart as xp
 import xobjects as xo
 from scipy.stats import gaussian_kde
 import my_functions as mf
+xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
 design=int(os.environ.get('DESIGN',1))
@@ -31,7 +32,7 @@ print(list(df.columns))
 
 # %%
 
-def filter_beam_core(df_raw, n_sigma=5):
+def filter_beam_core(df_raw, n_sigma=3):
     cols = ['x[mm]', 'xp[mrad]', 'y[mm]', 'yp[mrad]', 't[mm/c]', 'p[MeV/c]']
     df_centered = df_raw[cols] - df_raw[cols].mean()
     
@@ -249,9 +250,19 @@ def get_twiss(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0):
     
     return alpha, beta, gamma, dispersion_x, disp_prime_x
 
-def filter_by_action(df, position, angle, n_sigma=6, max_iter=5):
-    df_iter = df
+def remove_dispersion(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0):
+    df_out = df.copy()
+    delta = (df_out[p_col].values - p0_mev) / p0_mev
+    disp = np.cov(df_out[position].values, delta, ddof=0)[0, 1] / np.var(delta)
+    ddisp = np.cov(df_out[angle].values, delta, ddof=0)[0, 1] / np.var(delta)
+    df_out[position] = df_out[position].values - disp * delta
+    df_out[angle] = df_out[angle].values - ddisp * delta
+    return df_out
+
+def filter_by_action(df, position, angle, n_sigma=3, max_iter=8):
+    df_iter = df.copy()
     for _ in range(max_iter):
+        df_iter = remove_dispersion(df_iter, position, angle)
         alpha, beta, gamma, _, _ = get_twiss(df_iter, position, angle)
         eps = CalcEmittanceAuto(df_iter, position, angle)
 
@@ -265,7 +276,7 @@ def filter_by_action(df, position, angle, n_sigma=6, max_iter=5):
         df_iter = df_iter[mask].copy()
     return df_iter
 
-def filter_by_action_xy(df, n_sigma=6, max_iter=5):
+def filter_by_action_xy(df, n_sigma=3, max_iter=5):
     df_x = filter_by_action(df, 'x[mm]', 'xp[mrad]', n_sigma, max_iter)
     df_xy = filter_by_action(df_x, 'y[mm]', 'yp[mrad]', n_sigma, max_iter)
     return df_xy
@@ -387,7 +398,7 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 # %%
 
-df_clean = filter_by_action_xy(df, n_sigma=5)
+df_clean = filter_by_action_xy(df, n_sigma=3)
 print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
 
 emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
@@ -427,17 +438,13 @@ axes[0, 1].set_title('Vertical Phase Space')
 fig.colorbar(sc1, ax=axes[0, 1], label='Relative Density')
 
 theta = np.linspace(0, 2 * np.pi, 200)
-ax_ell, bx_ell, _, _, _ = get_twiss(df_clean, 'x[mm]', 'xp[mrad]')
-eps_x_ell = CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
-ellipse_x = np.sqrt(eps_x_ell * bx_ell) * np.cos(theta)
-ellipse_xp = -np.sqrt(eps_x_ell / bx_ell) * (ax_ell * np.cos(theta) - np.sin(theta))
+ellipse_x = np.sqrt(emittance_x * bx) * np.cos(theta)
+ellipse_xp = -np.sqrt(emittance_x / bx) * (ax * np.cos(theta) - np.sin(theta))
 axes[0, 0].plot(ellipse_x, ellipse_xp, color='hotpink', lw=2, label='RMS Ellipse')
 axes[0, 0].legend(fontsize='small')
 
-ay_ell, by_ell, _, _, _ = get_twiss(df_clean, 'y[mm]', 'yp[mrad]')
-eps_y_ell = CalcEmittanceAuto(df_clean, 'y[mm]', 'yp[mrad]')
-ellipse_y = np.sqrt(eps_y_ell * by_ell) * np.cos(theta)
-ellipse_yp = -np.sqrt(eps_y_ell / by_ell) * (ay_ell * np.cos(theta) - np.sin(theta))
+ellipse_y = np.sqrt(emittance_y * by) * np.cos(theta)
+ellipse_yp = -np.sqrt(emittance_y / by) * (ay * np.cos(theta) - np.sin(theta))
 axes[0, 1].plot(ellipse_y, ellipse_yp, color='hotpink', lw=2, label='RMS Ellipse')
 axes[0, 1].legend(fontsize='small')
 
@@ -707,113 +714,125 @@ col_labels = [
     ("$x$ (mm)", "$y$ (mm)")
 ]
 
-for label, e_mev in energies_to_track.items():
-    print(f"\n=== Tracking at {label} energy: {e_mev:.3f} MeV ===")
+def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
+                            df_subset, rand_num, design, config, phase, changes):
+    """Runs the same full tracking + diagnostic suite (injection tracking
+    evolution, initial-turns phase-space grid, survival curve + lifetime,
+    initial x-distribution) on `track_line`, using `track_tw`'s dispersion
+    both for matching and for the dispersion-corrected scatter plot.
+    Originally only ran on whichever `mode` JSON was loaded; factored out
+    so it can also run on an in-memory misaligned line, same as corrected."""
+    for label, e_mev in energies_to_track.items():
+        print(f"\n=== [{mode_tag}] Tracking at {label} energy: {e_mev:.3f} MeV ===")
 
-    p0c_reference = e_mev * 1e6
-    ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
+        p0c_reference = e_mev * 1e6
+        ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
 
-    x_matched, px_matched, y_matched, py_matched, delta, zeta = match_coordinates(
-        df_subset, p0c_reference, ref_particle,
-        ring_tw.dx[0], ring_tw.dpx[0], ring_tw.dy[0], ring_tw.dpy[0])
+        x_matched, px_matched, y_matched, py_matched, delta, zeta = match_coordinates(
+            df_subset, p0c_reference, ref_particle,
+            track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0])
 
-    particles = xp.Particles(
-        p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV,
-        x=x_matched, px=px_matched, y=y_matched, py=py_matched,
-        zeta=zeta, delta=delta
-    )
+        particles = xp.Particles(
+            p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV,
+            x=x_matched, px=px_matched, y=y_matched, py=py_matched,
+            zeta=zeta, delta=delta
+        )
 
-    n_track = len(particles.x)
-    ring.configure_radiation(model='quantum')
-    ring.track(particles, num_turns=6100, turn_by_turn_monitor=True, with_progress=True)
-    data = ring.record_last_track
+        n_track = len(particles.x)
+        track_line.configure_radiation(model='quantum')
+        track_line.track(particles, num_turns=6100, turn_by_turn_monitor=True, with_progress=True)
+        data = track_line.record_last_track
 
-    folder2 = mf.results_dir(design, config, phase, changes=changes,
-                              metric='InjectionEfficiency', sub=mode,
-                              sub2=f'{label}_{int(e_mev)}MeV')
+        folder2 = mf.results_dir(design, config, phase, changes=changes,
+                                  metric='InjectionEfficiency', sub=mode_tag,
+                                  sub2=f'{label}_{int(e_mev)}MeV')
 
-    fig, ax = plt.subplots(1, 3, figsize=(14, 4))
-    fig.subplots_adjust(wspace=0.4)
+        fig, ax = plt.subplots(1, 3, figsize=(14, 4))
+        fig.subplots_adjust(wspace=0.4)
 
-    survival_count = np.sum(particles.state > 0)
-    fig.suptitle(f'Particle Survival ({label}, {e_mev:.1f} MeV): {survival_count} / {n_track}')
+        survival_count = np.sum(particles.state > 0)
+        fig.suptitle(f'Particle Survival ({mode_tag}, {label}, {e_mev:.1f} MeV): {survival_count} / {n_track}')
 
-    for i, (xl, yl) in enumerate(col_labels[:3]):
-        ax[i].set_xlabel(xl)
-        ax[i].set_ylabel(yl)
+        for i, (xl, yl) in enumerate(col_labels[:3]):
+            ax[i].set_xlabel(xl)
+            ax[i].set_ylabel(yl)
 
-    for ind, turn in enumerate(trnplt):
-        x_beta = 1000 * (data.x[:, turn] - ring_tw.dx[0] * data.delta[:, turn])
-        px_beta = 1000 * (data.px[:, turn] - ring_tw.dpx[0] * data.delta[:, turn])
-        ax[0].scatter(x_beta, px_beta, s=2, color=f'C{ind}', label=f'Turn {turn}', alpha=0.6)
-        ax[1].scatter(1000 * data.y[:, turn], 1000 * data.py[:, turn], s=2, color=f'C{ind}', alpha=0.6)
-        ax[2].scatter(1000 * data.zeta[:, turn], 1000 * data.delta[:, turn], s=2, color=f'C{ind}', alpha=0.6)
+        for ind, turn in enumerate(trnplt):
+            x_beta = 1000 * (data.x[:, turn] - track_tw.dx[0] * data.delta[:, turn])
+            px_beta = 1000 * (data.px[:, turn] - track_tw.dpx[0] * data.delta[:, turn])
+            ax[0].scatter(x_beta, px_beta, s=2, color=f'C{ind}', label=f'Turn {turn}', alpha=0.6)
+            ax[1].scatter(1000 * data.y[:, turn], 1000 * data.py[:, turn], s=2, color=f'C{ind}', alpha=0.6)
+            ax[2].scatter(1000 * data.zeta[:, turn], 1000 * data.delta[:, turn], s=2, color=f'C{ind}', alpha=0.6)
 
-    ax[0].legend(fontsize='small')
-    plt.savefig(f'{folder2}/injection_tracking_evolution_{rand_num}_{e_mev:.0f}MeV.png')
-    plt.show()
+        ax[0].legend(fontsize='small')
+        plt.savefig(f'{folder2}/injection_tracking_evolution_{rand_num}_{e_mev:.0f}MeV.png')
+        plt.show()
 
-    fig, axes = plt.subplots(4, 3, figsize=(15, 18))
-    fig.subplots_adjust(hspace=0.4, wspace=0.35)
+        fig, axes = plt.subplots(4, 3, figsize=(15, 18))
+        fig.subplots_adjust(hspace=0.4, wspace=0.35)
 
-    for row, turn in enumerate(turns_to_plot):
-        survived = np.sum(data.state[:, turn] > 0)
+        for row, turn in enumerate(turns_to_plot):
+            survived = np.sum(data.state[:, turn] > 0)
 
-        axes[row, 0].scatter(data.x[:, turn]*1000, data.px[:, turn]*1000, s=2, color='C0', alpha=0.6)
-        axes[row, 0].set_xlabel(col_labels[0][0])
-        axes[row, 0].set_ylabel(f"Turn {turn}\n\n{col_labels[0][1]}")
+            axes[row, 0].scatter(data.x[:, turn]*1000, data.px[:, turn]*1000, s=2, color='C0', alpha=0.6)
+            axes[row, 0].set_xlabel(col_labels[0][0])
+            axes[row, 0].set_ylabel(f"Turn {turn}\n\n{col_labels[0][1]}")
 
-        axes[row, 1].scatter(data.y[:, turn]*1000, data.py[:, turn]*1000, s=2, color='C1', alpha=0.6)
-        axes[row, 1].set_xlabel(col_labels[1][0])
-        axes[row, 1].set_ylabel(col_labels[1][1])
-        axes[row, 1].set_title(f"Survivors: {survived}")
+            axes[row, 1].scatter(data.y[:, turn]*1000, data.py[:, turn]*1000, s=2, color='C1', alpha=0.6)
+            axes[row, 1].set_xlabel(col_labels[1][0])
+            axes[row, 1].set_ylabel(col_labels[1][1])
+            axes[row, 1].set_title(f"Survivors: {survived}")
 
-        axes[row, 2].scatter(data.zeta[:, turn]*1000, data.delta[:, turn]*1000, s=2, color='C2', alpha=0.6)
-        axes[row, 2].set_xlabel(col_labels[2][0])
-        axes[row, 2].set_ylabel(col_labels[2][1])
+            axes[row, 2].scatter(data.zeta[:, turn]*1000, data.delta[:, turn]*1000, s=2, color='C2', alpha=0.6)
+            axes[row, 2].set_xlabel(col_labels[2][0])
+            axes[row, 2].set_ylabel(col_labels[2][1])
 
-    fig.suptitle(f'Phase Space Evolution at {label} energy ({e_mev:.2f} MeV)', fontsize=16, y=0.92)
-    plt.savefig(f'{folder2}/initial_turns_{rand_num}_{e_mev:.0f}MeV.png')
-    plt.show()
+        fig.suptitle(f'Phase Space Evolution ({mode_tag}) at {label} energy ({e_mev:.2f} MeV)', fontsize=16, y=0.92)
+        plt.savefig(f'{folder2}/initial_turns_{rand_num}_{e_mev:.0f}MeV.png')
+        plt.show()
 
-    survival_counts = np.sum(data.state > 0, axis=0)
-    turns = np.arange(len(survival_counts))
+        survival_counts = np.sum(data.state > 0, axis=0)
+        turns = np.arange(len(survival_counts))
 
-    tau=mf.calculate_lifetime(survival_counts, ring, ref_particle, fit_start_turn=500)
-    print(f"Beam lifetime:{tau} Seconds")
+        tau=mf.calculate_lifetime(survival_counts, track_line, ref_particle, fit_start_turn=500)
+        print(f"Beam lifetime:{tau} Seconds")
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(turns, survival_counts, color='firebrick', linewidth=2)
-    plt.title(f'Particle Survival over {len(turns)} Turns ({label}, {e_mev:.1f} MeV)', fontsize=14)
-    plt.xlabel('Turn Number', fontsize=12)
-    plt.ylabel('Number of Surviving Particles', fontsize=12)
-    plt.grid(True, which='both', linestyle=':', alpha=0.6)
-    plt.ylim(min(survival_counts) - 5, survival_counts[0] + 5)
-    plt.savefig(f'{folder2}/survival_vs_turns_{e_mev:.0f}MeV.png', bbox_inches='tight')
-    plt.show()
+        plt.figure(figsize=(10, 6))
+        plt.plot(turns, survival_counts, color='firebrick', linewidth=2)
+        plt.title(f'Particle Survival over {len(turns)} Turns ({mode_tag}, {label}, {e_mev:.1f} MeV)', fontsize=14)
+        plt.xlabel('Turn Number', fontsize=12)
+        plt.ylabel('Number of Surviving Particles', fontsize=12)
+        plt.grid(True, which='both', linestyle=':', alpha=0.6)
+        plt.ylim(min(survival_counts) - 5, survival_counts[0] + 5)
+        plt.savefig(f'{folder2}/survival_vs_turns_{e_mev:.0f}MeV.png', bbox_inches='tight')
+        plt.show()
 
-    final_efficiency = (survival_counts[-1] / survival_counts[0]) * 100
-    print(f"[{label}] Final Survival: {survival_counts[-1]} / {survival_counts[0]} "
-          f"({final_efficiency:.2f}%)")
+        final_efficiency = (survival_counts[-1] / survival_counts[0]) * 100
+        print(f"[{mode_tag}/{label}] Final Survival: {survival_counts[-1]} / {survival_counts[0]} "
+              f"({final_efficiency:.2f}%)")
 
-    c_light = 299792458
-    T_rev0 = ring.get_length() / (ref_particle.beta0[0] * c_light)
-    with open(f'{folder2}/survival_curve.json', 'w') as f:
-        json.dump({
-            "label": label,
-            "energy_mev": float(e_mev),
-            "survival_counts": survival_counts.tolist(),
-            "T_rev0": float(T_rev0),
-        }, f, indent=4)
+        c_light = 299792458
+        T_rev0 = track_line.get_length() / (ref_particle.beta0[0] * c_light)
+        with open(f'{folder2}/survival_curve.json', 'w') as f:
+            json.dump({
+                "label": label,
+                "energy_mev": float(e_mev),
+                "survival_counts": survival_counts.tolist(),
+                "T_rev0": float(T_rev0),
+            }, f, indent=4)
 
-    plt.figure(figsize=(8, 6))
-    plt.hist(data.x[:, 0] * 1000, bins=50, color='C0', edgecolor='black', alpha=0.7)
-    plt.xlabel('$x$ (mm)')
-    plt.ylabel('Number of Particles')
-    plt.title(f'Initial x Distribution ({label}, {e_mev:.1f} MeV)')
-    plt.grid(axis='y', alpha=0.3)
-    plt.savefig(f'{folder2}/initial_x_distribution_{e_mev:.0f}MeV.png')
-    plt.show()
+        plt.figure(figsize=(8, 6))
+        plt.hist(data.x[:, 0] * 1000, bins=50, color='C0', edgecolor='black', alpha=0.7)
+        plt.xlabel('$x$ (mm)')
+        plt.ylabel('Number of Particles')
+        plt.title(f'Initial x Distribution ({mode_tag}, {label}, {e_mev:.1f} MeV)')
+        plt.grid(axis='y', alpha=0.3)
+        plt.savefig(f'{folder2}/initial_x_distribution_{e_mev:.0f}MeV.png')
+        plt.show()
+
+
+run_energy_diagnostics(ring, ring_tw, mode, energies_to_track,
+                        df_subset, rand_num, design, config, phase, changes)
 
 print("\nDone: tracked average, nominal, and optimal reference energies.")
 
@@ -877,6 +896,19 @@ if mode == 'perfect':
         t0 = seed_tw.rows[0]
         seed_line.configure_radiation(model='mean')
         return survival_counts_seed, t0['betx'][0], t0['alfx'][0], t0['bety'][0], t0['alfy'][0]
+
+    # Same full diagnostic suite that runs on whatever line was loaded via
+    # `mode` above (injection tracking evolution, initial-turns grid,
+    # survival+lifetime, initial x-distribution) -- now also run once on a
+    # single in-memory misaligned (uncorrected) realization, not just
+    # whichever mode's JSON happened to be loaded. Uses the same fixed
+    # seed as the first seed in the sweep below, so it's directly
+    # comparable to that seed's entry there.
+    misaligned_line = prep_seed_line(ring, seed=seeds[0], apply_correction=False)
+    misaligned_tw = misaligned_line.twiss6d()
+    run_energy_diagnostics(misaligned_line, misaligned_tw, 'misaligned_inmemory',
+                            energies_to_track, df_subset, rand_num,
+                            design, config, phase, changes)
 
     folder_seeds = mf.results_dir(design, config, phase, changes=changes,
                                    metric='InjectionEfficiency', sub='SeedStudy')
