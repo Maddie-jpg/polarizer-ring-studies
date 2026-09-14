@@ -23,9 +23,6 @@ mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
 
-# Energy Compressor System (ECS) on/off switch. Set the env var to
-# '0'/'false'/'off' to bypass the R56/Vdeb/Phasdeb transform below and run
-# on the raw (uncompressed) beam distribution instead.
 ENERGY_COMPRESSOR_ON = os.environ.get('ENERGY_COMPRESSOR', 'false').strip().lower() not in ('0', 'false', 'off', 'no')
 
 # %%
@@ -34,11 +31,7 @@ print(list(df.columns))
 
 # %%
 
-def filter_beam_core(df_raw, n_sigma=4):
-    """
-    Filters the dataframe to retain only the core particles within a specified n_sigma ellipsoid.
-    Uses coordinate columns: 'x[mm]', 'xp[mrad]', 'y[mm]', 'yp[mrad]', 't[mm/c]', 'p[MeV/c]'
-    """
+def filter_beam_core(df_raw, n_sigma=5):
     cols = ['x[mm]', 'xp[mrad]', 'y[mm]', 'yp[mrad]', 't[mm/c]', 'p[MeV/c]']
     df_centered = df_raw[cols] - df_raw[cols].mean()
     
@@ -53,32 +46,18 @@ def filter_beam_core(df_raw, n_sigma=4):
     return df_raw[is_core].copy()
 
 def select_main_bunch(df_in, t_col='t[mm/c]', mad_k=10):
-    """Isolates the main bunch in time and discards any distant satellite
-    population, WITHOUT assuming a fixed absolute t value. Different beam
-    files put the bunch at very different t[mm/c] centers (and the Energy
-    Compressor's z*1e-3 rescale shifts it again), so a hardcoded cutoff
-    like '< 278540' silently breaks -- or empties out entirely -- on any
-    other file. This centers on the median and uses a robust
-    Median-Absolute-Deviation window instead, which adapts automatically
-    to whatever file/units are actually loaded."""
     t_vals = np.asarray(df_in[t_col].values, dtype=float)
     med = np.median(t_vals)
     mad = np.median(np.abs(t_vals - med))
     if mad == 0:
         return df_in.copy()
-    window = mad_k * mad * 1.4826  # scale MAD to an approx-sigma equivalent
+    window = mad_k * mad * 1.4826
     mask = np.abs(t_vals - med) < window
     if mask.sum() < 2:
-        # Window ended up too tight to be useful -- fall back to
-        # everything rather than handing an empty/singleton set downstream.
         return df_in.copy()
     return df_in[mask].copy()
 
 def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles=500, num_turns=100, seed=74):
-    """
-    Evaluates a single combination of ECS parameters for both 
-    RMS momentum spread and tracking survival efficiency.
-    """
     R56, Vdeb, Phasdeb = params
     
     c = 299792458
@@ -129,9 +108,6 @@ def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles
     return rms_spread, efficiency
 
 def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
-    """
-    Performs a randomized parameter search to find the optimal trade-off space.
-    """
     np.random.seed(42)
     
     R56_samples = np.random.uniform(0.20, 0.45, n_samples)
@@ -273,6 +249,27 @@ def get_twiss(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0):
     
     return alpha, beta, gamma, dispersion_x, disp_prime_x
 
+def filter_by_action(df, position, angle, n_sigma=6, max_iter=5):
+    df_iter = df
+    for _ in range(max_iter):
+        alpha, beta, gamma, _, _ = get_twiss(df_iter, position, angle)
+        eps = CalcEmittanceAuto(df_iter, position, angle)
+
+        x = df_iter[position].values - df_iter[position].values.mean()
+        xp = df_iter[angle].values - df_iter[angle].values.mean()
+        J = gamma * x**2 + 2 * alpha * x * xp + beta * xp**2
+
+        mask = J <= n_sigma**2 * eps
+        if mask.sum() == len(df_iter):
+            break
+        df_iter = df_iter[mask].copy()
+    return df_iter
+
+def filter_by_action_xy(df, n_sigma=6, max_iter=5):
+    df_x = filter_by_action(df, 'x[mm]', 'xp[mrad]', n_sigma, max_iter)
+    df_xy = filter_by_action(df_x, 'y[mm]', 'yp[mrad]', n_sigma, max_iter)
+    return df_xy
+
 def plot_twiss_ellipse(beta, alpha, beta2, alpha2, emittance,ax):
     gamma = (1 + alpha**2) / beta
     theta = np.linspace(0, 2*np.pi, 100)
@@ -375,9 +372,6 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     y = np.asarray(y)
 
     if len(x) < 2 or np.ptp(x) == 0 or np.ptp(y) == 0:
-        # gaussian_kde needs >=2 points with some spread in both dimensions;
-        # fall back to a plain (undensity-colored) scatter rather than
-        # crashing when a cut upstream leaves too little data.
         print(f"[density_scatter] Only {len(x)} point(s) after filtering -- "
               f"skipping KDE coloring, plotting plain scatter instead.")
         return ax.scatter(x, y, s=s, **kwargs)
@@ -393,16 +387,19 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 # %%
 
-emittance_x=CalcEmittanceAuto(df, 'x[mm]', 'xp[mrad]')
-m_emittance_x=CalcEmittanceManual(df, 'x[mm]', 'xp[mrad]')
+df_clean = filter_by_action_xy(df, n_sigma=5)
+print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
+
+emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
+m_emittance_x=CalcEmittanceManual(df_clean, 'x[mm]', 'xp[mrad]')
 print(f'Horizontal geometric emittance:{emittance_x} um, {m_emittance_x}um' )
 
-emittance_y=CalcEmittanceAuto(df, 'y[mm]', 'yp[mrad]')
-m_emittance_y=CalcEmittanceManual(df, 'y[mm]', 'yp[mrad]')
+emittance_y=CalcEmittanceAuto(df_clean, 'y[mm]', 'yp[mrad]')
+m_emittance_y=CalcEmittanceManual(df_clean, 'y[mm]', 'yp[mrad]')
 print(f'Vertical geometric emittance:{emittance_y} um, {m_emittance_y}um' )
 
-ax, bx, gx, dx, ddx = get_twiss(df, 'x[mm]', 'xp[mrad]')
-ay, by, gy, dy, ddy = get_twiss(df, 'y[mm]', 'yp[mrad]')
+ax, bx, gx, dx, ddx = get_twiss(df_clean, 'x[mm]', 'xp[mrad]')
+ay, by, gy, dy, ddy = get_twiss(df_clean, 'y[mm]', 'yp[mrad]')
 print(f"Beam Twiss: alpha_x={ax:.3f}, beta_x={bx:.3f} m, dx={dx:.3f} m,ddx={ddx:.3f} m")
 print(f"Beam Twiss: alpha_y={ay:.3f}, beta_y={by:.3f} m, dy={dy:.3f} m,ddy={ddy:.3f} m")
 
@@ -428,6 +425,21 @@ axes[0, 1].set_xlabel('y [mm]')
 axes[0, 1].set_ylabel('yp [mrad]')
 axes[0, 1].set_title('Vertical Phase Space')
 fig.colorbar(sc1, ax=axes[0, 1], label='Relative Density')
+
+theta = np.linspace(0, 2 * np.pi, 200)
+ax_ell, bx_ell, _, _, _ = get_twiss(df_clean, 'x[mm]', 'xp[mrad]')
+eps_x_ell = CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
+ellipse_x = np.sqrt(eps_x_ell * bx_ell) * np.cos(theta)
+ellipse_xp = -np.sqrt(eps_x_ell / bx_ell) * (ax_ell * np.cos(theta) - np.sin(theta))
+axes[0, 0].plot(ellipse_x, ellipse_xp, color='hotpink', lw=2, label='RMS Ellipse')
+axes[0, 0].legend(fontsize='small')
+
+ay_ell, by_ell, _, _, _ = get_twiss(df_clean, 'y[mm]', 'yp[mrad]')
+eps_y_ell = CalcEmittanceAuto(df_clean, 'y[mm]', 'yp[mrad]')
+ellipse_y = np.sqrt(eps_y_ell * by_ell) * np.cos(theta)
+ellipse_yp = -np.sqrt(eps_y_ell / by_ell) * (ay_ell * np.cos(theta) - np.sin(theta))
+axes[0, 1].plot(ellipse_y, ellipse_yp, color='hotpink', lw=2, label='RMS Ellipse')
+axes[0, 1].legend(fontsize='small')
 
 main_bunch = select_main_bunch(df)
 sc2 = density_scatter(axes[1, 0], main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'])
@@ -501,8 +513,8 @@ plt.show()
 
 # %%
 
-plot_twiss_with_particles(df, 'x[mm]', 'xp[mrad]', ax, bx, emittance_x)
-plot_twiss_with_particles(df, 'y[mm]', 'yp[mrad]', ay, by, emittance_y)
+plot_twiss_with_particles(df_clean, 'x[mm]', 'xp[mrad]', ax, bx, emittance_x)
+plot_twiss_with_particles(df_clean, 'y[mm]', 'yp[mrad]', ay, by, emittance_y)
 
 # %%
 
@@ -526,7 +538,7 @@ beam_results = {
     "metadata": {
         "particle_type": "positron",
         "design_energy_mev": 2860.0,
-        "n_particles": len(df['ID'])
+        "n_particles": len(df_clean['ID'])
     }
 }
 
@@ -563,11 +575,6 @@ y     = initial_twiss['y'][0]
 yp    = initial_twiss['py'][0]
 
 delta_ring_ref = initial_twiss['delta'][0]
-# The ring's OWN on-axis delta from an on-momentum twiss calculation is ~0
-# by construction, so passing it into plot_twiss_ellipse_normalised's
-# dispersion-shift term makes that curve a permanent no-op. What actually
-# matters for "does this beam sit at the ring's reference energy" is the
-# beam's mean momentum relative to the ring's reference momentum:
 p0_ring_mev = ring.particle_ref.p0c[0] / 1e6
 p0_beam_mev = df['p[MeV/c]'].mean()
 delta_beam_vs_ring = (p0_beam_mev - p0_ring_mev) / p0_ring_mev
@@ -612,20 +619,6 @@ p0c_avg = p0c_avg_mev * 1e6
 ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
 def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
-    """Apply dispersion-based matching to raw beam coordinates for a given
-    reference momentum p0c_ref, returning arrays ready for xp.Particles().
-    Centralised here so the energy scan and the full tracking loop below
-    use the exact same matching logic instead of two separate copies.
-
-    dx/ddx/dy/ddy must be the RING's dispersion at the injection point
-    (e.g. ring_tw.dx[0], ring_tw.dpx[0]), NOT the beam's own measured
-    x-vs-energy correlation from get_twiss(df,...). The raw x[mm]/y[mm]
-    columns already contain whatever real dispersive correlation the beam
-    itself has; shifting by the beam's own dispersion on top of that
-    double-applies it. evaluate_ecs_performance() below does this the
-    correct way (ring_tw.dx[0]/ring_tw.dpx[0]) -- this function should
-    always be called the same way.
-    """
     delta = (df_in['p[MeV/c]'].values * 1e6 - p0c_ref) / p0c_ref
     x_matched  = df_in['x[mm]'].values  * 1e-3 + dx  * delta
     px_matched = df_in['xp[mrad]'].values * 1e-3 + ddx * delta
@@ -663,13 +656,6 @@ for e_mev in energy_range_mev:
 best_idx = np.argmax(efficiency_results)
 best_energy_mev = energy_range_mev[best_idx]
 
-# The loop above overwrites ring.particle_ref on every one of its 100
-# iterations and never puts it back -- without this, it's left pointing at
-# 3200 MeV (the top of energy_range_mev) for every tracking run after this,
-# including average/nominal/optimal below. RF cavities typically use
-# line.particle_ref (not each particle's own p0c) to set the synchronous
-# phase/frequency reference, so leaving this at an arbitrary scan energy
-# could silently mis-set the RF bucket for all the "real" tracking that follows.
 ring.particle_ref = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
 folder3 = mf.results_dir(design, config, phase, changes=changes,
@@ -810,10 +796,6 @@ for label, e_mev in energies_to_track.items():
     print(f"[{label}] Final Survival: {survival_counts[-1]} / {survival_counts[0]} "
           f"({final_efficiency:.2f}%)")
 
-    # Save the raw survival curve so analysis.py (which has no tracked real
-    # beam population of its own -- only a synthetic DA/MA scan grid) can
-    # reuse THIS actual beam's decay curve for calculate_lifetime() instead
-    # of fitting something that isn't beam-density-weighted.
     c_light = 299792458
     T_rev0 = ring.get_length() / (ref_particle.beta0[0] * c_light)
     with open(f'{folder2}/survival_curve.json', 'w') as f:
@@ -853,7 +835,6 @@ if mode == 'perfect':
         mc.insert_correctors(pdr)
 
     def prep_seed_line(base_line, seed, apply_correction):
-        """One misaligned (optionally corrected) realization of base_line."""
         seed_line = base_line.copy()
         seed_line.configure_radiation(model='mean')
         seed_line.build_tracker(_context=context_tracking)
@@ -872,15 +853,9 @@ if mode == 'perfect':
         return seed_line
 
     def track_seed_line(seed_line, e_mev):
-        """Same matching + 6100-turn tracking as the baseline loop above,
-        applied to one seed's line. Returns just what the overlay plots
-        need: the survival curve and the seed line's initial optics."""
         p0c_ref = e_mev * 1e6
         ref_particle = xp.Particles(p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV)
 
-        # This seed's own twiss (misalignment/correction shifts dispersion
-        # away from the baseline ring's) -- computed BEFORE matching so we
-        # match against THIS line's actual dispersion, not the baseline's.
         seed_tw = seed_line.twiss6d()
 
         x_m, px_m, y_m, py_m, delta_m, zeta_m = match_coordinates(

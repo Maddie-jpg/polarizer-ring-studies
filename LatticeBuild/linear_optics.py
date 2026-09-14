@@ -29,41 +29,66 @@ def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
     return qx, qy
 
 
-def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6, MakePlot=False):
+def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
+               betay_DS_target=None, MakePlot=False):
+    import numpy as np
+
     cell_arc_opt.run_jacobian(10)
     cell_arc_tw = cell_arc.twiss(method='4d')
     bc = dict(betx=cell_arc_tw.betx[0], alfx=cell_arc_tw.alfx[0],
               bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
               dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0])
 
-    mux0 = arc1R.twiss(method='4d', **bc).mux[-1]      # current phase = start
+    mux0 = arc1R.twiss(method='4d', **bc).mux[-1]
     muy0 = arc1R.twiss(method='4d', **bc).muy[-1]
+
+    
+
+    # Build vary and targets before creating opt
+    vary = [
+        xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4, limits=(-15, 15)),
+        xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
+        xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
+        xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
+        xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
+        
+    ]
+    targets = [
+        xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
+        xt.TargetSet(mux=mux0, muy=muy0, at=xt.END, tol=1e-9, tag='phase'),
+        xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
+        xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', tol=1e-9, weight=10.),
+    ]
+
+    BETA_MAX = 5.
+    soft_beta = []
+    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+                soft_beta += [
+                    xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                    xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                ]
+    targets += soft_beta
+
+    # Add decoupled DS betay knob/target if requested
+    '''if betay_DS_target is not None:
+        vary.append(xt.VaryList(['kQDDoubDS'], step=1e-4))
+        targets.append(
+            xt.Target('bety', betay_DS_target,
+                      at='CtrS1_xR1', tol=1e-4, weight=0.1, tag='betay_DS'))'''
 
     opt = arc1R.match(
         method='4d', solve=False, verbose=False, **bc,
-        vary=[
-            xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4, limits=(-10, 10)),
-            xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
-            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
-            xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
-            xt.VaryList(['l_trans','l_doub'], step=1e-5,limits=(0.05,0.9))
-        ],
-        targets=[
-            xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
-            xt.TargetSet(mux=mux0, muy=muy0, at=xt.END, tol=1e-9, tag='phase'),
-            xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-            xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', tol=1e-9, weight=10.),
-        ])
+        vary=vary, targets=targets)
+
     pt = [t for t in opt.targets if t.tag == 'phase']
 
-    import numpy as np
-    for frac in np.linspace(1/8, 1, 8):          # walk phase in, don't jump
+    for frac in np.linspace(1/16, 1, 16):
         pt[0].value = mux0 + frac * (qx/n_periods - mux0)
         pt[1].value = muy0 + frac * (qy/n_periods - muy0)
         try:
             opt.solve(n_steps=40)
         except Exception:
-            opt.step(30, broyden=True, rcond=1e-3)
+            opt.step(50, broyden=True, rcond=1e-4)
 
     if MakePlot:
         arc1R.twiss(method='4d', **bc).plot()
@@ -80,10 +105,14 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     cell_tr_opt.run_jacobian(10)
     tw_tr = cell_tr.twiss(method='4d')
 
+    
+
     vary = [xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
             xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
-            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4)]
-            #xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4)]
+            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
+            xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
+            ]
+
     targets = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
@@ -91,14 +120,31 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
                      at=xt.END, tol=1e-6),
     ]
 
+    BETA_MAX = 5.
+    soft_beta = []
+    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+                    soft_beta += [
+                        xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                        xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                    ]
+    targets += soft_beta
+
+    # If decoupled DS betay quads are present, add them to vary
+    # and add an explicit bety target at the straight centre
+    ''' if betay_DS_target is not None:
+        vary.append(xt.VaryList(['kQDDoubDS'], step=1e-4))
+        targets.append(
+            xt.Target('bety', betay_DS_target,
+                      at='CtrS1_xR1', tol=1e-4, weight=0.1, tag='betay_DS'))'''
+
     opt = arc1R.match(
         method='4d', solve=True, assert_within_tol=False,
         betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
         bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
         dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0],
-        vary=vary,
-        targets=targets)
+        vary=vary, targets=targets)
     opt.run_jacobian(30)
+
     if MakePlot:
         arc1R.twiss(method='4d',
                     betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
@@ -175,6 +221,81 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
     insert_into_line(period, 'period')
     for i, ln in enumerate(extra_lines):
         insert_into_line(ln, f'extra[{i}]')
+    return pdr
+
+def insert_DS_betay_quads_decoupled(pdr, ring, period, *extra_lines,
+                                     l_qy=None, frac=0.9):
+   
+    # Register independent knob, seeded from current kQDDoub value
+    pdr.vars({'kQDDoubDS': pdr['kQDDoub']})
+
+    q_length = l_qy if l_qy is not None else 'l_quad'
+
+    def insert_into_line(line, line_label):
+        names = line.element_names
+
+        def drift_length(nm):
+            try:
+                el = line.element_dict[nm]
+                return el.length if el.__class__.__name__ == 'Drift' else None
+            except Exception:
+                return None
+
+        LONG = 1.0  # DrDSL is >1 m; anything shorter is a regular drift
+
+        plan, skipped = [], []
+        for qfds in sorted(n for n in names if n.startswith('QFDS_')):
+            sector  = qfds[len('QFDS_'):]
+            new_name = 'QDDoubDS_' + sector
+            if new_name in names:
+                continue
+            idx = names.index(qfds)
+            qfds_half = line.element_dict[qfds].length / 2.0
+
+            prev_nm  = names[idx - 1] if idx - 1 >= 0       else None
+            next_nm  = names[idx + 1] if idx + 1 < len(names) else None
+            prev_len = drift_length(prev_nm)
+            next_len = drift_length(next_nm)
+
+            cand = []
+            if next_len is not None and next_len > LONG:
+                cand.append(('+', next_len))
+            if prev_len is not None and prev_len > LONG:
+                cand.append(('-', prev_len))
+
+            if not cand:
+                skipped.append((qfds, prev_nm, prev_len, next_nm, next_len))
+                continue
+
+            sign, dlen = cand[0]
+            off = qfds_half + frac * dlen
+            plan.append((new_name, qfds, f'{sign}{off}', sign, round(off, 3)))
+
+        for new_name, qfds, at_expr, sign, off in plan:
+            line.insert(
+                # ---- only change from the original: k1='kQDDoubDS' ----
+                pdr.new(new_name, xt.Quadrupole,
+                        length=q_length, k1='kQDDoubDS'),
+                at=at_expr, from_=qfds, from_anchor='center')
+
+        print(f"insert_DS_betay_quads_decoupled [{line_label}]: "
+              f"inserted {len(plan)} quads (own knob kQDDoubDS)")
+        for new_name, qfds, at_expr, sign, off in plan:
+            print(f"   {new_name}: at {sign}{off} m from {qfds} centre")
+        if skipped:
+            print(f"   WARNING [{line_label}]: {len(skipped)} QFDS had no adjacent "
+                  f"long drift -- not inserted:")
+            for row in skipped:
+                print(f"     {row}")
+
+    insert_into_line(ring,   'ring')
+    insert_into_line(period, 'period')
+    for i, ln in enumerate(extra_lines):
+        insert_into_line(ln, f'extra[{i}]')
+
+    print(f"\nkQDDoubDS initialised to {pdr['kQDDoubDS']:.6f} "
+          f"(= kQDDoub at insertion time)")
+    print("Include 'kQDDoubDS' in a vary list to match bety independently.")
     return pdr
 
 # ----------------
@@ -312,11 +433,11 @@ def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
 
 def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                             arc1R, wp_constants, n_periods=6,
-                            betay_DS_target=None):
+                            betay_DS_target=7):
     kQFtr_saved = arc1R.vars['kQFtr']._value
     kQDtr_saved = arc1R.vars['kQDtr']._value
 
-    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
+    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods,betay_DS_target=betay_DS_target)
     
     # Check what we actually got
     tw_cell = cell_arc.twiss(method='4d')
@@ -439,6 +560,7 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
     # arc1R included so the extra DS quad is present where matching runs.
     # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
     # the existing doublet quad automatically.
+    #insert_DS_betay_quads_decoupled(pdr, ring, period, arc1R)
     insert_DS_betay_quads(pdr, ring, period, arc1R)
 
     _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
@@ -1187,7 +1309,7 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
 #------------------------
 
 
-def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None):
+def three_fold_periodicity_long(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None):
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
