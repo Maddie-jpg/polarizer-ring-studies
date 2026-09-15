@@ -557,7 +557,7 @@ with open(f'{folder}/TwissResults.json', 'w') as f:
 if changes is not None:
     pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
 else:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_original.json")
     
 ring=pdr.lines['ring']
 ring.element_dict['RFCav'].voltage = 20e6
@@ -635,54 +635,87 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
     zeta = (np.mean(t_mm) - t_mm) * 1e-3 * ref_particle.beta0[0]
     return x_matched, px_matched, y_matched, py_matched, delta, zeta
 
-x_m, px_m, y_m, py_m, _, zeta_m = match_coordinates(
-    df_subset, p0c_avg, ref_particle_avg,
-    ring_tw.dx[0], ring_tw.dpx[0], ring_tw.dy[0], ring_tw.dpy[0])
+def compute_energy_scan(track_line, track_tw, df_subset, p0c_avg_mev, energy_range_mev=None):
+    """Core of the energy scan, no plotting: scans reference energy vs.
+    short (100-turn) survival efficiency for `track_line`. Matched
+    coordinates are computed ONCE at p0c_avg (using track_tw's dispersion)
+    and reused across the whole scan -- only `track_line.particle_ref` and
+    each particle's own `delta` change per energy point. Restores
+    track_line.particle_ref to p0c_avg afterward (RF cavities key off the
+    line's particle_ref, not each particle's own p0c, so leaving this at
+    the scan's last test energy would silently mis-set the RF bucket for
+    anything tracked afterward). Returns (energy_range_mev, efficiency_results).
+    """
+    if energy_range_mev is None:
+        energy_range_mev = np.linspace(2.5e3, 3.2e3, 100)
 
-energy_range_mev = np.linspace(2.5e3, 3.2e3, 100)
-efficiency_results = []
+    p0c_avg = p0c_avg_mev * 1e6
+    ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
-for e_mev in energy_range_mev:
-    p0c_test = e_mev * 1e6
-    ring.particle_ref = xp.Particles(p0c=p0c_test, mass0=xp.ELECTRON_MASS_EV)
-    delta_test = (df_subset['p[MeV/c]'].values - e_mev) / e_mev
+    x_m, px_m, y_m, py_m, _, zeta_m = match_coordinates(
+        df_subset, p0c_avg, ref_particle_avg,
+        track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0])
 
-    p_test = xp.Particles(
-        p0c=p0c_test, mass0=xp.ELECTRON_MASS_EV,
-        x=x_m, px=px_m, y=y_m, py=py_m,
-        delta=delta_test, zeta=zeta_m
-    )
+    efficiency_results = []
+    for e_mev in energy_range_mev:
+        p0c_test = e_mev * 1e6
+        track_line.particle_ref = xp.Particles(p0c=p0c_test, mass0=xp.ELECTRON_MASS_EV)
+        delta_test = (df_subset['p[MeV/c]'].values - e_mev) / e_mev
 
-    ring.track(p_test, num_turns=100)
-    survived = np.sum(p_test.state > 0)
-    efficiency = (survived / len(p_test.x)) * 100
-    efficiency_results.append(efficiency)
+        p_test = xp.Particles(
+            p0c=p0c_test, mass0=xp.ELECTRON_MASS_EV,
+            x=x_m, px=px_m, y=y_m, py=py_m,
+            delta=delta_test, zeta=zeta_m
+        )
 
-    print(f"Energy: {e_mev:.3f} MeV | Efficiency: {efficiency:.1f}%")
+        track_line.track(p_test, num_turns=100)
+        survived = np.sum(p_test.state > 0)
+        efficiency = (survived / len(p_test.x)) * 100
+        efficiency_results.append(efficiency)
 
-best_idx = np.argmax(efficiency_results)
-best_energy_mev = energy_range_mev[best_idx]
+    track_line.particle_ref = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
+    return energy_range_mev, efficiency_results
 
-ring.particle_ref = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
-folder3 = mf.results_dir(design, config, phase, changes=changes,
-                          metric='InjectionEfficiency', sub=mode)
+def run_energy_scan(track_line, track_tw, mode_tag, df_subset, p0c_avg_mev,
+                     design, config, phase, changes,
+                     energy_range_mev=None):
+    """Single-lattice energy scan: computes the scan via
+    compute_energy_scan(), then plots/saves it and returns best_energy_mev.
+    Used for the baseline (perfect) lattice, where the result actually
+    determines the 'optimal' energy tracked everywhere else."""
+    energy_range_mev, efficiency_results = compute_energy_scan(
+        track_line, track_tw, df_subset, p0c_avg_mev, energy_range_mev)
 
-plt.figure(figsize=(10, 6))
-plt.plot(energy_range_mev, efficiency_results, 'o-', color='teal', linewidth=2)
-plt.axvline(best_energy_mev, color='red', linestyle='--',
-            label=f'Optimal: {best_energy_mev:.3f} MeV')
-plt.axvline(p0c_avg_mev, color='blue', linestyle='--',
-            label=f'Average: {p0c_avg_mev:.3f} MeV')
-plt.title('Injection Efficiency vs. Beam Energy', fontsize=14)
-plt.xlabel('Energy [MeV]', fontsize=12)
-plt.ylabel('Survival Efficiency [%]', fontsize=12)
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.savefig(f'{folder3}/MPD_energy_scan.png')
-plt.show()
+    for e_mev, eff in zip(energy_range_mev, efficiency_results):
+        print(f"[{mode_tag}] Energy: {e_mev:.3f} MeV | Efficiency: {eff:.1f}%")
 
-print(f"\nThe best injection efficiency is at {best_energy_mev:.3f} MeV.")
+    best_idx = np.argmax(efficiency_results)
+    best_energy_mev = energy_range_mev[best_idx]
+
+    folder3 = mf.results_dir(design, config, phase, changes=changes,
+                              metric='InjectionEfficiency', sub=mode_tag)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(energy_range_mev, efficiency_results, 'o-', color='teal', linewidth=2)
+    plt.axvline(best_energy_mev, color='red', linestyle='--',
+                label=f'Optimal: {best_energy_mev:.3f} MeV')
+    plt.axvline(p0c_avg_mev, color='blue', linestyle='--',
+                label=f'Average: {p0c_avg_mev:.3f} MeV')
+    plt.title(f'Injection Efficiency vs. Beam Energy ({mode_tag})', fontsize=14)
+    plt.xlabel('Energy [MeV]', fontsize=12)
+    plt.ylabel('Survival Efficiency [%]', fontsize=12)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.savefig(f'{folder3}/MPD_energy_scan.png')
+    plt.show()
+
+    print(f"\n[{mode_tag}] The best injection efficiency is at {best_energy_mev:.3f} MeV.")
+    return best_energy_mev
+
+
+best_energy_mev = run_energy_scan(ring, ring_tw, mode, df_subset, p0c_avg_mev,
+                                   design, config, phase, changes)
 
 # %%
 compressor_params = {
@@ -692,6 +725,8 @@ compressor_params = {
     "V_deb": Vdeb if ENERGY_COMPRESSOR_ON else None,
     "Phase_deb": Phasdeb if ENERGY_COMPRESSOR_ON else None,
 }
+folder3 = mf.results_dir(design, config, phase, changes=changes,
+                          metric='InjectionEfficiency', sub=mode)
 with open(f'{folder3}/CompressorParams.json', 'w') as f:
     json.dump(compressor_params, f, indent=4)
 
@@ -899,14 +934,22 @@ if mode == 'perfect':
 
     # Same full diagnostic suite that runs on whatever line was loaded via
     # `mode` above (injection tracking evolution, initial-turns grid,
-    # survival+lifetime, initial x-distribution) -- now also run once on a
-    # single in-memory misaligned (uncorrected) realization, not just
-    # whichever mode's JSON happened to be loaded. Uses the same fixed
-    # seed as the first seed in the sweep below, so it's directly
-    # comparable to that seed's entry there.
+    # survival+lifetime, initial x-distribution) -- now also run once each
+    # on a single in-memory misaligned (uncorrected) and corrected
+    # realization, not just whichever mode's JSON happened to be loaded.
+    # Uses the SAME energies_to_track as the baseline (including the
+    # baseline's own best_energy_mev) -- the optimal energy is fixed by
+    # the perfect machine's scan, same as the original; misaligned/
+    # corrected don't get their own separately-optimized energy here.
     misaligned_line = prep_seed_line(ring, seed=seeds[0], apply_correction=False)
     misaligned_tw = misaligned_line.twiss6d()
     run_energy_diagnostics(misaligned_line, misaligned_tw, 'misaligned_inmemory',
+                            energies_to_track, df_subset, rand_num,
+                            design, config, phase, changes)
+
+    corrected_line = prep_seed_line(ring, seed=seeds[0], apply_correction=True)
+    corrected_tw = corrected_line.twiss6d()
+    run_energy_diagnostics(corrected_line, corrected_tw, 'corrected_inmemory',
                             energies_to_track, df_subset, rand_num,
                             design, config, phase, changes)
 
@@ -917,17 +960,25 @@ if mode == 'perfect':
     fig_surv_cor, ax_surv_cor = plt.subplots(figsize=(10, 6))
     fig_ell_mis, axs_ell_mis = plt.subplots(1, 2, figsize=(13, 6))
     fig_ell_cor, axs_ell_cor = plt.subplots(1, 2, figsize=(13, 6))
+    fig_escan_mis, ax_escan_mis = plt.subplots(figsize=(10, 6))
+    fig_escan_cor, ax_escan_cor = plt.subplots(figsize=(10, 6))
 
     colors = plt.cm.viridis(np.linspace(0, 1, len(seeds)))
     theta = np.linspace(0, 2 * np.pi, 200)
 
-    for apply_correction, ax_surv, axs_ell, tag in [
-        (False, ax_surv_mis, axs_ell_mis, 'misaligned'),
-        (True, ax_surv_cor, axs_ell_cor, 'corrected'),
+    for apply_correction, ax_surv, axs_ell, ax_escan, tag in [
+        (False, ax_surv_mis, axs_ell_mis, ax_escan_mis, 'misaligned'),
+        (True, ax_surv_cor, axs_ell_cor, ax_escan_cor, 'corrected'),
     ]:
         for seed, c in zip(seeds, colors):
             print(f"\n=== Seed {seed} ({tag}) ===")
             seed_line = prep_seed_line(ring, seed, apply_correction)
+            seed_tw_escan = seed_line.twiss6d()
+            energy_range_seed, efficiency_seed = compute_energy_scan(
+                seed_line, seed_tw_escan, df_subset, p0c_avg_mev)
+            ax_escan.plot(energy_range_seed, efficiency_seed, color=c,
+                          label=f'Seed {seed}')
+
             survival_counts_seed, betx0_s, alfx0_s, bety0_s, alfy0_s = \
                 track_seed_line(seed_line, seed_energy_mev)
 
@@ -951,6 +1002,14 @@ if mode == 'perfect':
         ax_surv.grid(True, which='both', linestyle=':', alpha=0.6)
         ax_surv.legend(fontsize='small')
 
+        ax_escan.axvline(seed_energy_mev, color='red', linestyle='--',
+                          label=f'Optimal (perfect machine): {seed_energy_mev:.3f} MeV')
+        ax_escan.set_title(f'Injection Efficiency vs. Beam Energy -- {tag} seeds')
+        ax_escan.set_xlabel('Energy [MeV]')
+        ax_escan.set_ylabel('Survival Efficiency [%]')
+        ax_escan.grid(True, alpha=0.3)
+        ax_escan.legend(fontsize='small')
+
         for ax_e, plane_name in zip(axs_ell, ['Horizontal', 'Vertical']):
             ax_e.axhline(0, color='black', lw=0.5, ls='--')
             ax_e.axvline(0, color='black', lw=0.5, ls='--')
@@ -963,6 +1022,10 @@ if mode == 'perfect':
     fig_surv_mis.savefig(f'{folder_seeds}/survival_vs_turns_overlay_misaligned.png')
     fig_surv_cor.tight_layout()
     fig_surv_cor.savefig(f'{folder_seeds}/survival_vs_turns_overlay_corrected.png')
+    fig_escan_mis.tight_layout()
+    fig_escan_mis.savefig(f'{folder_seeds}/energy_scan_overlay_misaligned.png')
+    fig_escan_cor.tight_layout()
+    fig_escan_cor.savefig(f'{folder_seeds}/energy_scan_overlay_corrected.png')
     fig_ell_mis.tight_layout()
     fig_ell_mis.savefig(f'{folder_seeds}/twiss_ellipse_overlay_misaligned.png')
     fig_ell_cor.tight_layout()
