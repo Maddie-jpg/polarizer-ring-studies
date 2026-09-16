@@ -281,6 +281,33 @@ def filter_by_action_xy(df, n_sigma=3, max_iter=5):
     df_xy = filter_by_action(df_x, 'y[mm]', 'yp[mrad]', n_sigma, max_iter)
     return df_xy
 
+def betatron_mismatch(beta1, alpha1, beta2, alpha2):
+    """
+    Mismatch factor between two Twiss ellipses (beta1,alpha1) and
+    (beta2,alpha2) -- e.g. an actual beam vs. a design/reference lattice,
+    or one seed's optics vs. the baseline ring's. Symmetric: swapping
+    which is "beam" and which is "reference" gives the same result.
+
+    Standard formula (Sagan & Rubin; same one MAD-X/Bmad report as "Bmag"):
+        gamma1 = (1+alpha1^2)/beta1,  gamma2 = (1+alpha2^2)/beta2
+        H    = 0.5*(beta2*gamma1 - 2*alpha1*alpha2 + beta1*gamma2)
+        Bmag = H + sqrt(H^2 - 1)
+
+    Returns (H, Bmag):
+      H    -- 1.0 when perfectly matched, >1 otherwise.
+      Bmag -- the emittance growth factor after filamentation:
+              eps_effective = Bmag * eps_true. Bmag=1 means no mismatch.
+
+    beta1/beta2 must be in the SAME unit convention (both meters, or both
+    the mm/mrad convention used elsewhere in this project -- confirmed
+    numerically interchangeable earlier in this project).
+    """
+    gamma1 = (1 + alpha1**2) / beta1
+    gamma2 = (1 + alpha2**2) / beta2
+    H = 0.5 * (beta2*gamma1 - 2*alpha1*alpha2 + beta1*gamma2)
+    Bmag = H + np.sqrt(max(H**2 - 1, 0.0))
+    return H, Bmag
+
 def plot_twiss_ellipse(beta, alpha, beta2, alpha2, emittance,ax):
     gamma = (1 + alpha**2) / beta
     theta = np.linspace(0, 2*np.pi, 100)
@@ -554,18 +581,62 @@ with open(f'{folder}/TwissResults.json', 'w') as f:
 
 # %%
 
+def insert_marker_in_drift(pdr, ring, drift_name='DrTripl', occurrence=0,
+                            marker_name='TripletInject'):
+    """Insert a marker at the midpoint of the `occurrence`-th (0-indexed,
+    in s-order) PLAIN instance of a drift named exactly `drift_name`.
+    Excludes already-split DriftSlice pieces (e.g. 'DrTripl..102') -- those
+    have different names, so the exact-match check here never picks them up.
+ 
+    Looks up the drift's actual position/length at RUNTIME rather than
+    assuming a fixed index or s-value, so this works across different
+    design/config/phase rings that may have different l_cell, l_tripl,
+    N_cells_S, etc. -- the index and s-position of 'DrTripl' instances
+    will differ between ring configurations, but the NAME 'DrTripl' stays
+    consistent since it comes from the same line in linear_optics.py
+    (`pdr.place('DrTripl')`) regardless of the numeric parameters used to
+    build that particular ring.
+ 
+    Returns marker_name for convenience (so it can be passed straight into
+    ring_tw.rows[...] and ring.track(ele_start=...)).
+    """
+    names = ring.element_names
+    indices = [i for i, n in enumerate(names) if n == drift_name]
+    if not indices:
+        raise ValueError(f"No element named exactly '{drift_name}' found in this ring. "
+                          f"If this ring was built with a different lattice function "
+                          f"than three_fold_periodicity_long, the triplet drift may "
+                          f"have a different name -- check ring.element_names for "
+                          f"anything containing 'Tripl'.")
+    if occurrence >= len(indices):
+        raise ValueError(f"Requested occurrence {occurrence}, but only "
+                          f"{len(indices)} instance(s) of '{drift_name}' exist "
+                          f"in this ring.")
+ 
+    idx = indices[occurrence]
+    s_positions = ring.get_s_position()
+    s_start = s_positions[idx]
+    length = ring.element_dict[names[idx]].length
+    s_center = s_start + length / 2
+ 
+    ring.insert(pdr.new(marker_name, xt.Marker), at=s_center)
+    return marker_name
+
+
 if changes is not None:
     pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
 else:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_original.json")
+    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
+
     
 ring=pdr.lines['ring']
+marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
 ring.element_dict['RFCav'].voltage = 20e6
 ring.element_dict['RFCav_1'].voltage = 20e6
 
 ring_tw=ring.twiss6d()
 print(ring_tw.cols)
-initial_twiss = ring_tw.rows[0]
+initial_twiss = ring_tw.rows[marker_name]
 
 betx0 = initial_twiss['betx'][0]
 alfx0 = initial_twiss['alfx'][0]
@@ -587,6 +658,11 @@ p0_beam_mev = df['p[MeV/c]'].mean()
 delta_beam_vs_ring = (p0_beam_mev - p0_ring_mev) / p0_ring_mev
 print(f"Beam mean momentum: {p0_beam_mev:.2f} MeV vs ring reference: "
       f"{p0_ring_mev:.2f} MeV  ->  delta_beam_vs_ring = {delta_beam_vs_ring:.5f}")
+
+H_x, Bmag_x = betatron_mismatch(bx, ax, betx0, alfx0)
+H_y, Bmag_y = betatron_mismatch(by, ay, bety0, alfy0)
+print(f"Beam-vs-ring betatron mismatch: "
+      f"H_x={H_x:.4f} (Bmag_x={Bmag_x:.4f}), H_y={H_y:.4f} (Bmag_y={Bmag_y:.4f})")
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
@@ -982,18 +1058,23 @@ if mode == 'perfect':
             survival_counts_seed, betx0_s, alfx0_s, bety0_s, alfy0_s = \
                 track_seed_line(seed_line, seed_energy_mev)
 
+            H_x_seed, Bmag_x_seed = betatron_mismatch(betx0_s, alfx0_s, betx0, alfx0)
+            H_y_seed, Bmag_y_seed = betatron_mismatch(bety0_s, alfy0_s, bety0, alfy0)
+            print(f"  Seed {seed} ({tag}) vs baseline ring: "
+                  f"Bmag_x={Bmag_x_seed:.4f}, Bmag_y={Bmag_y_seed:.4f}")
+
             turns_seed = np.arange(len(survival_counts_seed))
             final_eff = 100 * survival_counts_seed[-1] / survival_counts_seed[0]
             ax_surv.plot(turns_seed, survival_counts_seed, color=c,
                          label=f'Seed {seed} ({final_eff:.1f}%)')
 
-            for ax_e, beta0_s, alfa0_s, eps in [
-                (axs_ell[0], betx0_s, alfx0_s, emittance_x),
-                (axs_ell[1], bety0_s, alfy0_s, emittance_y),
+            for ax_e, beta0_s, alfa0_s, eps, Bmag_s in [
+                (axs_ell[0], betx0_s, alfx0_s, emittance_x, Bmag_x_seed),
+                (axs_ell[1], bety0_s, alfy0_s, emittance_y, Bmag_y_seed),
             ]:
                 xs = np.sqrt(eps * beta0_s) * np.cos(theta)
                 xps = -np.sqrt(eps / beta0_s) * (alfa0_s * np.cos(theta) - np.sin(theta))
-                ax_e.plot(xs, xps, color=c, label=f'Seed {seed}')
+                ax_e.plot(xs, xps, color=c, label=f'Seed {seed} (Bmag={Bmag_s:.2f})')
 
         ax_surv.set_title(f'Particle Survival over Turns -- {tag} seeds, '
                            f'{seed_energy_mev:.1f} MeV')
