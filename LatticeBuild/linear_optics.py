@@ -49,7 +49,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4, limits=(-15, 15)),
         xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
         xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
-        xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
+        #xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
         xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
         
     ]
@@ -110,7 +110,7 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     vary = [xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
             xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
             xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
-            xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
+            #xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
             ]
 
     targets = [
@@ -462,9 +462,9 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
 
     matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
                  cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
-                 betay_DS_target=betay_DS_target)
-    #matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
-
+                 betay_DS_target=None)
+    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods,betay_DS_target=betay_DS_target)
+    
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
     """Register all lines in pdr.lines — same keys for all lattice functions."""
     pdr.lines['arc1R']    = arc1R

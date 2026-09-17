@@ -947,6 +947,159 @@ def config_D1_C10(pdr):
 
     return pdr
 
+def config_D1_C11(pdr):
+    """
+    8 SF's and 8 SD's in each half-arc, 4 independent families,
+    strictly alternating every other sextupole.
+
+    Focusing, in s-order per half-arc:
+        QFA_1  -> XF1     QFA_2  -> XF2
+        QFA_3  -> XF1     QFA_4  -> XF2
+        QFA_5  -> XF1     QFA_6  -> XF2
+        QFA_M7 -> XF1     QFDS   -> XF2
+
+    Defocusing, in s-order per half-arc:
+        QDA_1  -> XD1     QDA_2  -> XD2
+        QDA_3  -> XD1     QDA_4  -> XD2
+        QDA_5  -> XD1     QDA_6  -> XD2
+        QDA_7  -> XD1     QDA_M8 -> XD2
+
+    Four fully independent knobs: k2XF1arc, k2XF2arc, k2XD1arc, k2XD2arc.
+
+    Sign convention follows C9: right sextants '-', left sextants '+'.
+    (Note C6 uses the opposite convention -- check which is correct
+    for your lattice before running.)
+    """
+
+    ring   = pdr.lines['ring']
+    period = pdr.lines['period']
+
+    pdr.vars({'l_sext': 0.1,
+              'k2XF1arc': 0.00, 'k2XF2arc': 0.00,
+              'k2XD1arc': 0.00, 'k2XD2arc': 0.00})
+
+    pdr.new('XF1arc', xt.Sextupole, length='l_sext', k2='k2XF1arc',
+            edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XF2arc', xt.Sextupole, length='l_sext', k2='k2XF2arc',
+            edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD1arc', xt.Sextupole, length='l_sext', k2='k2XD1arc',
+            edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc', xt.Sextupole, length='l_sext', k2='k2XD2arc',
+            edge_entry_active=True, edge_exit_active=True)
+
+    # =================================================================
+    # RING
+    # =================================================================
+
+    # ---- Defocusing family 1: QDA odd cells 1,3,5,7 ----
+    for elem in ([ [el, '-'] for el in ['1R1','1R3','1R5','1R7',
+                                        '2R1','2R3','2R5','2R7',
+                                        '3R1','3R3','3R5','3R7'] ] +
+                 [ [el, '+'] for el in ['1L1','1L3','1L5','1L7',
+                                        '2L1','2L3','2L5','2L7',
+                                        '3L1','3L3','3L5','3L7'] ]):
+        ring.insert( pdr.new('XD1arc_'+elem[0], 'XD1arc'),
+                     at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
+
+    # ---- Defocusing family 2: QDA even cells 2,4,6 ----
+    for elem in ([ [el, '-'] for el in ['1R2','1R4','1R6',
+                                        '2R2','2R4','2R6',
+                                        '3R2','3R4','3R6'] ] +
+                 [ [el, '+'] for el in ['1L2','1L4','1L6',
+                                        '2L2','2L4','2L6',
+                                        '3L2','3L4','3L6'] ]):
+        ring.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'),
+                     at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
+
+    # ---- Defocusing family 2: matching cell QDA_M8 (position 8, even) ----
+    for elem in ([ [el, '-'] for el in ['1R8','2R8','3R8'] ] +
+                 [ [el, '+'] for el in ['1L8','2L8','3L8'] ]):
+        ring.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'),
+                     at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] )
+
+    # ---- Focusing family 1: QFA odd cells 1,3,5 ----
+    for elem in ([ [el, '-'] for el in ['1R1','1R3','1R5',
+                                        '2R1','2R3','2R5',
+                                        '3R1','3R3','3R5'] ] +
+                 [ [el, '+'] for el in ['1L1','1L3','1L5',
+                                        '2L1','2L3','2L5',
+                                        '3L1','3L3','3L5'] ]):
+        ring.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'),
+                     at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+
+    # ---- Focusing family 2: QFA even cells 2,4,6 ----
+    for elem in ([ [el, '-'] for el in ['1R2','1R4','1R6',
+                                        '2R2','2R4','2R6',
+                                        '3R2','3R4','3R6'] ] +
+                 [ [el, '+'] for el in ['1L2','1L4','1L6',
+                                        '2L2','2L4','2L6',
+                                        '3L2','3L4','3L6'] ]):
+        ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'),
+                     at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+
+    # ---- Focusing family 1: matching quad QFA_M7 (position 7, odd) ----
+    for elem in ([ [el, '-'] for el in ['1R7','2R7','3R7'] ] +
+                 [ [el, '+'] for el in ['1L7','2L7','3L7'] ]):
+        ring.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'),
+                     at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_M' + elem[0] )
+
+    # ---- Focusing family 2: DS quad QFDS (position 8, even) ----
+    for elem in ([ [el, '-'] for el in ['1R','2R','3R'] ] +
+                 [ [el, '+'] for el in ['1L','2L','3L'] ]):
+        ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'),
+                     at=elem[1] + '(l_drift+l_quad)/2', from_='QFDS_' + elem[0] )
+
+    # =================================================================
+    # PERIOD
+    # =================================================================
+
+    # ---- Defocusing family 1: QDA odd 1,3,5,7 ----
+    for elem in ([ [el, '-'] for el in ['PR1','PR3','PR5','PR7'] ] +
+                 [ [el, '+'] for el in ['PL1','PL3','PL5','PL7'] ]):
+        period.insert( pdr.new('XD1arc_'+elem[0], 'XD1arc'),
+                       at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
+
+    # ---- Defocusing family 2: QDA even 2,4,6 ----
+    for elem in ([ [el, '-'] for el in ['PR2','PR4','PR6'] ] +
+                 [ [el, '+'] for el in ['PL2','PL4','PL6'] ]):
+        period.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'),
+                       at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
+
+    # ---- Defocusing family 2: matching cell QDA_M8 ----
+    for elem in ([ [el, '-'] for el in ['PR8'] ] +
+                 [ [el, '+'] for el in ['PL8'] ]):
+        period.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'),
+                       at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] )
+
+    # ---- Focusing family 1: QFA odd 1,3,5 ----
+    for elem in ([ [el, '-'] for el in ['PR1','PR3','PR5'] ] +
+                 [ [el, '+'] for el in ['PL1','PL3','PL5'] ]):
+        period.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'),
+                       at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+
+    # ---- Focusing family 2: QFA even 2,4,6 ----
+    for elem in ([ [el, '-'] for el in ['PR2','PR4','PR6'] ] +
+                 [ [el, '+'] for el in ['PL2','PL4','PL6'] ]):
+        period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'),
+                       at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
+
+    # ---- Focusing family 1: matching quad QFA_M7 ----
+    for elem in ([ [el, '-'] for el in ['PR7'] ] +
+                 [ [el, '+'] for el in ['PL7'] ]):
+        period.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'),
+                       at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_M' + elem[0] )
+
+    # ---- Focusing family 2: DS quad QFDS ----
+    for elem in ([ [el, '-'] for el in ['PR'] ] +
+                 [ [el, '+'] for el in ['PL'] ]):
+        period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'),
+                       at=elem[1] + '(l_drift+l_quad)/2', from_='QFDS_' + elem[0] )
+
+    variables = ['k2XF1arc', 'k2XD1arc', 'k2XF2arc', 'k2XD2arc']
+    ChromCorrect(ring, pdr, variables, MakePlot=False)
+
+    return pdr
+
 #---------------
 # Design 2
 #---------------
