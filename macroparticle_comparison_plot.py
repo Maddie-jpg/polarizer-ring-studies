@@ -15,8 +15,8 @@ Phasdeb = 0.29229
 C_LIGHT = 299792458
 FREQ = 3e9
 K = 2 * np.pi * FREQ / C_LIGHT
-
-
+ 
+ 
 def apply_energy_compressor(df):
     """Same R56/Vdeb/Phasdeb transform as the ENERGY_COMPRESSOR_ON branch
     in macroparticles.py. That transform works in meters internally
@@ -155,3 +155,121 @@ plot_phase_space_comparison(
     't[mm/c]', 'p[MeV/c]', r'$t$ [mm/c]', r'$p$ [MeV/c]',
     'Longitudinal Phase Space Comparison', 'longitudinal_phase_space_comparison.png')
  
+ 
+def filter_by_sigma_2d(pos, ang, n_sigma):
+    """Mahalanobis-distance cut in (pos,ang) space, same convention as
+    filter_beam_core() in macroparticles.py: keep points within n_sigma
+    of the 2D ellipse defined by the population's own covariance."""
+    data = np.column_stack([pos, ang])
+    centered = data - data.mean(axis=0)
+    cov = np.cov(centered.T, ddof=0)
+    inv_cov = np.linalg.inv(cov)
+    dist_sq = np.sum((centered @ inv_cov) * centered, axis=1)
+    mask = dist_sq <= n_sigma**2
+    return pos[mask], ang[mask]
+ 
+ 
+sigma_values = [1, 2, 3, 4, 5, None]  # None = no cut, full population
+sigma_colors = plt.cm.viridis(np.linspace(0, 1, len(sigma_values)))
+theta = np.linspace(0, 2 * np.pi, 200)
+ 
+ 
+def sigma_cut_ellipses(pos_full, ang_full):
+    """Returns [(label, x_ellipse, xp_ellipse), ...] for each sigma_values
+    entry, reused by both the clean ellipse-only plot and the
+    scatter-background version below."""
+    results = []
+    for n_sigma, c in zip(sigma_values, sigma_colors):
+        if n_sigma is None:
+            pos, ang = pos_full, ang_full
+            label = f'No cut (N={len(pos)})'
+        else:
+            pos, ang = filter_by_sigma_2d(pos_full, ang_full, n_sigma)
+            label = f'{n_sigma}\u03c3 (N={len(pos)})'
+ 
+        cov = np.cov(pos, ang, ddof=0)
+        eps = np.sqrt(np.linalg.det(cov))
+        beta = cov[0, 0] / eps
+        alpha = -cov[0, 1] / eps
+ 
+        x_ell = np.sqrt(eps * beta) * np.cos(theta)
+        xp_ell = -np.sqrt(eps / beta) * (alpha * np.cos(theta) - np.sin(theta))
+        results.append((label, x_ell, xp_ell, c))
+    return results
+ 
+ 
+fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+ 
+for ax, pos_col, ang_col, plane_label in [
+    (axes[0], 'x[mm]', 'xp[mrad]', 'Horizontal'),
+    (axes[1], 'y[mm]', 'yp[mrad]', 'Vertical'),
+]:
+    pos_full = current_df[pos_col].values
+    ang_full = current_df[ang_col].values
+ 
+    for label, x_ell, xp_ell, c in sigma_cut_ellipses(pos_full, ang_full):
+        ax.plot(x_ell, xp_ell, color=c, label=label)
+ 
+    ax.set_title(f'{plane_label} Twiss Ellipse vs. Sigma Cut (Current)')
+    ax.set_xlabel(pos_col)
+    ax.set_ylabel(ang_col)
+    ax.axhline(0, color='black', lw=0.5, ls='--')
+    ax.axvline(0, color='black', lw=0.5, ls='--')
+    ax.axis('equal')
+    ax.grid(True, linestyle=':', alpha=0.5)
+    ax.legend(fontsize='small')
+ 
+plt.tight_layout()
+plt.savefig('current_twiss_vs_sigma.png', dpi=150, bbox_inches='tight')
+plt.show()
+ 
+ 
+fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+ 
+for ax, pos_col, ang_col, plane_label in [
+    (axes[0], 'x[mm]', 'xp[mrad]', 'Horizontal'),
+    (axes[1], 'y[mm]', 'yp[mrad]', 'Vertical'),
+]:
+    pos_full = current_df[pos_col].values
+    ang_full = current_df[ang_col].values
+ 
+    ax.scatter(pos_full, ang_full, s=2, alpha=0.15, color='gray', zorder=1,
+               label=f'Particles (N={len(pos_full)})')
+ 
+    for label, x_ell, xp_ell, c in sigma_cut_ellipses(pos_full, ang_full):
+        ax.plot(x_ell, xp_ell, color=c, label=label, linewidth=2, zorder=2)
+ 
+    # Zoom to the 0.5-99.5 percentile range with margin, rather than the
+    # full data range -- a handful of far-out particles (real beam files
+    # routinely have these, as established earlier) would otherwise force
+    # the axes so wide the ellipses collapse to an unreadable sliver.
+    pos_lo, pos_hi = np.percentile(pos_full, [0.5, 99.5])
+    ang_lo, ang_hi = np.percentile(ang_full, [0.5, 99.5])
+    pos_margin = 0.3 * (pos_hi - pos_lo)
+    ang_margin = 0.3 * (ang_hi - ang_lo)
+    ax.set_xlim(pos_lo - pos_margin, pos_hi + pos_margin)
+    ax.set_ylim(ang_lo - ang_margin, ang_hi + ang_margin)
+ 
+    ax.set_title(f'{plane_label} Twiss Ellipse vs. Sigma Cut (Current, with particles)')
+    ax.set_xlabel(pos_col)
+    ax.set_ylabel(ang_col)
+    ax.axhline(0, color='black', lw=0.5, ls='--')
+    ax.axvline(0, color='black', lw=0.5, ls='--')
+    ax.grid(True, linestyle=':', alpha=0.3)
+    ax.legend(fontsize='small')
+ 
+plt.tight_layout()
+plt.savefig('current_twiss_vs_sigma_with_particles.png', dpi=150, bbox_inches='tight')
+plt.show()
+ 
+plt.figure(figsize=(9, 6))
+for label, df_i, color in datasets:
+    plt.hist(df_i['p[MeV/c]'], bins=100, histtype='step', color=color,
+              linewidth=1.6, label=f'{label} (N={len(df_i)})')
+plt.xlabel(r'$p$ [MeV/c]')
+plt.ylabel('Counts')
+plt.title('Momentum Distribution Comparison')
+plt.grid(True, linestyle=':', alpha=0.4)
+plt.legend()
+plt.savefig('momentum_histogram_comparison.png', dpi=150, bbox_inches='tight')
+plt.show()
