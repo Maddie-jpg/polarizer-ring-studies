@@ -9,7 +9,7 @@ parent_dir = os.path.abspath('..')
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-import LatticeBuild.linear_optics as lo
+import linear_optics as lo
 import sextupole_configs as sc
 import misalignments_corrections as mc
 import constants

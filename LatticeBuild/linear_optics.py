@@ -50,7 +50,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
         xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
         #xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
-        xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
+        #xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
         
     ]
     targets = [
@@ -496,8 +496,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
             'dl_noben': 0.95,   'l_quad':   0.30,
             'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.', 
             'dl_drift': -0.0,   'dl_trans': 0.20,
-            'l_doub':   0.25,   'l_tripl':  2.5,    'l_trips':  0.40,
-            'l_sext':   0.20, 'l_trans': 'l_drift+dl_trans', 'l_DSL':'2*l_drift + l_bend + dl_noben'
+            'l_doub':   0.07,   'l_tripl':  2.5,    'l_trips':  0.57,
+            'l_sext':   0.20, 'l_trans': 0.75, 'l_DSL':'2*l_drift + l_bend + dl_noben'
         })
 
 
