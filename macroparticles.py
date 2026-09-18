@@ -308,6 +308,11 @@ def betatron_mismatch(beta1, alpha1, beta2, alpha2):
     Bmag = H + np.sqrt(max(H**2 - 1, 0.0))
     return H, Bmag
 
+def optics_match_transform(pos, ang, beta1, alpha1, beta2, alpha2):
+    pos_matched = np.sqrt(beta2 / beta1) * pos
+    ang_matched = ((alpha1 - alpha2) / np.sqrt(beta1 * beta2)) * pos + np.sqrt(beta1 / beta2) * ang
+    return pos_matched, ang_matched
+
 def plot_twiss_ellipse(beta, alpha, beta2, alpha2, emittance,ax):
     gamma = (1 + alpha**2) / beta
     theta = np.linspace(0, 2*np.pi, 100)
@@ -679,7 +684,7 @@ axes[0, 0].set_ylabel("xp [mrad]")
 axes[0, 1].set_title("Horizontal: Normalized Phase Space")
 axes[0, 1].set_xlabel(r"$\zeta_x$")
 axes[0, 1].set_ylabel(r"$\zeta'_x$")
-
+optics_match_transform
 axes[1, 0].set_title("Vertical: Physical Phase Space")
 axes[1, 0].set_xlabel("y [mm]")
 axes[1, 0].set_ylabel("yp [mrad]")
@@ -701,12 +706,34 @@ p0c_avg_mev = df['p[MeV/c]'].mean()
 p0c_avg = p0c_avg_mev * 1e6
 ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
-def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy):
+def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy,
+                       beam_disp_x=(0.0, 0.0), beam_disp_y=(0.0, 0.0),
+                       beam_optics_x=None, beam_optics_y=None,
+                       ring_optics_x=None, ring_optics_y=None):
     delta = (df_in['p[MeV/c]'].values * 1e6 - p0c_ref) / p0c_ref
-    x_matched  = df_in['x[mm]'].values  * 1e-3 + dx  * delta
-    px_matched = df_in['xp[mrad]'].values * 1e-3 + ddx * delta
-    y_matched  = df_in['y[mm]'].values  * 1e-3 + dy  * delta
-    py_matched = df_in['yp[mrad]'].values * 1e-3 + ddy * delta
+
+    x_raw  = df_in['x[mm]'].values  * 1e-3
+    px_raw = df_in['xp[mrad]'].values * 1e-3
+    y_raw  = df_in['y[mm]'].values  * 1e-3
+    py_raw = df_in['yp[mrad]'].values * 1e-3
+
+    dxb, ddxb = beam_disp_x
+    dyb, ddyb = beam_disp_y
+    x_beta  = x_raw  - dxb * delta
+    px_beta = px_raw - ddxb * delta
+    y_beta  = y_raw  - dyb * delta
+    py_beta = py_raw - ddyb * delta
+
+    if beam_optics_x is not None and ring_optics_x is not None:
+        x_beta, px_beta = (x_beta, px_beta, *beam_optics_x, *ring_optics_x)
+    if beam_optics_y is not None and ring_optics_y is not None:
+        y_beta, py_beta = optics_match_transform(y_beta, py_beta, *beam_optics_y, *ring_optics_y)
+
+    x_matched  = x_beta  + dx  * delta
+    px_matched = px_beta + ddx * delta
+    y_matched  = y_beta  + dy  * delta
+    py_matched = py_beta + ddy * delta
+
     t_mm = df_in['t[mm/c]'].values
     zeta = (np.mean(t_mm) - t_mm) * 1e-3 * ref_particle.beta0[0]
     return x_matched, px_matched, y_matched, py_matched, delta, zeta
@@ -730,7 +757,10 @@ def compute_energy_scan(track_line, track_tw, df_subset, p0c_avg_mev, energy_ran
 
     x_m, px_m, y_m, py_m, _, zeta_m = match_coordinates(
         df_subset, p0c_avg, ref_particle_avg,
-        track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0])
+        track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0],
+        beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
+        beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
+        ring_optics_x=(betx0, alfx0), ring_optics_y=(bety0, alfy0))
 
     efficiency_results = []
     for e_mev in energy_range_mev:
@@ -841,7 +871,10 @@ def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
 
         x_matched, px_matched, y_matched, py_matched, delta, zeta = match_coordinates(
             df_subset, p0c_reference, ref_particle,
-            track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0])
+            track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0],
+            beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
+            beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
+            ring_optics_x=(betx0, alfx0), ring_optics_y=(bety0, alfy0))
 
         particles = xp.Particles(
             p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV,
@@ -858,24 +891,24 @@ def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
                                   metric='InjectionEfficiency', sub=mode_tag,
                                   sub2=f'{label}_{int(e_mev)}MeV')
 
-        fig, ax = plt.subplots(1, 3, figsize=(14, 4))
+        fig, ax3 = plt.subplots(1, 3, figsize=(14, 4))
         fig.subplots_adjust(wspace=0.4)
 
         survival_count = np.sum(particles.state > 0)
         fig.suptitle(f'Particle Survival ({mode_tag}, {label}, {e_mev:.1f} MeV): {survival_count} / {n_track}')
 
         for i, (xl, yl) in enumerate(col_labels[:3]):
-            ax[i].set_xlabel(xl)
-            ax[i].set_ylabel(yl)
+            ax3[i].set_xlabel(xl)
+            ax3[i].set_ylabel(yl)
 
         for ind, turn in enumerate(trnplt):
             x_beta = 1000 * (data.x[:, turn] - track_tw.dx[0] * data.delta[:, turn])
             px_beta = 1000 * (data.px[:, turn] - track_tw.dpx[0] * data.delta[:, turn])
-            ax[0].scatter(x_beta, px_beta, s=2, color=f'C{ind}', label=f'Turn {turn}', alpha=0.6)
-            ax[1].scatter(1000 * data.y[:, turn], 1000 * data.py[:, turn], s=2, color=f'C{ind}', alpha=0.6)
-            ax[2].scatter(1000 * data.zeta[:, turn], 1000 * data.delta[:, turn], s=2, color=f'C{ind}', alpha=0.6)
+            ax3[0].scatter(x_beta, px_beta, s=2, color=f'C{ind}', label=f'Turn {turn}', alpha=0.6)
+            ax3[1].scatter(1000 * data.y[:, turn], 1000 * data.py[:, turn], s=2, color=f'C{ind}', alpha=0.6)
+            ax3[2].scatter(1000 * data.zeta[:, turn], 1000 * data.delta[:, turn], s=2, color=f'C{ind}', alpha=0.6)
 
-        ax[0].legend(fontsize='small')
+        ax3[0].legend(fontsize='small')
         plt.savefig(f'{folder2}/injection_tracking_evolution_{rand_num}_{e_mev:.0f}MeV.png')
         plt.show()
 
@@ -990,7 +1023,11 @@ if mode == 'perfect':
 
         x_m, px_m, y_m, py_m, delta_m, zeta_m = match_coordinates(
             df_subset, p0c_ref, ref_particle,
-            seed_tw.dx[0], seed_tw.dpx[0], seed_tw.dy[0], seed_tw.dpy[0])
+            seed_tw.dx[0], seed_tw.dpx[0], seed_tw.dy[0], seed_tw.dpy[0],
+            beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
+            beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
+            ring_optics_x=(seed_tw.betx[0], seed_tw.alfx[0]),
+            ring_optics_y=(seed_tw.bety[0], seed_tw.alfy[0]))
 
         particles = xp.Particles(
             p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV,
@@ -1008,15 +1045,6 @@ if mode == 'perfect':
         seed_line.configure_radiation(model='mean')
         return survival_counts_seed, t0['betx'][0], t0['alfx'][0], t0['bety'][0], t0['alfy'][0]
 
-    # Same full diagnostic suite that runs on whatever line was loaded via
-    # `mode` above (injection tracking evolution, initial-turns grid,
-    # survival+lifetime, initial x-distribution) -- now also run once each
-    # on a single in-memory misaligned (uncorrected) and corrected
-    # realization, not just whichever mode's JSON happened to be loaded.
-    # Uses the SAME energies_to_track as the baseline (including the
-    # baseline's own best_energy_mev) -- the optimal energy is fixed by
-    # the perfect machine's scan, same as the original; misaligned/
-    # corrected don't get their own separately-optimized energy here.
     misaligned_line = prep_seed_line(ring, seed=seeds[0], apply_correction=False)
     misaligned_tw = misaligned_line.twiss6d()
     run_energy_diagnostics(misaligned_line, misaligned_tw, 'misaligned_inmemory',
