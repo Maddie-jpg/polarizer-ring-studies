@@ -1,0 +1,38 @@
+Very first version of a FCC-ee polarizer ring
+---------------------------------------------
+
+This is work in progress and significant changes of the design should be 
+expected in the near future. Nevertheless, the design presented here would
+work from the beam dynamics and polarization build-up point of view with
+hardware requirements being checked.
+
+The intention was to design a short ring (circumference ~210 m) with reasonably 
+large magnetic fields (finally about 1.47 T) of bending magnets to obtain fast 
+polarization build-up without asymmetric wigglers reducing the equilibrium 
+polarization.
+
+The design is based on 90 degrees phase advance FODO arc cells with a cell 
+length of 3.4 m (hopefully long enough to allow integration of all elements). 
+This allows to obtain sufficient dynamic aperture and momentum acceptance for 
+high injection efficiency. The equilibrium emittance is too large for 
+acceleration in the high energy linac, such that the polarized beam has to 
+pass through the damping ring.
+
+Design evolutions to be expected in the near future:
+ - Inversion of the polarity of quadrupoles of the triplets in the straight
+   section (change of triplet from DFD to FDF) to ease beam transfer.
+ - Reduction of the RF voltage (smaller RF acceptance probably acceptable
+   and to ease the construction of the RF system).
+ - Development of polarizer rings with circumference similar to the damping 
+   ring. The aim is to install both the damping ring and the polarizer ring
+   in the same tunnel (in addition to the circumference, the shapes must be
+   similar as well). Various options are possible as, e.g., longer straights 
+   and asymmetric wigglers reducing the equilibrium polarization or longer 
+   arcs with larger bending radius allowing the accelerate temporarily the 
+   beam to enhance the polarization build-up rate.
+
+Possible design evolutions in the long term:
+ - Alternative focusing structures (e.g. triplet focusing as well in arcs)
+   with the aim to reduce the horizontal equilibrium emittance.
+
+ 

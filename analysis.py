@@ -268,6 +268,7 @@ for (row, col), cell in table.get_celld().items():
 plt.savefig(f'{folder1}/table_{mode}.png')
 
 
+
 def integer_tune_ranges(qx, qy, half_width=1):
     """
     Range of half_width on each side of the nearest integer to each tune.
@@ -373,6 +374,56 @@ ax.set_ylim(Qy_range)
 plt.tight_layout()
 plt.savefig(f'{folder1}/momentum_dev_working_point{current_wp}_{mode}.png')
 
+# %%
+# Off-momentum beta-beating: pattern at the extremes, and rms/peak envelope vs delta
+ring.configure_radiation(model=None)
+ref_tw = ring.twiss4d(delta0=0)
+
+bb_delta, bb_rms_x, bb_rms_y, bb_max_x, bb_max_y = [], [], [], [], []
+
+for d in deltas:
+    try:
+        tw_d = ring.twiss4d(delta0=d)
+    except Exception:
+        print('deltap of %1.2e not stable' % d)
+        continue
+    if len(tw_d.betx) != len(ref_tw.betx):
+        print('element count mismatch at deltap %1.2e -- skipped' % d)
+        continue
+
+    bbx = (tw_d.betx - ref_tw.betx) / ref_tw.betx
+    bby = (tw_d.bety - ref_tw.bety) / ref_tw.bety
+
+    bb_delta.append(d)
+    bb_rms_x.append(np.sqrt(np.mean(bbx**2)))
+    bb_rms_y.append(np.sqrt(np.mean(bby**2)))
+    bb_max_x.append(np.max(np.abs(bbx)))
+    bb_max_y.append(np.max(np.abs(bby)))
+
+# --- envelope: beating vs delta
+plt.figure(figsize=(8, 4))
+plt.plot(bb_delta, bb_rms_x, '-',  color='tab:blue', label=r'rms $x$')
+plt.plot(bb_delta, bb_rms_y, '-',  color='tab:red',  label=r'rms $y$')
+plt.plot(bb_delta, bb_max_x, '--', color='tab:blue', label=r'peak $x$', alpha=0.6)
+plt.plot(bb_delta, bb_max_y, '--', color='tab:red',  label=r'peak $y$', alpha=0.6)
+plt.xlabel('Relative momentum deviation')
+plt.ylabel(r'$\Delta\beta/\beta$')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(f'{folder1}/beta_beating_envelope{current_wp}_{mode}.png')
+
+# --- pattern around the ring, at the edges of the scanned range
+for d in (-max_dp, max_dp):
+    try:
+        tw_d = ring.twiss4d(delta0=d)
+    except Exception:
+        print('deltap of %1.2e not stable -- no beating plot' % d)
+        continue
+    my_xpf.beta_beating_vs_s(ref_tw, tw_d)
+    plt.title(r'$\delta$ = %+.1f%%' % (d * 100))
+    plt.savefig(f'{folder1}/beta_beating_s_delta{d:+.3f}_{current_wp}_{mode}.png')
+    plt.close()
 
 
 # %%

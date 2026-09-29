@@ -1,8 +1,8 @@
-PWD /Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Slides and Notes
+PWD /Users/maddiewatson/polarizer-ring-studies/Slides and Notes
 INPUT /usr/local/texlive/2025/texmf.cnf
 INPUT /usr/local/texlive/2025/texmf-dist/web2c/texmf.cnf
 INPUT /usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT /Users/maddiewatson/Library/CloudStorage/OneDrive-Personal/University/Research year/polarizer-ring-studies/Slides and Notes/Notes.tex
+INPUT /Users/maddiewatson/polarizer-ring-studies/Slides and Notes/Notes.tex
 OUTPUT Notes.log
 INPUT /usr/local/texlive/2025/texmf-dist/tex/latex/base/article.cls
 INPUT /usr/local/texlive/2025/texmf-dist/tex/latex/base/article.cls

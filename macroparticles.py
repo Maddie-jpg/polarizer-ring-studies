@@ -430,7 +430,7 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 # %%
 
-df_clean = filter_by_action_xy(df, n_sigma=3)
+df_clean = filter_by_action_xy(df, n_sigma=4)
 print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
 
 emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
@@ -589,41 +589,48 @@ with open(f'{folder}/TwissResults.json', 'w') as f:
 def insert_marker_in_drift(pdr, ring, drift_name='DrTripl', occurrence=0,
                             marker_name='TripletInject'):
     """Insert a marker at the midpoint of the `occurrence`-th (0-indexed,
-    in s-order) PLAIN instance of a drift named exactly `drift_name`.
-    Excludes already-split DriftSlice pieces (e.g. 'DrTripl..102') -- those
-    have different names, so the exact-match check here never picks them up.
- 
+    in s-order) PLAIN instance of a drift named `drift_name`. Excludes
+    already-split DriftSlice pieces (e.g. 'DrTripl..102').
+
+    Matches EITHER a bare name ('DrTripl') OR that name with an xtrack
+    auto-disambiguation suffix ('DrTripl::0', 'DrTripl::1', ...) -- which
+    convention shows up depends on the xtrack version/environment that
+    built the ring (confirmed directly: one ring used bare 'DrTripl'
+    repeated as-is, another used 'DrTripl::N' for the same construction).
+    An exact-only match would silently find zero instances on rings using
+    the '::N' convention. The '..NNN' pattern used for sliced pieces is
+    still excluded either way, since neither branch of this pattern
+    matches it.
+
     Looks up the drift's actual position/length at RUNTIME rather than
     assuming a fixed index or s-value, so this works across different
     design/config/phase rings that may have different l_cell, l_tripl,
-    N_cells_S, etc. -- the index and s-position of 'DrTripl' instances
-    will differ between ring configurations, but the NAME 'DrTripl' stays
-    consistent since it comes from the same line in linear_optics.py
-    (`pdr.place('DrTripl')`) regardless of the numeric parameters used to
-    build that particular ring.
- 
+    N_cells_S, etc.
+
     Returns marker_name for convenience (so it can be passed straight into
     ring_tw.rows[...] and ring.track(ele_start=...)).
     """
+    import re
     names = ring.element_names
-    indices = [i for i, n in enumerate(names) if n == drift_name]
+    pattern = re.compile(rf'^{re.escape(drift_name)}(::\d+)?$')
+    indices = [i for i, n in enumerate(names) if pattern.match(n)]
     if not indices:
-        raise ValueError(f"No element named exactly '{drift_name}' found in this ring. "
-                          f"If this ring was built with a different lattice function "
-                          f"than three_fold_periodicity_long, the triplet drift may "
+        raise ValueError(f"No element matching '{drift_name}' or '{drift_name}::N' found "
+                          f"in this ring. If this ring was built with a different lattice "
+                          f"function than three_fold_periodicity_long, the triplet drift may "
                           f"have a different name -- check ring.element_names for "
                           f"anything containing 'Tripl'.")
     if occurrence >= len(indices):
         raise ValueError(f"Requested occurrence {occurrence}, but only "
-                          f"{len(indices)} instance(s) of '{drift_name}' exist "
+                          f"{len(indices)} instance(s) matching '{drift_name}' exist "
                           f"in this ring.")
- 
+
     idx = indices[occurrence]
     s_positions = ring.get_s_position()
     s_start = s_positions[idx]
     length = ring.element_dict[names[idx]].length
     s_center = s_start + length / 2
- 
+
     ring.insert(pdr.new(marker_name, xt.Marker), at=s_center)
     return marker_name
 
@@ -636,8 +643,8 @@ else:
     
 ring=pdr.lines['ring']
 marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
-ring.element_dict['RFCav'].voltage = 20e6
-ring.element_dict['RFCav_1'].voltage = 20e6
+ring.element_dict['RFCav'].voltage = 8e6
+ring.element_dict['RFCav_1'].voltage = 8e6
 
 ring_tw=ring.twiss6d()
 print(ring_tw.cols)
@@ -646,14 +653,14 @@ initial_twiss = ring_tw.rows[marker_name]
 betx0 = initial_twiss['betx'][0]
 alfx0 = initial_twiss['alfx'][0]
 dx0   = initial_twiss['dx'][0]
-ddx0   = initial_twiss['ddx'][0]
+ddx0   = initial_twiss['dpx'][0]
 x     = initial_twiss['x'][0]
 xp_v    = initial_twiss['px'][0]
 
 bety0 = initial_twiss['bety'][0]
 alfy0 = initial_twiss['alfy'][0]
 dy0   = initial_twiss['dy'][0]
-ddy0   = initial_twiss['ddy'][0]
+ddy0   = initial_twiss['dpy'][0]
 y     = initial_twiss['y'][0]
 yp    = initial_twiss['py'][0]
 
@@ -684,7 +691,7 @@ axes[0, 0].set_ylabel("xp [mrad]")
 axes[0, 1].set_title("Horizontal: Normalized Phase Space")
 axes[0, 1].set_xlabel(r"$\zeta_x$")
 axes[0, 1].set_ylabel(r"$\zeta'_x$")
-optics_match_transform
+
 axes[1, 0].set_title("Vertical: Physical Phase Space")
 axes[1, 0].set_xlabel("y [mm]")
 axes[1, 0].set_ylabel("yp [mrad]")
@@ -695,6 +702,49 @@ axes[1, 1].set_ylabel(r"$\zeta'_y$")
 plt.xlabel
 plt.tight_layout()
 plt.savefig(f'{folder}/twiss_ellipses.png')
+plt.show()
+
+# %%
+def normalize_coords(pos, ang, beta, alpha):
+    zeta = pos / np.sqrt(beta)
+    zeta_prime = np.sqrt(beta) * ang + (alpha / np.sqrt(beta)) * pos
+    return zeta, zeta_prime
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+theta = np.linspace(0, 2 * np.pi, 200)
+
+for ax_i, pos_col, ang_col, beta_l, alpha_l, beta_r, alpha_r, eps, plane_label in [
+    (axes[0], 'x[mm]', 'xp[mrad]', bx, ax, betx0, alfx0, emittance_x, 'Horizontal'),
+    (axes[1], 'y[mm]', 'yp[mrad]', by, ay, bety0, alfy0, emittance_y, 'Vertical'),
+]:
+    pos = df_clean[pos_col].values
+    ang = df_clean[ang_col].values
+    zeta_p, zeta_prime_p = normalize_coords(pos, ang, beta_l, alpha_l)
+
+    sc = density_scatter(ax_i, zeta_p, zeta_prime_p, s=1)
+    fig.colorbar(sc, ax=ax_i, label='Relative Density')
+
+    x_beam_ell = np.sqrt(eps * beta_l) * np.cos(theta)
+    xp_beam_ell = -np.sqrt(eps / beta_l) * (alpha_l * np.cos(theta) - np.sin(theta))
+
+    zeta_beam, zeta_prime_beam = normalize_coords(x_beam_ell, xp_beam_ell, beta_l, alpha_l)
+    ax_i.plot(zeta_beam, zeta_prime_beam, color='blue', lw=2, label='Beam Twiss (self-normalised)')
+
+    zeta_ring, zeta_prime_ring = normalize_coords(x_beam_ell, xp_beam_ell, beta_r, alpha_r)
+    ax_i.plot(zeta_ring, zeta_prime_ring, color='red', lw=2, linestyle='--',
+              label='Ring Twiss (beam-normalised frame)')
+
+    ax_i.set_title(f'{plane_label}: Normalised Phase Space Density')
+    ax_i.set_xlabel(r'$\zeta$')
+    ax_i.set_ylabel(r"$\zeta'$")
+    ax_i.axhline(0, color='black', lw=0.5, ls='--')
+    ax_i.axvline(0, color='black', lw=0.5, ls='--')
+    ax_i.axis('equal')
+    ax_i.grid(True, linestyle=':', alpha=0.5)
+    ax_i.legend(fontsize='small')
+
+plt.tight_layout()
+plt.savefig(f'{folder}/normalised_phase_space_density.png')
 plt.show()
 
 # %%
@@ -725,7 +775,7 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy,
     py_beta = py_raw - ddyb * delta
 
     if beam_optics_x is not None and ring_optics_x is not None:
-        x_beta, px_beta = (x_beta, px_beta, *beam_optics_x, *ring_optics_x)
+        x_beta, px_beta = optics_match_transform(x_beta, px_beta, *beam_optics_x, *ring_optics_x)
     if beam_optics_y is not None and ring_optics_y is not None:
         y_beta, py_beta = optics_match_transform(y_beta, py_beta, *beam_optics_y, *ring_optics_y)
 
@@ -737,6 +787,124 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy,
     t_mm = df_in['t[mm/c]'].values
     zeta = (np.mean(t_mm) - t_mm) * 1e-3 * ref_particle.beta0[0]
     return x_matched, px_matched, y_matched, py_matched, delta, zeta
+
+# %%
+x_m_full, px_m_full, y_m_full, py_m_full, delta_full, zeta_full = match_coordinates(
+    df_raw, p0c_avg, ref_particle_avg,
+    dx0, ddx0, dy0, ddy0,
+    beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
+    beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
+    ring_optics_x=(betx0, alfx0), ring_optics_y=(bety0, alfy0))
+
+def twiss_from_arrays(pos, ang):
+    cov = np.cov(pos, ang, ddof=0)
+    eps = np.sqrt(np.linalg.det(cov))
+    beta = cov[0, 0] / eps
+    alpha = -cov[0, 1] / eps
+    return alpha, beta, eps
+
+x_m_full_mm, px_m_full_mrad = x_m_full*1e3, px_m_full*1e3
+y_m_full_mm, py_m_full_mrad = y_m_full*1e3, py_m_full*1e3
+
+alpha_mx, beta_mx, eps_mx = twiss_from_arrays(x_m_full_mm, px_m_full_mrad)
+alpha_my, beta_my, eps_my = twiss_from_arrays(y_m_full_mm, py_m_full_mrad)
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+
+for ax_i, pos_full, ang_full, beta_m, alpha_m, beta_r, alpha_r, eps_m, pos_label, ang_label, plane_label in [
+    (axes[0], x_m_full_mm, px_m_full_mrad, beta_mx, alpha_mx, betx0, alfx0, eps_mx, 'x [mm]', "xp [mrad]", 'Horizontal'),
+    (axes[1], y_m_full_mm, py_m_full_mrad, beta_my, alpha_my, bety0, alfy0, eps_my, 'y [mm]', "yp [mrad]", 'Vertical'),
+]:
+    sc = density_scatter(ax_i, pos_full, ang_full, s=1)
+    fig.colorbar(sc, ax=ax_i, label='Relative Density')
+
+    x1 = np.sqrt(eps_m * beta_m) * np.cos(theta)
+    xp1 = -np.sqrt(eps_m / beta_m) * (alpha_m * np.cos(theta) - np.sin(theta))
+    ax_i.plot(x1, xp1, color='blue', lw=2, label='Matched distribution Twiss')
+
+    x2 = np.sqrt(eps_m * beta_r) * np.cos(theta)
+    xp2 = -np.sqrt(eps_m / beta_r) * (alpha_r * np.cos(theta) - np.sin(theta))
+    ax_i.plot(x2, xp2, color='red', lw=2, linestyle='--', label='Ring Twiss')
+
+    ax_i.set_title(f'{plane_label}: Matched (Injected) Beam vs Ring Twiss')
+    ax_i.set_xlabel(pos_label)
+    ax_i.set_ylabel(ang_label)
+    ax_i.axhline(0, color='black', lw=0.5, ls='--')
+    ax_i.axvline(0, color='black', lw=0.5, ls='--')
+    #ax_i.axis('equal')
+    ax_i.set_xlim(-20,20)
+    ax_i.set_ylim(-20,20)
+    ax_i.grid(True, linestyle=':', alpha=0.5)
+    ax_i.legend(fontsize='small')
+
+plt.tight_layout()
+plt.savefig(f'{folder}/injected_beam_vs_ring_twiss.png')
+plt.show()
+
+# %%
+delta_before = (df['p[MeV/c]'].values * 1e6 - p0c_avg) / p0c_avg
+x_before = df['x[mm]'].values * 1e-3 - (dx * 1e-3) * delta_before
+px_before = df['xp[mrad]'].values * 1e-3 - (ddx * 1e-3) * delta_before
+y_before = df['y[mm]'].values * 1e-3 - (dy * 1e-3) * delta_before
+py_before = df['yp[mrad]'].values * 1e-3 - (ddy * 1e-3) * delta_before
+x_before, px_before = optics_match_transform(x_before, px_before, bx, ax, betx0, alfx0)
+y_before, py_before = optics_match_transform(y_before, py_before, by, ay, bety0, alfy0)
+
+x_before_mm, px_before_mrad = x_before * 1e3, px_before * 1e3
+y_before_mm, py_before_mrad = y_before * 1e3, py_before * 1e3
+
+fig, axes = plt.subplots(2, 2, figsize=(13, 12))
+
+panels = [
+    (axes[0, 0], x_before_mm, px_before_mrad, betx0, alfx0, 'x [mm]', "xp [mrad]",
+     'Horizontal: Before Dispersion (Pure Betatron)'),
+    (axes[0, 1], x_m_full_mm, px_m_full_mrad, betx0, alfx0, 'x [mm]', "xp [mrad]",
+     'Horizontal: After Dispersion (Injected)'),
+    (axes[1, 0], y_before_mm, py_before_mrad, bety0, alfy0, 'y [mm]', "yp [mrad]",
+     'Vertical: Before Dispersion (Pure Betatron)'),
+    (axes[1, 1], y_m_full_mm, py_m_full_mrad, bety0, alfy0, 'y [mm]', "yp [mrad]",
+     'Vertical: After Dispersion (Injected)'),
+]
+
+for ax_i, pos_full, ang_full, beta_r, alpha_r, pos_label, ang_label, title in panels:
+    alpha_m, beta_m, eps_m = twiss_from_arrays(pos_full, ang_full)
+
+    sc = density_scatter(ax_i, pos_full, ang_full, s=1)
+    fig.colorbar(sc, ax=ax_i, label='Relative Density')
+
+    x1 = np.sqrt(eps_m * beta_m) * np.cos(theta)
+    xp1 = -np.sqrt(eps_m / beta_m) * (alpha_m * np.cos(theta) - np.sin(theta))
+    ax_i.plot(x1, xp1, color='blue', lw=2, label='Distribution Twiss')
+
+    x2 = np.sqrt(eps_m * beta_r) * np.cos(theta)
+    xp2 = -np.sqrt(eps_m / beta_r) * (alpha_r * np.cos(theta) - np.sin(theta))
+    ax_i.plot(x2, xp2, color='red', lw=2, linestyle='--', label='Ring Twiss')
+
+    ax_i.set_title(title)
+    ax_i.set_xlabel(pos_label)
+    ax_i.set_ylabel(ang_label)
+    ax_i.axhline(0, color='black', lw=0.5, ls='--')
+    ax_i.axvline(0, color='black', lw=0.5, ls='--')
+    ax_i.set_xlim(-20, 20)
+    ax_i.set_ylim(-20, 20)
+    ax_i.grid(True, linestyle=':', alpha=0.5)
+    ax_i.legend(fontsize='small')
+
+plt.tight_layout()
+plt.savefig(f'{folder}/injected_beam_before_after_dispersion.png')
+plt.show()
+
+# %%
+fig, ax_long = plt.subplots(figsize=(8, 6))
+sc = density_scatter(ax_long, zeta_full*1e3, delta_full*1e3, s=2)
+fig.colorbar(sc, ax=ax_long, label='Relative Density')
+ax_long.set_xlabel(r'$\zeta$ (mm)')
+ax_long.set_ylabel(r'$\delta$ ($10^{-3}$)')
+ax_long.set_title('Longitudinal Phase Space (Matched/Injected Beam)')
+ax_long.grid(True, linestyle=':', alpha=0.5)
+plt.tight_layout()
+plt.savefig(f'{folder}/injected_beam_longitudinal.png')
+plt.show()
 
 def compute_energy_scan(track_line, track_tw, df_subset, p0c_avg_mev, energy_range_mev=None):
     """Core of the energy scan, no plotting: scans reference energy vs.
@@ -755,12 +923,14 @@ def compute_energy_scan(track_line, track_tw, df_subset, p0c_avg_mev, energy_ran
     p0c_avg = p0c_avg_mev * 1e6
     ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
+    tw_row = track_tw.rows[marker_name]
     x_m, px_m, y_m, py_m, _, zeta_m = match_coordinates(
         df_subset, p0c_avg, ref_particle_avg,
-        track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0],
+        tw_row['dx'][0], tw_row['dpx'][0], tw_row['dy'][0], tw_row['dpy'][0],
         beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
         beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
-        ring_optics_x=(betx0, alfx0), ring_optics_y=(bety0, alfy0))
+        ring_optics_x=(tw_row['betx'][0], tw_row['alfx'][0]),
+        ring_optics_y=(tw_row['bety'][0], tw_row['alfy'][0]))
 
     efficiency_results = []
     for e_mev in energy_range_mev:
@@ -869,12 +1039,14 @@ def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
         p0c_reference = e_mev * 1e6
         ref_particle = xp.Particles(p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV)
 
+        tw_row = track_tw.rows[marker_name]
         x_matched, px_matched, y_matched, py_matched, delta, zeta = match_coordinates(
             df_subset, p0c_reference, ref_particle,
-            track_tw.dx[0], track_tw.dpx[0], track_tw.dy[0], track_tw.dpy[0],
+            tw_row['dx'][0], tw_row['dpx'][0], tw_row['dy'][0], tw_row['dpy'][0],
             beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
             beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
-            ring_optics_x=(betx0, alfx0), ring_optics_y=(bety0, alfy0))
+            ring_optics_x=(tw_row['betx'][0], tw_row['alfx'][0]),
+            ring_optics_y=(tw_row['bety'][0], tw_row['alfy'][0]))
 
         particles = xp.Particles(
             p0c=p0c_reference, mass0=xp.ELECTRON_MASS_EV,
@@ -902,8 +1074,8 @@ def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
             ax3[i].set_ylabel(yl)
 
         for ind, turn in enumerate(trnplt):
-            x_beta = 1000 * (data.x[:, turn] - track_tw.dx[0] * data.delta[:, turn])
-            px_beta = 1000 * (data.px[:, turn] - track_tw.dpx[0] * data.delta[:, turn])
+            x_beta = 1000 * (data.x[:, turn] - tw_row['dx'][0] * data.delta[:, turn])
+            px_beta = 1000 * (data.px[:, turn] - tw_row['dpx'][0] * data.delta[:, turn])
             ax3[0].scatter(x_beta, px_beta, s=2, color=f'C{ind}', label=f'Turn {turn}', alpha=0.6)
             ax3[1].scatter(1000 * data.y[:, turn], 1000 * data.py[:, turn], s=2, color=f'C{ind}', alpha=0.6)
             ax3[2].scatter(1000 * data.zeta[:, turn], 1000 * data.delta[:, turn], s=2, color=f'C{ind}', alpha=0.6)
@@ -1020,14 +1192,15 @@ if mode == 'perfect':
         ref_particle = xp.Particles(p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV)
 
         seed_tw = seed_line.twiss6d()
+        tw_row = seed_tw.rows[marker_name]
 
         x_m, px_m, y_m, py_m, delta_m, zeta_m = match_coordinates(
             df_subset, p0c_ref, ref_particle,
-            seed_tw.dx[0], seed_tw.dpx[0], seed_tw.dy[0], seed_tw.dpy[0],
+            tw_row['dx'][0], tw_row['dpx'][0], tw_row['dy'][0], tw_row['dpy'][0],
             beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
             beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
-            ring_optics_x=(seed_tw.betx[0], seed_tw.alfx[0]),
-            ring_optics_y=(seed_tw.bety[0], seed_tw.alfy[0]))
+            ring_optics_x=(tw_row['betx'][0], tw_row['alfx'][0]),
+            ring_optics_y=(tw_row['bety'][0], tw_row['alfy'][0]))
 
         particles = xp.Particles(
             p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV,
@@ -1041,7 +1214,7 @@ if mode == 'perfect':
         survival_counts_seed = np.sum(data_seed.state > 0, axis=0)
 
         
-        t0 = seed_tw.rows[0]
+        t0 = seed_tw.rows[marker_name]
         seed_line.configure_radiation(model='mean')
         return survival_counts_seed, t0['betx'][0], t0['alfx'][0], t0['bety'][0], t0['alfy'][0]
 
