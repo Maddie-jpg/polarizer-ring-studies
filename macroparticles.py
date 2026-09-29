@@ -14,6 +14,7 @@ import xtrack as xt
 import xpart as xp
 import xobjects as xo
 from scipy.stats import gaussian_kde
+from scipy.optimize import curve_fit
 import my_functions as mf
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
@@ -313,6 +314,87 @@ def optics_match_transform(pos, ang, beta1, alpha1, beta2, alpha2):
     ang_matched = ((alpha1 - alpha2) / np.sqrt(beta1 * beta2)) * pos + np.sqrt(beta1 / beta2) * ang
     return pos_matched, ang_matched
 
+def getrms_gaussfit(xis, maxnmax=50, max_doublings=20):
+    """Robust average/variance via histogram + Gaussian fit, adapted from
+    the supervisor's getrms(). Doubles nbins until the tallest bin drops
+    below maxnmax counts, then fits a Gaussian to the histogram -- the fit
+    itself is what makes this robust to a handful of far-out particles,
+    since they barely move where a fitted peak sits, unlike a raw
+    np.var() which they can dominate."""
+    xis = np.asarray(xis, dtype=float)
+    minxi = xis.min() - 0.001 * (xis.max() - xis.min())
+    maxxi = xis.max() + 0.001 * (xis.max() - xis.min())
+    nbins = max(2 ** int(np.floor(np.log2(len(xis) / maxnmax))), 1)
+    nmax = 2 * maxnmax
+    n_doublings = 0
+    counts, edges = None, None
+    while nmax > maxnmax and n_doublings < max_doublings:
+        nbins *= 2
+        counts, edges = np.histogram(xis, nbins, range=[minxi, maxxi])
+        nmax = counts.max()
+        n_doublings += 1
+    centers = (edges[:-1] + edges[1:]) / 2
+
+    def gauss(x, amp, xav, xvar):
+        return amp * np.exp(-(x - xav) ** 2 / (2 * xvar))
+
+    p0 = [counts.max(), xis.mean(), xis.var()]
+    popt, _ = curve_fit(gauss, centers, counts, p0=p0)
+    return popt[1], popt[2]
+
+def moment_based_twiss(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0,
+                        iters=5, maxnmax=50):
+    """Iterative moment/projection-based Twiss reconstruction, ported from
+    the supervisor's analysedataProj(). At each iteration: normalize the
+    (dispersion-subtracted) coordinates using the current beta/alpha
+    guess, take three projections at 0/120/240 degrees in that normalized
+    frame, get each projection's variance via getrms_gaussfit(), and
+    reconstruct an updated beta/alpha/emittance from the three variances.
+    Returns (history, Dt, Dpt) where history is a list of
+    (iteration, eps, beta, alfa) tuples, one per iteration, so the
+    convergence itself can be plotted -- distinct from filter_by_action(),
+    which this is meant to be compared against, not replace."""
+    pos = df[position].values
+    ang = df[angle].values
+    delta = (df[p_col].values - p0_mev) / p0_mev
+
+    pos_av, ang_av, delta_av = pos.mean(), ang.mean(), delta.mean()
+    var_delta = np.var(delta)
+
+    Dt = np.cov(pos, delta, ddof=0)[0, 1] / var_delta
+    Dpt = np.cov(ang, delta, ddof=0)[0, 1] / var_delta
+
+    pos_beta = pos - Dt * (delta - delta_av)
+    ang_beta = ang - Dpt * (delta - delta_av)
+
+    xxbet = np.mean((pos - pos_av - Dt * (delta - delta_av)) ** 2)
+    xpxpbet = np.mean((ang - ang_av - Dpt * (delta - delta_av)) ** 2)
+    xxpbet = np.mean((pos - pos_av - Dt * (delta - delta_av)) * (ang - ang_av - Dpt * (delta - delta_av)))
+    eps_ref = np.sqrt(xxbet * xpxpbet - xxpbet ** 2)
+    beta_ref, alfa_ref = xxbet / eps_ref, -xxpbet / eps_ref
+
+    history = []
+    for it in range(iters):
+        xi = pos_beta / np.sqrt(beta_ref)
+        xip = np.sqrt(beta_ref) * ang_beta + alfa_ref * pos_beta / np.sqrt(beta_ref)
+        xi1 = (-xi + np.sqrt(3) * xip) / 2
+        xi2 = (xi + np.sqrt(3) * xip) / 2
+
+        _, xivar = getrms_gaussfit(xi, maxnmax)
+        _, xi1var = getrms_gaussfit(xi1, maxnmax)
+        _, xi2var = getrms_gaussfit(xi2, maxnmax)
+
+        betnoreps = xivar
+        alfnoreps = (xi1var - xi2var) / np.sqrt(3)
+        gamnoreps = (2 * (xi1var + xi2var) - xivar) / 3
+        eps = np.sqrt(betnoreps * gamnoreps - alfnoreps ** 2)
+        betn, alfn = betnoreps / eps, alfnoreps / eps
+        alfa_ref = betn * alfa_ref + alfn
+        beta_ref = betn * beta_ref
+
+        history.append((it + 1, eps, beta_ref, alfa_ref))
+    return history, Dt, Dpt
+
 def plot_twiss_ellipse(beta, alpha, beta2, alpha2, emittance,ax):
     gamma = (1 + alpha**2) / beta
     theta = np.linspace(0, 2*np.pi, 100)
@@ -495,6 +577,47 @@ fig.colorbar(sc3, ax=axes[1, 1], label='Relative Density')
 
 folder=mf.results_dir(design, config, phase, changes=changes, metric='InjectionEfficiency', sub='BeamSource')
 plt.savefig(f'{folder}/phase_space_plots.png')
+
+# %%
+moment_iters = 5
+history_x, Dt_x, Dpt_x = moment_based_twiss(df, 'x[mm]', 'xp[mrad]', iters=moment_iters)
+history_y, Dt_y, Dpt_y = moment_based_twiss(df, 'y[mm]', 'yp[mrad]', iters=moment_iters)
+
+print("\nMoment-based (Gaussian-fit) Twiss, horizontal:")
+for it, eps, beta, alfa in history_x:
+    print(f"  iter {it}: eps={eps:.4f} um, beta={beta:.4f} m, alfa={alfa:.4f}")
+print("Moment-based (Gaussian-fit) Twiss, vertical:")
+for it, eps, beta, alfa in history_y:
+    print(f"  iter {it}: eps={eps:.4f} um, beta={beta:.4f} m, alfa={alfa:.4f}")
+
+theta_cmp = np.linspace(0, 2 * np.pi, 200)
+fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+
+for ax_i, history, beta_action, alfa_action, eps_action, plane_label in [
+    (axes[0], history_x, bx, ax, emittance_x, 'Horizontal'),
+    (axes[1], history_y, by, ay, emittance_y, 'Vertical'),
+]:
+    colors_it = plt.cm.viridis(np.linspace(0, 1, len(history)))
+    for (it, eps, beta, alfa), c in zip(history, colors_it):
+        x_ell = np.sqrt(eps * beta) * np.cos(theta_cmp)
+        xp_ell = -np.sqrt(eps / beta) * (alfa * np.cos(theta_cmp) - np.sin(theta_cmp))
+        ax_i.plot(x_ell, xp_ell, color=c, label=f'Moment-based iter {it} (\u03b5={eps:.3f})')
+
+    x_action = np.sqrt(eps_action * beta_action) * np.cos(theta_cmp)
+    xp_action = -np.sqrt(eps_action / beta_action) * (alfa_action * np.cos(theta_cmp) - np.sin(theta_cmp))
+    ax_i.plot(x_action, xp_action, color='red', lw=2.5, linestyle='--',
+              label=f'Action-based, n_sigma=4 (\u03b5={eps_action:.3f})')
+
+    ax_i.set_title(f'{plane_label}: Moment-based vs Action-based Emittance')
+    ax_i.axhline(0, color='black', lw=0.5, ls='--')
+    ax_i.axvline(0, color='black', lw=0.5, ls='--')
+    ax_i.axis('equal')
+    ax_i.grid(True, linestyle=':', alpha=0.5)
+    ax_i.legend(fontsize='small')
+
+plt.tight_layout()
+plt.savefig(f'{folder}/moment_vs_action_emittance.png')
+plt.show()
 
 # %%
 from matplotlib.gridspec import GridSpec
@@ -1239,13 +1362,15 @@ if mode == 'perfect':
     fig_ell_cor, axs_ell_cor = plt.subplots(1, 2, figsize=(13, 6))
     fig_escan_mis, ax_escan_mis = plt.subplots(figsize=(10, 6))
     fig_escan_cor, ax_escan_cor = plt.subplots(figsize=(10, 6))
+    fig_tune_mis, ax_tune_mis = plt.subplots(figsize=(8, 8))
+    fig_tune_cor, ax_tune_cor = plt.subplots(figsize=(8, 8))
 
     colors = plt.cm.viridis(np.linspace(0, 1, len(seeds)))
     theta = np.linspace(0, 2 * np.pi, 200)
 
-    for apply_correction, ax_surv, axs_ell, ax_escan, tag in [
-        (False, ax_surv_mis, axs_ell_mis, ax_escan_mis, 'misaligned'),
-        (True, ax_surv_cor, axs_ell_cor, ax_escan_cor, 'corrected'),
+    for apply_correction, ax_surv, axs_ell, ax_escan, ax_tune, tag in [
+        (False, ax_surv_mis, axs_ell_mis, ax_escan_mis, ax_tune_mis, 'misaligned'),
+        (True, ax_surv_cor, axs_ell_cor, ax_escan_cor, ax_tune_cor, 'corrected'),
     ]:
         for seed, c in zip(seeds, colors):
             print(f"\n=== Seed {seed} ({tag}) ===")
@@ -1255,6 +1380,10 @@ if mode == 'perfect':
                 seed_line, seed_tw_escan, df_subset, p0c_avg_mev)
             ax_escan.plot(energy_range_seed, efficiency_seed, color=c,
                           label=f'Seed {seed}')
+
+            ax_tune.scatter(seed_tw_escan.qx, seed_tw_escan.qy, color=c,
+                             s=90, edgecolors='black', linewidths=0.8,
+                             label=f'Seed {seed} (Qx={seed_tw_escan.qx:.4f}, Qy={seed_tw_escan.qy:.4f})')
 
             survival_counts_seed, betx0_s, alfx0_s, bety0_s, alfy0_s = \
                 track_seed_line(seed_line, seed_energy_mev)
@@ -1292,6 +1421,12 @@ if mode == 'perfect':
         ax_escan.grid(True, alpha=0.3)
         ax_escan.legend(fontsize='small')
 
+        ax_tune.set_title(f'Tune Diagram -- {tag} seeds')
+        ax_tune.set_xlabel('Qx')
+        ax_tune.set_ylabel('Qy')
+        ax_tune.grid(True, linestyle=':', alpha=0.6)
+        ax_tune.legend(fontsize='small')
+
         for ax_e, plane_name in zip(axs_ell, ['Horizontal', 'Vertical']):
             ax_e.axhline(0, color='black', lw=0.5, ls='--')
             ax_e.axvline(0, color='black', lw=0.5, ls='--')
@@ -1308,6 +1443,10 @@ if mode == 'perfect':
     fig_escan_mis.savefig(f'{folder_seeds}/energy_scan_overlay_misaligned.png')
     fig_escan_cor.tight_layout()
     fig_escan_cor.savefig(f'{folder_seeds}/energy_scan_overlay_corrected.png')
+    fig_tune_mis.tight_layout()
+    fig_tune_mis.savefig(f'{folder_seeds}/tune_diagram_overlay_misaligned.png')
+    fig_tune_cor.tight_layout()
+    fig_tune_cor.savefig(f'{folder_seeds}/tune_diagram_overlay_corrected.png')
     fig_ell_mis.tight_layout()
     fig_ell_mis.savefig(f'{folder_seeds}/twiss_ellipse_overlay_misaligned.png')
     fig_ell_cor.tight_layout()
