@@ -512,7 +512,7 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 # %%
 
-df_clean = filter_by_action_xy(df, n_sigma=4)
+df_clean = filter_by_action_xy(df, n_sigma=3)
 print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
 
 emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
@@ -606,7 +606,7 @@ for ax_i, history, beta_action, alfa_action, eps_action, plane_label in [
     x_action = np.sqrt(eps_action * beta_action) * np.cos(theta_cmp)
     xp_action = -np.sqrt(eps_action / beta_action) * (alfa_action * np.cos(theta_cmp) - np.sin(theta_cmp))
     ax_i.plot(x_action, xp_action, color='red', lw=2.5, linestyle='--',
-              label=f'Action-based, n_sigma=4 (\u03b5={eps_action:.3f})')
+              label=f'Action-based, n_sigma=3 (\u03b5={eps_action:.3f})')
 
     ax_i.set_title(f'{plane_label}: Moment-based vs Action-based Emittance')
     ax_i.axhline(0, color='black', lw=0.5, ls='--')
@@ -913,7 +913,7 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy,
 
 # %%
 x_m_full, px_m_full, y_m_full, py_m_full, delta_full, zeta_full = match_coordinates(
-    df_raw, p0c_avg, ref_particle_avg,
+    df, p0c_avg, ref_particle_avg,
     dx0, ddx0, dy0, ddy0,
     beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
     beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
@@ -1278,6 +1278,7 @@ print("\nDone: tracked average, nominal, and optimal reference energies.")
 # %%
 if mode == 'perfect':
     import LatticeBuild.misalignments_corrections as mc
+    from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 
     seeds = [100, 200, 300, 400, 500]
     misalignment_val = 0.25e-3
@@ -1341,7 +1342,7 @@ if mode == 'perfect':
         seed_line.configure_radiation(model='mean')
         return survival_counts_seed, t0['betx'][0], t0['alfx'][0], t0['bety'][0], t0['alfy'][0]
 
-    misaligned_line = prep_seed_line(ring, seed=seeds[0], apply_correction=False)
+    '''misaligned_line = prep_seed_line(ring, seed=seeds[0], apply_correction=False)
     misaligned_tw = misaligned_line.twiss6d()
     run_energy_diagnostics(misaligned_line, misaligned_tw, 'misaligned_inmemory',
                             energies_to_track, df_subset, rand_num,
@@ -1351,7 +1352,7 @@ if mode == 'perfect':
     corrected_tw = corrected_line.twiss6d()
     run_energy_diagnostics(corrected_line, corrected_tw, 'corrected_inmemory',
                             energies_to_track, df_subset, rand_num,
-                            design, config, phase, changes)
+                            design, config, phase, changes)'''
 
     folder_seeds = mf.results_dir(design, config, phase, changes=changes,
                                    metric='InjectionEfficiency', sub='SeedStudy')
@@ -1420,6 +1421,18 @@ if mode == 'perfect':
         ax_escan.set_ylabel('Survival Efficiency [%]')
         ax_escan.grid(True, alpha=0.3)
         ax_escan.legend(fontsize='small')
+
+        qx_lim, qy_lim = ax_tune.get_xlim(), ax_tune.get_ylim()
+        qx_center, qy_center = np.mean(qx_lim), np.mean(qy_lim)
+        half_window = max(0.05, (qx_lim[1]-qx_lim[0])/2, (qy_lim[1]-qy_lim[0])/2)
+        qx_range = (qx_center - half_window, qx_center + half_window)
+        qy_range = (qy_center - half_window, qy_center + half_window)
+        # periodicity=3 assumes three_fold_periodicity_long (per LatticeBuild) --
+        # adjust if this ring uses a different lattice function
+        res_lines = resonance_lines(qx_range, qy_range, orders=[1, 2, 3, 4], periodicity=3)
+        res_lines.plot_resonance(figure_object=ax_tune.figure)
+        ax_tune.set_xlim(qx_range)
+        ax_tune.set_ylim(qy_range)
 
         ax_tune.set_title(f'Tune Diagram -- {tag} seeds')
         ax_tune.set_xlabel('Qx')
