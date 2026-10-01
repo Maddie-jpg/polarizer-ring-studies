@@ -29,6 +29,7 @@ def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
     return qx, qy
 
 
+
 def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
                betay_DS_target=None, MakePlot=False):
     import numpy as np
@@ -50,7 +51,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
         xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
         #xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
-        #xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
+        xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
         
     ]
     targets = [
@@ -62,7 +63,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
 
     BETA_MAX = 5.
     soft_beta = []
-    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
                 soft_beta += [
                     xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                     xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
@@ -122,7 +123,7 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
 
     BETA_MAX = 5.
     soft_beta = []
-    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
                     soft_beta += [
                         xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                         xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
@@ -223,80 +224,171 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
         insert_into_line(ln, f'extra[{i}]')
     return pdr
 
-def insert_DS_betay_quads_decoupled(pdr, ring, period, *extra_lines,
-                                     l_qy=None, frac=0.9):
-   
-    # Register independent knob, seeded from current kQDDoub value
-    pdr.vars({'kQDDoubDS': pdr['kQDDoub']})
+def _seed_arc_knobs(pdr, l_cell=None, l_quad=None, mu_cell=0.25):
+    """
+    Thin-lens FODO estimate for the arc quad strengths.
+ 
+        sin(mu/2) = L_half / (2 f)   ->   f = L_half / (2 sin(mu/2))
+        k1 = 1 / (f * l_quad)
+ 
+    Sets kQFarc/kQDarc and seeds the matching quads to the same magnitude.
+    Cheap, closed-form, and always lands inside the FODO stability region.
+    """
+    import numpy as np
+    l_cell = pdr['l_cell'] if l_cell is None else l_cell
+    l_quad = pdr['l_quad'] if l_quad is None else l_quad
+ 
+    mu     = 2*np.pi*mu_cell
+    L_half = l_cell/2.
+    f      = L_half/(2*np.sin(mu/2.))
+    k1     = 1./(f*l_quad)
+ 
+    pdr.vars({'kQFarc':  k1,       'kQDarc':  -k1,
+              'kQFarcM': k1*0.98,  'kQDarcM': -k1*0.94})
+    print(f'_seed_arc_knobs: mu_cell={mu_cell:.4f} -> f={f:.4f} m, '
+          f'kQFarc={k1:.4f}, kQDarc={-k1:.4f}')
+    return k1
+ 
+ 
+def _seed_triplet_knobs(pdr, cell_tr,
+                        kf_lo=0.5, kf_hi=10.0, nf=40,
+                        ratio_lo=1.2, ratio_hi=3.0, nr=25,
+                        betx_target=2.5, bety_target=2.5, verbose=True):
+    """
+    Find a stable (kQFtr, kQDtr) starting point for the triplet cell.
 
-    q_length = l_qy if l_qy is not None else 'l_quad'
+    cell_tr is  QF/2 - QD - drift(l_tripl) - QD - QF/2, so the integrated
+    strengths are  l_quad*kQFtr  focusing  against  2*l_quad*kQDtr
+    defocusing. The cell is only stable near  kQFtr ~ 2*|kQDtr| ; on the
+    antisymmetric line kQDtr = -kQFtr the net is always defocusing in x
+    and no stable point exists. So the scan runs over kQFtr and the ratio
+    r = kQFtr / |kQDtr| rather than over kQFtr alone.
 
-    def insert_into_line(line, line_label):
-        names = line.element_names
+    Picks the point whose beta at Mkr_cell_tr is closest to the targets.
+    Needed whenever l_tripl changes, since the old strengths then fall
+    outside the stability region ('Invalid n1' / 'Invalid n2').
+    """
+    import numpy as np
 
-        def drift_length(nm):
+    kf_save, kd_save = pdr['kQFtr'], pdr['kQDtr']
+
+    best, n_stable = None, 0
+    kf_stable, r_stable = [], []
+
+    for kf in np.linspace(kf_lo, kf_hi, nf):
+        for r in np.linspace(ratio_lo, ratio_hi, nr):
+            kd = -kf/r
+            pdr.vars['kQFtr'] = kf
+            pdr.vars['kQDtr'] = kd
             try:
-                el = line.element_dict[nm]
-                return el.length if el.__class__.__name__ == 'Drift' else None
+                tw = cell_tr.twiss(method='4d')
+                bx = tw['betx', 'Mkr_cell_tr']
+                by = tw['bety', 'Mkr_cell_tr']
+                if np.isnan(bx) or np.isnan(by):
+                    continue
+                n_stable += 1
+                kf_stable.append(kf); r_stable.append(r)
+                score = abs(bx - betx_target) + abs(by - bety_target)
+                if best is None or score < best[0]:
+                    best = (score, kf, kd, bx, by)
             except Exception:
-                return None
-
-        LONG = 1.0  # DrDSL is >1 m; anything shorter is a regular drift
-
-        plan, skipped = [], []
-        for qfds in sorted(n for n in names if n.startswith('QFDS_')):
-            sector  = qfds[len('QFDS_'):]
-            new_name = 'QDDoubDS_' + sector
-            if new_name in names:
-                continue
-            idx = names.index(qfds)
-            qfds_half = line.element_dict[qfds].length / 2.0
-
-            prev_nm  = names[idx - 1] if idx - 1 >= 0       else None
-            next_nm  = names[idx + 1] if idx + 1 < len(names) else None
-            prev_len = drift_length(prev_nm)
-            next_len = drift_length(next_nm)
-
-            cand = []
-            if next_len is not None and next_len > LONG:
-                cand.append(('+', next_len))
-            if prev_len is not None and prev_len > LONG:
-                cand.append(('-', prev_len))
-
-            if not cand:
-                skipped.append((qfds, prev_nm, prev_len, next_nm, next_len))
                 continue
 
-            sign, dlen = cand[0]
-            off = qfds_half + frac * dlen
-            plan.append((new_name, qfds, f'{sign}{off}', sign, round(off, 3)))
+    if best is None:
+        pdr.vars['kQFtr'], pdr.vars['kQDtr'] = kf_save, kd_save
+        raise RuntimeError(
+            f'_seed_triplet_knobs: no stable point found for '
+            f'l_tripl={pdr["l_tripl"]} over kQFtr in [{kf_lo}, {kf_hi}], '
+            f'ratio in [{ratio_lo}, {ratio_hi}]. Widen the scan.')
 
-        for new_name, qfds, at_expr, sign, off in plan:
-            line.insert(
-                # ---- only change from the original: k1='kQDDoubDS' ----
-                pdr.new(new_name, xt.Quadrupole,
-                        length=q_length, k1='kQDDoubDS'),
-                at=at_expr, from_=qfds, from_anchor='center')
+    _, kf, kd, bx, by = best
+    pdr.vars['kQFtr'], pdr.vars['kQDtr'] = kf, kd
 
-        print(f"insert_DS_betay_quads_decoupled [{line_label}]: "
-              f"inserted {len(plan)} quads (own knob kQDDoubDS)")
-        for new_name, qfds, at_expr, sign, off in plan:
-            print(f"   {new_name}: at {sign}{off} m from {qfds} centre")
-        if skipped:
-            print(f"   WARNING [{line_label}]: {len(skipped)} QFDS had no adjacent "
-                  f"long drift -- not inserted:")
-            for row in skipped:
-                print(f"     {row}")
+    if verbose:
+        print(f'_seed_triplet_knobs: {n_stable} stable points found')
+        print(f'  kQFtr range {min(kf_stable):.2f}..{max(kf_stable):.2f}, '
+              f'ratio range {min(r_stable):.2f}..{max(r_stable):.2f}')
+        print(f'  chose kQFtr={kf:.4f}, kQDtr={kd:.4f} '
+              f'(ratio {kf/abs(kd):.2f}) -> '
+              f'betx={bx:.3f} m, bety={by:.3f} m at Mkr_cell_tr')
+    return kf, kd
+ 
+ 
+def _seed_transition_knobs(pdr, scale=1.0):
+    """
+    Seed the DS / doublet knobs from the arc strength. These only need to be
+    in the right ballpark and sign; the matching does the rest. Seeding from
+    kQFarc keeps them consistent when l_cell or the phase advance changes.
+    """
+    k = pdr['kQFarc']
+    pdr.vars({'kQFDS':   k*0.95*scale, 'kQDDS':   -k*0.78*scale,
+              'kQFDoub': k*1.33*scale, 'kQDDoub': -k*0.85*scale})
+    print(f'_seed_transition_knobs: from kQFarc={k:.4f} -> '
+          f'kQFDS={pdr["kQFDS"]:.4f}, kQDDS={pdr["kQDDS"]:.4f}, '
+          f'kQFDoub={pdr["kQFDoub"]:.4f}, kQDDoub={pdr["kQDDoub"]:.4f}')
 
-    insert_into_line(ring,   'ring')
-    insert_into_line(period, 'period')
-    for i, ln in enumerate(extra_lines):
-        insert_into_line(ln, f'extra[{i}]')
+def _seed_triplet_knobs_FDF(pdr, cell_tr,
+                            kf_lo=0.3, kf_hi=6.0, nf=40,
+                            ratio_lo=1.2, ratio_hi=3.0, nr=25,
+                            betx_target=2.5, bety_target=2.5, verbose=True):
+    """
+    Seeding scan for the F-D-F triplet cell.
+ 
+    cell_tr is  QD/2 - QF - drift(l_tripl) - QF - QD/2, so the integrated
+    strengths are  2*l_quad*kQFtr  focusing  against  l_quad*|kQDtr|
+    defocusing. Stability requires roughly  |kQDtr| ~ 2*kQFtr, so the scan
+    runs over kQFtr and the ratio  r = |kQDtr| / kQFtr.
+ 
+    (This is the inverse of the D-F-D case, where the ratio was
+    kQFtr / |kQDtr|. Using the wrong one finds no stable points.)
+    """
+    import numpy as np
+ 
+    kf_save, kd_save = pdr['kQFtr'], pdr['kQDtr']
+ 
+    best, n_stable = None, 0
+    kf_stable, r_stable = [], []
+ 
+    for kf in np.linspace(kf_lo, kf_hi, nf):
+        for r in np.linspace(ratio_lo, ratio_hi, nr):
+            kd = -kf*r                      # |kQDtr| = r * kQFtr
+            pdr.vars['kQFtr'] = kf
+            pdr.vars['kQDtr'] = kd
+            try:
+                tw = cell_tr.twiss(method='4d')
+                bx = tw['betx', 'Mkr_cell_tr']
+                by = tw['bety', 'Mkr_cell_tr']
+                if np.isnan(bx) or np.isnan(by):
+                    continue
+                n_stable += 1
+                kf_stable.append(kf); r_stable.append(r)
+                score = abs(bx - betx_target) + abs(by - bety_target)
+                if best is None or score < best[0]:
+                    best = (score, kf, kd, bx, by)
+            except Exception:
+                continue
+ 
+    if best is None:
+        pdr.vars['kQFtr'], pdr.vars['kQDtr'] = kf_save, kd_save
+        raise RuntimeError(
+            f'_seed_triplet_knobs_FDF: no stable point for '
+            f'l_tripl={pdr["l_tripl"]} over kQFtr in [{kf_lo}, {kf_hi}], '
+            f'ratio |kQDtr|/kQFtr in [{ratio_lo}, {ratio_hi}]. Widen the scan.')
+ 
+    _, kf, kd, bx, by = best
+    pdr.vars['kQFtr'], pdr.vars['kQDtr'] = kf, kd
+ 
+    if verbose:
+        print(f'_seed_triplet_knobs_FDF: {n_stable} stable points')
+        print(f'  kQFtr range {min(kf_stable):.2f}..{max(kf_stable):.2f}, '
+              f'ratio range {min(r_stable):.2f}..{max(r_stable):.2f}')
+        print(f'  chose kQFtr={kf:.4f}, kQDtr={kd:.4f} '
+              f'(|kQDtr|/kQFtr = {abs(kd)/kf:.2f}) -> '
+              f'betx={bx:.3f} m, bety={by:.3f} m at Mkr_cell_tr')
+    return kf, kd
+ 
+ 
 
-    print(f"\nkQDDoubDS initialised to {pdr['kQDDoubDS']:.6f} "
-          f"(= kQDDoub at insertion time)")
-    print("Include 'kQDDoubDS' in a vary list to match bety independently.")
-    return pdr
 
 # ----------------
 # Shared Builders
@@ -344,18 +436,18 @@ def _make_base_elements(pdr, quad_edge, bend_edge):
             edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('QDtr',   xt.Quadrupole, length='l_quad',    k1='kQDtr',
             edge_entry_active=quad_edge, edge_exit_active=quad_edge)
-    pdr.new('QDtrH',  xt.Quadrupole, length='l_quad',    k1='kQDtr',
+    pdr.new('QDtrH',  xt.Quadrupole, length='l_quad/2',    k1='kQDtr',
             edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('Drarc',  xt.Drift, length='l_drift')
     pdr.new('DrarcS', xt.Drift, length='l_drift + dl_drift')
-    pdr.new('DrDSL',  xt.Drift, length='l_DSL')
+    pdr.new('DrDSL',  xt.Drift, length='2*l_drift + l_bend + dl_noben')
     pdr.new('DrTrans',xt.Drift, length='l_trans')
     pdr.new('DrDoub', xt.Drift, length='l_doub')
     pdr.new('DrTripl',xt.Drift, length='l_tripl')
     pdr.new('DrTrips',xt.Drift, length='l_trips')
 
 
-def _make_reference_cells(pdr):
+def _make_reference_cells(pdr, FDF=True):
     cell_arc = pdr.new_line(components=[
         pdr.new('QF_cell_arcH1',   'QFarcH'), pdr.place('Drarc'),
         pdr.new('Bend1_cell_arcH', 'Bend'),   pdr.place('Drarc'),
@@ -363,16 +455,30 @@ def _make_reference_cells(pdr):
         pdr.new('Bend2_cell_arcH', 'Bend'),   pdr.place('Drarc'),
         pdr.new('QF_cell_arcH2',   'QFarcH'),
     ])
-    cell_tr = pdr.new_line(components=[
-        pdr.new('QF_cell_trH1', 'QFtrH',
+    if FDF==False:
+        cell_tr = pdr.new_line(components=[
+            pdr.new('QF_cell_trH1', 'QFtrH',
+                    at='0*l_trips + 0.25*l_quad + 0.0*l_tripl'),
+            pdr.new('QD_cell_tr1',  'QDtr',
+                    at='1*l_trips + 1.00*l_quad + 0.0*l_tripl'),
+            pdr.new('Mkr_cell_tr',  xt.Marker,
+                    at='1*l_trips + 1.50*l_quad + 0.5*l_tripl'),
+            pdr.new('QD_cell_tr2',  'QDtr',
+                    at='1*l_trips + 2.00*l_quad + 1.0*l_tripl'),
+            pdr.new('QF_cell_trH2', 'QFtrH',
+                    at='2*l_trips + 2.75*l_quad + 1.0*l_tripl'),
+        ])
+    else:
+        cell_tr=pdr.new_line(components=[
+        pdr.new('QD_cell_trH1', 'QDtrH',
                 at='0*l_trips + 0.25*l_quad + 0.0*l_tripl'),
-        pdr.new('QD_cell_tr1',  'QDtr',
+        pdr.new('QF_cell_tr1',  'QFtr',
                 at='1*l_trips + 1.00*l_quad + 0.0*l_tripl'),
         pdr.new('Mkr_cell_tr',  xt.Marker,
                 at='1*l_trips + 1.50*l_quad + 0.5*l_tripl'),
-        pdr.new('QD_cell_tr2',  'QDtr',
+        pdr.new('QF_cell_tr2',  'QFtr',
                 at='1*l_trips + 2.00*l_quad + 1.0*l_tripl'),
-        pdr.new('QF_cell_trH2', 'QFtrH',
+        pdr.new('QD_cell_trH2', 'QDtrH',
                 at='2*l_trips + 2.75*l_quad + 1.0*l_tripl'),
     ])
     return cell_arc, cell_tr
@@ -433,11 +539,11 @@ def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
 
 def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                             arc1R, wp_constants, n_periods=6,
-                            betay_DS_target=7):
+                            betay_DS_target=None):
     kQFtr_saved = arc1R.vars['kQFtr']._value
     kQDtr_saved = arc1R.vars['kQDtr']._value
 
-    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods,betay_DS_target=betay_DS_target)
+    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
     
     # Check what we actually got
     tw_cell = cell_arc.twiss(method='4d')
@@ -462,9 +568,9 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
 
     matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
                  cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
-                 betay_DS_target=None)
-    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods,betay_DS_target=betay_DS_target)
-    
+                 betay_DS_target=betay_DS_target)
+    #matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
+
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
     """Register all lines in pdr.lines — same keys for all lattice functions."""
     pdr.lines['arc1R']    = arc1R
@@ -492,12 +598,13 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
         'l_sext':   0.20,
     })'''
     pdr.vars({
-            'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4, 
+            'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.4,
             'dl_noben': 0.95,   'l_quad':   0.30,
-            'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.', 
+            'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
             'dl_drift': -0.0,   'dl_trans': 0.20,
-            'l_doub':   0.07,   'l_tripl':  2.5,    'l_trips':  0.57,
-            'l_sext':   0.20, 'l_trans': 0.75, 'l_DSL':'2*l_drift + l_bend + dl_noben'
+            'l_doub':   0.25,   'l_tripl':  2.5,    'l_trips':  0.40,
+            'l_sext':   0.20,'l_trans':  'l_drift+dl_trans',
+                    'l_DSL':    '2*l_drift + l_bend + dl_noben',
         })
 
 
@@ -516,6 +623,115 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
     _make_base_elements(pdr, quad_edge, bend_edge)
     cell_arc, cell_tr = _make_reference_cells(pdr)
 
+    _seed_arc_knobs(pdr, mu_cell=phase_advance)
+    _seed_transition_knobs(pdr)
+    _seed_triplet_knobs_FDF(pdr, cell_tr)     # F-D-F ratio convention
+
+    def makesextant(name, fall):
+            comps = []
+            for ind in range(int(pdr['N_cells_S']) - 1):
+                comps += [pdr.place('Drarc'), pdr.new(f'Bend1_{name}{ind+1}', 'Bend'),
+                          pdr.place('Drarc'), pdr.new(f'QDA_{name}{ind+1}',   'QDarc'),
+                          pdr.place('Drarc'), pdr.new(f'Bend2_{name}{ind+1}', 'Bend'),
+                          pdr.place('Drarc'), pdr.new(f'QFA_{name}{ind+1}',   'QFarc')]
+            n = int(pdr['N_cells_S'])
+            comps[-1] = pdr.new(f'QFA_M{name}{n-1}', 'QFarcM')
+            comps += [pdr.place('Drarc'),  pdr.new(f'Bend1_{name}{n}', 'Bend'),
+                      pdr.place('Drarc'),  pdr.new(f'QDA_M{name}{n}',  'QDarcM'),
+                      pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend'),
+                      pdr.place('DrarcS'), pdr.new(f'QFDS_{name}',     'QFDS'),
+                      pdr.place('DrDSL'),  pdr.new(f'QDDS_{name}',     'QDDS'),
+                      pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
+                      # ---- F-D-F straight: D outside, F either side of drift ----
+                      pdr.place('DrTrans'),pdr.new(f'QDDoub_{name}',   'QDDoub'),
+                      pdr.place('DrDoub'), pdr.new(f'QFDoub_{name}',   'QFDoub'),
+                      pdr.place('DrTripl'),pdr.new(f'QFTrip_{name}1',  'QFtr')]
+            if fall == 'symm':
+                comps = [pdr.new(f'QFA_{name}CH', 'QFarcH')] + comps + \
+                        [pdr.place('DrTrips'),
+                         pdr.new(f'QDTripC_{name}2H', 'QDtrH')]
+            elif fall == 'right':
+                comps = [pdr.new(f'QFA_{name}C', 'QFarc')] + comps + \
+                        [pdr.place('DrTrips')]
+            elif fall == 'left':
+                comps += [pdr.place('DrTrips'),
+                          pdr.new(f'QDTripC_{name}2', 'QDtr')]
+                comps = list(reversed(comps))
+            else:
+                raise ValueError(f'Unknown fall value: {fall!r}')
+            return pdr.new_line(components=comps)
+
+    arc1R = makesextant('xR', 'symm')
+    arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
+                 at='(l_tripl+l_quad)/2', from_='QDDoub_xR')
+    arc1R_sliced = _sliced(arc1R)
+    period       = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
+    period_sliced = _sliced(period)
+    ring = (makesextant('1R', 'right') + makesextant('2L', 'left') +
+            makesextant('2R', 'right') + makesextant('3L', 'left') +
+            makesextant('3R', 'right') + makesextant('1L', 'left'))
+
+    # arc1R included so the extra DS quad is present where matching runs.
+    # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
+    # the existing doublet quad automatically.
+    insert_DS_betay_quads(pdr, ring, period, arc1R)
+
+    _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
+
+    if not matched:
+        return pdr
+
+    cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
+                                                    mu_cell=phase_advance)
+    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+                           arc1R, WP, betay_DS_target=betay_DS_target)
+    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc_opt, cell_tr_opt,
+                          period, U0, VRF, bend_edge)
+    return pdr
+
+
+def three_fold_periodicity_long(fringe_fields=True, matched=True,
+                                WP=constants.WP_D1, phase_advance=0.25,
+                                betay_DS_target=None):
+ 
+    pdr, quad_edge, bend_edge = _make_env(fringe_fields)
+    E0 = constants.E0; VRF = constants.VRF
+ 
+    pdr.vars({
+        'l_cell':   3.6,    'l_bend':   0.40,   'l_bendDS': 0.40,
+        'dl_noben': 0.85,   'l_quad':   0.30,
+        'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
+        'dl_drift': -0.0,   'dl_trans': 0.20,
+        'l_doub':   0.25,   'l_tripl':  7,
+        'l_trips':  0.40,   'l_sext':   0.20,
+        'l_trans':  'l_drift+dl_trans',
+        'l_DSL':    '2*l_drift + l_bend + dl_noben',
+    })
+ 
+    pdr.vars({
+        'N_cells_S': 12,
+        'hBarc': '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
+        # placeholders -- overwritten by the seeding helpers below
+        'kQFarc':  2.9478,  'kQDarc':  -2.9231,
+        'kQFarcM': 2.8846,  'kQDarcM': -2.7567,
+        'kQFDS':   2.8042,  'kQDDS':   -2.2858,
+        'kQFDoub': 3.9170,  'kQDDoub': -2.5190,
+        'kQFtr':   4.4429,  'kQDtr':   -2.4723,
+    })
+ 
+    U0 = (0.88463e-31)*E0**4*(2.*np.pi) / (
+        6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']))
+ 
+    _make_base_elements(pdr, quad_edge, bend_edge)
+ 
+    # cell_arc from the shared helper; cell_tr rebuilt as F-D-F
+    cell_arc, cell_tr = _make_reference_cells(pdr)
+ 
+    # ---- seed knobs before anything is Twissed ----
+    _seed_arc_knobs(pdr, mu_cell=phase_advance)
+    _seed_transition_knobs(pdr)
+    _seed_triplet_knobs_FDF(pdr, cell_tr)     # F-D-F ratio convention
+ 
     def makesextant(name, fall):
         comps = []
         for ind in range(int(pdr['N_cells_S']) - 1):
@@ -531,43 +747,47 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
                   pdr.place('DrarcS'), pdr.new(f'QFDS_{name}',     'QFDS'),
                   pdr.place('DrDSL'),  pdr.new(f'QDDS_{name}',     'QDDS'),
                   pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
-                  pdr.place('DrTrans'),pdr.new(f'QFDoub_{name}',   'QFDoub'),
-                  pdr.place('DrDoub'), pdr.new(f'QDDoub_{name}',   'QDDoub'),
-                  pdr.place('DrTripl'),pdr.new(f'QDTrip_{name}1',  'QDtr')]
+                  # ---- F-D-F straight: D outside, F either side of drift ----
+                  pdr.place('DrTrans'),pdr.new(f'QDDoub_{name}',   'QDDoub'),
+                  pdr.place('DrDoub'), pdr.new(f'QFDoub_{name}',   'QFDoub'),
+                  pdr.place('DrTripl'),pdr.new(f'QFTrip_{name}1',  'QFtr')]
         if fall == 'symm':
             comps = [pdr.new(f'QFA_{name}CH', 'QFarcH')] + comps + \
-                    [pdr.place('DrTrips'), pdr.new(f'QFTripC_{name}2H', 'QFtrH')]
+                    [pdr.place('DrTrips'),
+                     pdr.new(f'QDTripC_{name}2H', 'QDtrH')]
         elif fall == 'right':
             comps = [pdr.new(f'QFA_{name}C', 'QFarc')] + comps + \
                     [pdr.place('DrTrips')]
         elif fall == 'left':
-            comps += [pdr.place('DrTrips'), pdr.new(f'QFTripC_{name}2', 'QFtr')]
+            comps += [pdr.place('DrTrips'),
+                      pdr.new(f'QDTripC_{name}2', 'QDtr')]
             comps = list(reversed(comps))
         else:
             raise ValueError(f'Unknown fall value: {fall!r}')
         return pdr.new_line(components=comps)
-
+ 
     arc1R = makesextant('xR', 'symm')
+    # marker at the centre of the long drift -- now measured from QFDoub,
+    # which is the quad adjacent to it in the F-D-F arrangement
     arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
-                 at='(l_tripl+l_quad)/2', from_='QDDoub_xR')
-    arc1R_sliced = _sliced(arc1R)
-    period       = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
+                 at='(l_tripl+l_quad)/2', from_='QFDoub_xR')
+    arc1R_sliced  = _sliced(arc1R)
+    period        = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
     period_sliced = _sliced(period)
     ring = (makesextant('1R', 'right') + makesextant('2L', 'left') +
             makesextant('2R', 'right') + makesextant('3L', 'left') +
             makesextant('3R', 'right') + makesextant('1L', 'left'))
-
-    # arc1R included so the extra DS quad is present where matching runs.
-    # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
-    # the existing doublet quad automatically.
-    #insert_DS_betay_quads_decoupled(pdr, ring, period, arc1R)
+ 
     insert_DS_betay_quads(pdr, ring, period, arc1R)
-
+ 
+    print(f'\nthree_fold_periodicity_long (F-D-F): C = {ring.get_length():.3f} m '
+          f'(N_cells_S={int(pdr["N_cells_S"])}, l_tripl={pdr["l_tripl"]} m)')
+ 
     _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
-
+ 
     if not matched:
         return pdr
-
+ 
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
     _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
@@ -575,6 +795,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc_opt, cell_tr_opt,
                           period, U0, VRF, bend_edge)
     return pdr
+
+
 
 
 
@@ -598,7 +820,7 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True, WP
                 'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
                 'dl_drift': -0.0,   'dl_trans': 0.20,
                 'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
-                'l_sext':   0.20, 'l_DSL':'2*l_drift + l_bend + dl_noben'
+                'l_sext':   0.20,
             })
     pdr.vars({
         'N_cells_S': 8,
@@ -1302,107 +1524,4 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
 
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R_2')
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
-    return pdr
-
-#------------------------
-# DESIGN 4 - Longer ring
-#------------------------
-
-
-def three_fold_periodicity_long(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None):
-    
-    pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = constants.E0; VRF = constants.VRF
-
-    '''pdr.vars({
-        'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.55,
-        'dl_noben': 0.25,   'l_quad':   0.30,
-        'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
-        'dl_drift': -0.1,   'dl_trans': 0.00,
-        'l_doub':   0.25,   'l_tripl':  2.7,    'l_trips':  0.40,
-        'l_sext':   0.20,
-    })'''
-    pdr.vars({
-    'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.40,
-    'dl_noben': 0.85,   'l_quad':   0.30,
-    'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
-    'dl_drift': -0.0,   'dl_trans': 0.20,
-    'l_doub':   0.25,   'l_tripl':  9.9,   
-    'l_trips':  0.40,   'l_sext':   0.20,'l_trans': 'l_drift+dl_trans', 'l_DSL':'2*l_drift + l_bend + dl_noben'
-    })
-
-
-
-    pdr.vars({
-        'N_cells_S': 12,
-        'hBarc': '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
-        'kQFarc':  2.9478,  'kQDarc':  -2.9231,
-        'kQFarcM': 2.8846,  'kQDarcM': -2.7567,
-        'kQFDS':   2.8042,  'kQDDS':   -2.2858,
-        'kQFDoub': 3.9170,  'kQDDoub': -2.5190,
-        'kQFtr':   4.4429,  'kQDtr':   -2.4723,
-    })
-    U0 = (0.88463e-31)*E0**4*(2.*np.pi) / (
-        6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']))
-
-    _make_base_elements(pdr, quad_edge, bend_edge)
-    cell_arc, cell_tr = _make_reference_cells(pdr)
-
-    def makesextant(name, fall):
-        comps = []
-        for ind in range(int(pdr['N_cells_S']) - 1):
-            comps += [pdr.place('Drarc'), pdr.new(f'Bend1_{name}{ind+1}', 'Bend'),
-                      pdr.place('Drarc'), pdr.new(f'QDA_{name}{ind+1}',   'QDarc'),
-                      pdr.place('Drarc'), pdr.new(f'Bend2_{name}{ind+1}', 'Bend'),
-                      pdr.place('Drarc'), pdr.new(f'QFA_{name}{ind+1}',   'QFarc')]
-        n = int(pdr['N_cells_S'])
-        comps[-1] = pdr.new(f'QFA_M{name}{n-1}', 'QFarcM')
-        comps += [pdr.place('Drarc'),  pdr.new(f'Bend1_{name}{n}', 'Bend'),
-                  pdr.place('Drarc'),  pdr.new(f'QDA_M{name}{n}',  'QDarcM'),
-                  pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend'),
-                  pdr.place('DrarcS'), pdr.new(f'QFDS_{name}',     'QFDS'),
-                  pdr.place('DrDSL'),  pdr.new(f'QDDS_{name}',     'QDDS'),
-                  pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
-                  pdr.place('DrTrans'),pdr.new(f'QFDoub_{name}',   'QFDoub'),
-                  pdr.place('DrDoub'), pdr.new(f'QDDoub_{name}',   'QDDoub'),
-                  pdr.place('DrTripl'),pdr.new(f'QDTrip_{name}1',  'QDtr')]
-        if fall == 'symm':
-            comps = [pdr.new(f'QFA_{name}CH', 'QFarcH')] + comps + \
-                    [pdr.place('DrTrips'), pdr.new(f'QFTripC_{name}2H', 'QFtrH')]
-        elif fall == 'right':
-            comps = [pdr.new(f'QFA_{name}C', 'QFarc')] + comps + \
-                    [pdr.place('DrTrips')]
-        elif fall == 'left':
-            comps += [pdr.place('DrTrips'), pdr.new(f'QFTripC_{name}2', 'QFtr')]
-            comps = list(reversed(comps))
-        else:
-            raise ValueError(f'Unknown fall value: {fall!r}')
-        return pdr.new_line(components=comps)
-
-    arc1R = makesextant('xR', 'symm')
-    arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
-                 at='(l_tripl+l_quad)/2', from_='QDDoub_xR')
-    arc1R_sliced = _sliced(arc1R)
-    period       = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
-    period_sliced = _sliced(period)
-    ring = (makesextant('1R', 'right') + makesextant('2L', 'left') +
-            makesextant('2R', 'right') + makesextant('3L', 'left') +
-            makesextant('3R', 'right') + makesextant('1L', 'left'))
-
-    # arc1R included so the extra DS quad is present where matching runs.
-    # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
-    # the existing doublet quad automatically.
-    insert_DS_betay_quads(pdr, ring, period, arc1R)
-
-    _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
-
-    if not matched:
-        return pdr
-
-    cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
-                                                    mu_cell=phase_advance)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, WP, betay_DS_target=betay_DS_target)
-    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc_opt, cell_tr_opt,
-                          period, U0, VRF, bend_edge)
     return pdr

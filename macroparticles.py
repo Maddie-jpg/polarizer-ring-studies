@@ -28,7 +28,7 @@ changes=os.environ.get('CHANGES',None)
 ENERGY_COMPRESSOR_ON = os.environ.get('ENERGY_COMPRESSOR', 'false').strip().lower() not in ('0', 'false', 'off', 'no')
 
 # %%
-df = pd.read_csv('PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat', sep=r'\s+')
+df = pd.read_csv('/home/mwatson/Documents/laughing-octo-bassoon/PositronBeam_2p86GeV/Beam_3GHzOption_2.86GeV_20260421.dat', sep=r'\s+')
 print(list(df.columns))
 
 # %%
@@ -144,7 +144,7 @@ def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
     df_res = df_res.sort_values(by=['Efficiency_%', 'RMS_Spread_%'], ascending=[False, True])
     return df_res
 
-df_raw=filter_beam_core(df, n_sigma=4)
+df_raw=filter_beam_core(df, n_sigma=8)
 
 # %%
 '''
@@ -512,7 +512,7 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 # %%
 
-df_clean = filter_by_action_xy(df, n_sigma=3)
+df_clean = filter_by_action_xy(df, n_sigma=8)
 print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
 
 emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
@@ -606,7 +606,7 @@ for ax_i, history, beta_action, alfa_action, eps_action, plane_label in [
     x_action = np.sqrt(eps_action * beta_action) * np.cos(theta_cmp)
     xp_action = -np.sqrt(eps_action / beta_action) * (alfa_action * np.cos(theta_cmp) - np.sin(theta_cmp))
     ax_i.plot(x_action, xp_action, color='red', lw=2.5, linestyle='--',
-              label=f'Action-based, n_sigma=3 (\u03b5={eps_action:.3f})')
+              label=f'Action-based, n_sigma=8 (\u03b5={eps_action:.3f})')
 
     ax_i.set_title(f'{plane_label}: Moment-based vs Action-based Emittance')
     ax_i.axhline(0, color='black', lw=0.5, ls='--')

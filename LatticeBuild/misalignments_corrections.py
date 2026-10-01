@@ -604,9 +604,12 @@ def misalignments(line, sigma, seed=None, cut=2.5):
         ref.rot_x_rad = sigma * truncnorm(cut, rng)
         ref.rot_y_rad = sigma * truncnorm(cut, rng)
 
-        relative_error = 1 + truncnorm(cut, rng) * 1e-3
-        ref.knl *= relative_error
-        ref.ksl *= relative_error
+        eps = truncnorm(cut, rng) * 1e-3
+        if name in quads:   ref.k1 = ref.k1 * (1 + eps)
+        elif name in sexts: ref.k2 = ref.k2 * (1 + eps)
+        elif name in bends:
+            line[name].k0_from_h = False      # keep geometry (h), perturb the field
+            ref.k0 = ref.h * (1 + eps)
 
     return line
 
