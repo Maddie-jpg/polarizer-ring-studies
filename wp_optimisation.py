@@ -1,12 +1,47 @@
 #%%
-#---------------------
-# phase advance scan
-#---------------------
+#---------------------------------------------------------------------------
+# Setup -- load the lattice once, used by all three sections below
+#---------------------------------------------------------------------------
 
 import numpy as np
 import matplotlib.pyplot as plt
 import xtrack as xt
+import xobjects as xo
+from math import factorial
 
+# Adjust this import path to wherever linear_optics.py actually lives
+# relative to this script (e.g. 'LatticeBuild.linear_optics' if it's in a
+# LatticeBuild package, matching the sys.path setup at the top of
+# linear_optics.py itself).
+from LatticeBuild.linear_optics import matchingWP, matchingBeta, _match_cells_3fold
+import xutil_DA_CC.xsuite_utilities as xutil
+
+pdr = xt.Environment.from_json('/home/mwatson/Documents/laughing-octo-bassoon/JSON_Files/D1/C9/pdr_perfect_90.json')
+ring = pdr.lines['ring']
+cell_arc = pdr.lines['cell_arc']
+arc1R = pdr.lines['arc1R']
+cell_tr = pdr.lines['cell_tr']
+ref_twiss = ring.twiss6d()
+line_table = ring.get_table()
+
+gamma0 = ring.particle_ref.gamma0[0]
+beta0 = ring.particle_ref.beta0[0]
+n_emittancex = 1.354177116369456e-6 * gamma0 * beta0
+n_emittancey = 1.420755089827341e-6 * gamma0 * beta0
+
+
+def two_integer_range(q):
+    """Returns (lo, hi) spanning a full 2-integer window around q, e.g.
+    q=15.46 -> (14, 16). The RDT scan and the DA tune scan both use this
+    same helper so their windows always stay consistent with each other."""
+    base = np.floor(q)
+    return base - 1, base + 1
+
+
+#%%
+#---------------------
+# phase advance scan
+#---------------------
 
 def _twiss_4d_radiation_safe(line, **twiss_kwargs):
     """
@@ -52,7 +87,7 @@ def scan_mux_muy_emittance(cell_arc, mux_range, muy_range, n_mux=15, n_muy=15,
         knob so a bad grid point's Newton step can't run away into an
         unstable cell. Defaults to +-3x each knob's starting value.
 
-    Returns dict with 'mux_grid', 'muy_grid' (1D arrays) and three 2D
+    Returns dict with 'mux_grid', 'muy_grid' (1D arrays) and four 2D
     arrays -- 'emit_x', 'alpha_c', 'dqx', 'dqy' -- NaN wherever the match
     failed to converge or the cell went unstable at that grid point.
     """
@@ -122,14 +157,10 @@ def scan_mux_muy_emittance(cell_arc, mux_range, muy_range, n_mux=15, n_muy=15,
     finally:
         # Restore the vary knobs to their ORIGINAL starting values, not
         # just whatever the very last grid point happened to leave them
-        # at. The loop resets to k0 at the start of every ROW, but never
-        # after the last row's last point -- and if these knobs are
-        # global (shared with `ring` via the same pdr environment, not
-        # local to cell_arc), that leaves the ACTUAL RING's magnet
-        # strengths corrupted for the rest of the script, not just
-        # cell_arc. This is what was silently breaking every twiss()
-        # call on `ring` after this scan ran, even with no copy/match
-        # involved -- confirmed via debug_tune_match's isolation tests.
+        # at. These knobs are shared with `ring` via the same pdr
+        # environment, not local to cell_arc, so leaving them at a bad
+        # value corrupts every twiss()/match() on the real ring for the
+        # rest of the script, not just cell_arc.
         for kn, v in k0.items():
             cell_arc.vars[kn] = v
         if had_radiation:
@@ -243,13 +274,55 @@ def plot_mux_muy_4panel(scan_result, cmap='viridis', log_emittance=False,
     return fig, axes
 
 
+def plot_mux_muy_combined_chroma(scan_result, ax=None, cmap='viridis',
+                                 show_best=True, objective='min'):
+    """
+    Plot mu_x vs mu_y with the heatmap being sqrt(dqx + dqy), computed
+    from an existing scan_mux_muy_emittance() result (no re-scan needed).
 
+    NOTE: dqx and dqy are typically both negative for uncorrected natural
+    chromaticity, so dqx+dqy is usually negative -- sqrt() of that is NaN
+    (numpy returns NaN rather than raising), so most of this plot may come
+    back blank unless some region of your scanned (mu_x, mu_y) actually
+    has dqx+dqy >= 0. That's expected given the formula as specified, not
+    a bug. If you want a real-valued combined-chromaticity magnitude
+    everywhere instead, use sqrt(dqx**2 + dqy**2) (quadrature sum).
+    """
+    mux_grid = scan_result['mux_grid']
+    muy_grid = scan_result['muy_grid']
+    dqx = scan_result['dqx']
+    dqy = scan_result['dqy']
 
-pdr = xt.Environment.from_json('/home/mwatson/Documents/laughing-octo-bassoon/JSON_Files/D1/C9/pdr_perfect_90.json')
-ring = pdr.lines['ring']
-cell_arc = pdr.lines['cell_arc']
-ref_twiss = ring.twiss6d()
-line_table = ring.get_table()
+    with np.errstate(invalid='ignore'):
+        combined = np.sqrt(dqx + dqy)
+
+    n_valid = np.sum(~np.isnan(combined))
+    print(f"sqrt(dqx+dqy): {n_valid}/{combined.size} grid points have "
+         f"dqx+dqy >= 0 (real-valued); the rest are NaN.")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 7))
+    else:
+        fig = ax.figure
+
+    im = ax.pcolormesh(mux_grid, muy_grid, combined, shading='auto', cmap=cmap)
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label(r'$\sqrt{\delta_{q_x}+\delta_{q_y}}$')
+
+    ax.set_xlim(mux_grid.min(), mux_grid.max())
+    ax.set_ylim(muy_grid.min(), muy_grid.max())
+
+    if show_best:
+        best = _find_best_point(combined, mux_grid, muy_grid, objective=objective)
+        _annotate_best_point(ax, best, label=f'{objective} '+r'$\sqrt{\delta_{q_x}+\delta_{q_y}}$',
+                             value_fmt='{:.4f}')
+
+    ax.set_xlabel(r'Cell $\mu_x$ (fraction of $2\pi$)')
+    ax.set_ylabel(r'Cell $\mu_y$ (fraction of $2\pi$)')
+    ax.set_title(r'$\sqrt{\delta_{q_x}+\delta_{q_y}}$ vs cell phase advance')
+
+    return fig, ax
+
 
 scan = scan_mux_muy_emittance(
     cell_arc, mux_range=(0.30, 0.45), muy_range=(0.15, 0.35),
@@ -258,10 +331,13 @@ scan = scan_mux_muy_emittance(
 fig, axes = plot_mux_muy_4panel(scan)
 fig.savefig('wp_plots.png')
 
+fig2, ax2 = plot_mux_muy_combined_chroma(scan)
+fig2.savefig('combined_chroma_plot.png')
+
 # Guard: kQFarc/kQDarc are shared globally between cell_arc and ring (both
 # come from `pdr`), so if the scan above ever again leaves them at a bad
 # grid point instead of restoring k0, this catches it here with a clear
-# message instead of a confusing "Invalid n1" much later in the script.
+# message instead of a confusing error much later in the script.
 try:
     _sanity_tw = ring.twiss6d()
     print(f"[sanity check] ring.twiss6d() OK after scan_mux_muy_emittance "
@@ -274,15 +350,11 @@ except Exception as e:
         "restoration before trusting anything downstream in this script."
     ) from e
 
+
 #%%
 #-----------
 # RDTs scan
 #-----------
-
-import numpy as np
-from math import factorial
-import matplotlib.pyplot as plt
-
 
 def _parse_rdt_key(rdt):
     pqrt = rdt[1:]
@@ -350,13 +422,13 @@ def _get_multipole_strength(elem_obj, order):
     sextupole, 3 for octupole, ...). 'method' says which convention
     actually matched, for diagnostics -- (0.0, 0.0, None) if neither did.
 
-    Tries the scalar convention FIRST: confirmed via debug_rdt_element()
-    that dedicated element classes here (Sextupole etc.) carry BOTH a
-    real .k2/.length AND a stale, always-zero .knl array simultaneously
-    -- checking .knl first (as this used to) silently "succeeds" with 0.0
-    and never reaches the real value. The scalar attribute, when present,
-    is authoritative for these dedicated classes; .knl is the fallback
-    for generic Multipole-class elements that only have that array.
+    Tries the scalar convention FIRST: dedicated element classes here
+    (Sextupole etc.) carry BOTH a real .k2/.length AND a stale,
+    always-zero .knl array simultaneously -- checking .knl first silently
+    "succeeds" with 0.0 and never reaches the real value. The scalar
+    attribute, when present, is authoritative for these dedicated
+    classes; .knl is the fallback for generic Multipole-class elements
+    that only have that array.
     """
     k_scalar = getattr(elem_obj, f'k{order}', None)
     length = getattr(elem_obj, 'length', None)
@@ -381,14 +453,6 @@ def precompute_rdt_elements(rdt, ref_twiss, line, line_table, observation_point,
     to the observation point -- everything the RDT sum needs EXCEPT the
     actual (Qx, Qy) choice. Returns a dict of numpy arrays ready for a fast
     scan over many candidate working points via evaluate_rdt_at().
-
-    Strength is read via _get_multipole_strength(), which tries both the
-    generic Multipole knl-array convention and the dedicated-element
-    scalar-gradient-times-length convention -- table column naming for
-    strengths varies across xtrack versions/element types, so going
-    straight to the element and trying both is more robust than betting on
-    one specific attribute name. line_table is still used for element_type
-    (Marker/Drift filtering).
     """
     tt = line_table
     p, q, r, t = _parse_rdt_key(rdt)
@@ -424,12 +488,6 @@ def precompute_rdt_elements(rdt, ref_twiss, line, line_table, observation_point,
             is_expected_type = (expected_type is not None
                                  and tt.rows[elem].element_type[0] == expected_type)
             if method is None and is_expected_type and not diagnostic_dumped:
-                # Only worth dumping diagnostics for an element that's
-                # actually SUPPOSED to carry this order's strength (a
-                # Quadrupole legitimately has no k2 -- that's normal, not
-                # a problem). If a genuine Sextupole/Octupole/etc still
-                # matches neither convention, something's really off --
-                # print exactly what IS on it instead of guessing again.
                 diagnostic_dumped = True
                 print(f"[precompute_rdt_elements] DIAGNOSTIC for element '{elem}' "
                       f"(type {type(elem_obj).__name__}, element_type='{expected_type}'), "
@@ -450,18 +508,10 @@ def precompute_rdt_elements(rdt, ref_twiss, line, line_table, observation_point,
             wrap_x_list.append(wrap_x)
             wrap_y_list.append(wrap_y)
         except (IndexError, ValueError, TypeError, KeyError):
-            # KeyError specifically covers synthetic table-only rows like
-            # '_end_point' that get_table() reports but that aren't real,
-            # indexable elements in the Line object -- skip them like any
-            # other non-physical entry rather than crashing the scan.
             continue
 
     h_arr = np.array(h_list, dtype=complex)
     if h_arr.size == 0:
-        # No guessing this time -- show exactly what element_type strings
-        # (and how many of each) actually exist in source_elements, so the
-        # real name for your sextupoles (whatever it's called) is visible
-        # instead of assuming it's literally 'Sextupole'.
         type_counts = {}
         for elem in source_elements:
             try:
@@ -551,15 +601,12 @@ def _overlay_resonance_lines(ax, qx_range, qy_range, max_order=4):
 
 def plot_rdt_lines_combined(QX, QY, maps, qx_range, qy_range,
                              current_qx=None, current_qy=None, cmap='inferno'):
-    """Single combined diagram for all scanned RDTs, replacing the old
-    one-subplot-per-RDT layout:
+    """Single combined diagram for all scanned RDTs:
       - background: log10 of the STRONGEST RDT at each grid point (max
-        across whichever RDTs were scanned), so you still see where any
-        of them gets dangerous
+        across whichever RDTs were scanned)
       - foreground: each RDT's own specific resonance line(s)
         (p-q)*Qx + (r-t)*Qy = integer, drawn in its own color with one
-        legend entry -- so you can tell exactly which term is responsible
-        for a given stopband, all on one (Qx, Qy) plot.
+        legend entry
     """
     fig, ax = plt.subplots(figsize=(9, 8))
 
@@ -575,11 +622,6 @@ def plot_rdt_lines_combined(QX, QY, maps, qx_range, qy_range,
     for rdt, color in zip(maps.keys(), colors):
         p, q, r, t = _parse_rdt_key(rdt)
         a, b = p - q, r - t
-        # Sweep exactly the range of integer c that can actually cross
-        # this window -- computed from the rectangle's corners, so it
-        # works regardless of how large |a| or |b| happens to be (a fixed
-        # guess would either miss lines for large a/b or waste time for
-        # small ones).
         corner_vals = [a * cx + b * cy for cx in qx_range for cy in qy_range]
         c_lo, c_hi = int(np.floor(min(corner_vals))), int(np.ceil(max(corner_vals)))
 
@@ -623,13 +665,6 @@ def find_best_working_point(QX, QY, maps, weight=None):
     idx = np.unravel_index(np.argmin(combined), combined.shape)
     return QX[idx], QY[idx], combined
 
-def two_integer_range(q):
-    """Returns (lo, hi) spanning a full 2-integer window around q, e.g.
-    q=15.46 -> (14, 16). Both the RDT scan and the DA tune scan use this
-    same helper so their windows always stay consistent with each other."""
-    base = np.floor(q)
-    return base - 1, base + 1
-
 
 tt = ring.get_table()
 
@@ -638,67 +673,36 @@ current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
 qx_range = two_integer_range(current_qx)
 qy_range = two_integer_range(current_qy)
 
-# n_points bumped up from 120: the window just grew from +-0.15 (0.3 wide)
-# to a full 2 integers wide -- roughly 7x wider per axis, ~44x more area.
-# RDT evaluation is cheap (vectorized per grid point, no tracking), so
-# more points here costs seconds, not the hours a DA scan would.
 QX, QY, maps = scan_working_point(
-rdts_of_interest, ref_twiss, ring, line_table,
+    rdts_of_interest, ref_twiss, ring, line_table,
     observation_point=tt.name[0], source_elements=line_table.name,
     qx_range=qx_range, qy_range=qy_range,
     n_points=400,
-    )
-    
+)
+
 plot_rdt_lines_combined(QX, QY, maps, qx_range, qy_range,
                         current_qx=current_qx, current_qy=current_qy)
 plt.show()
-    
+
 best_qx, best_qy, combined_score = find_best_working_point(QX, QY, maps)
 print(f"Best working point in scanned window: Qx={best_qx:.4f}, Qy={best_qy:.4f}")
 
+
 #%%
-#----------------------------------
-# Tune performance scan (min DA/MA)
-#----------------------------------
-
+#----------------------------------------------
+# Tune performance scan (min DA) -- REALISTIC
+#----------------------------------------------
 """
-tune_scan.py
+For each candidate (Qx, Qy), re-matches the ring using the SAME
+production matching process as linear_optics.py's _run_standard_matching
+(matchingWP then matchingBeta on arc1R), instead of a generic placeholder
+match on ring directly. Then runs a reduced-resolution DA study there.
 
-Performance tune scan: for each candidate (Qx, Qy) in a grid, actually
-re-matches the ring's quadrupoles to hit that tune, then runs a
-reduced-resolution DA study there and records the resulting minimum
-dynamic aperture. This is the "real" counterpart to an RDT-based working
-point scan -- it accounts for how the optics (beta functions, and
-therefore the actual dynamic aperture) change as you move the tune,
-instead of approximating with the reference lattice's optics held fixed.
-
-
-Safety: line.match() mutates the line's knobs in place. This module always
-scans on a line.copy() so your actual ring is never left at some
-arbitrary grid point's tune when the scan finishes.
-
-You will need to adjust for your lattice:
-- tune_knobs: which quadrupole families actually control GLOBAL tune in
-  your ring. This example project uses arc quad families like
-  ['kQFarcM', 'kQDarcM'] for tune matching elsewhere (see
-  LatticeBuild/linear_optics.py) -- confirm that's the right pair (or
-  combination) for YOUR global tune knob before trusting scan results.
-- start_element: wherever your DA study's particle grid should start from
-  (matches study_params_DA['start_element'] convention already used in
-  analysis.py).
+Imports matchingWP / matchingBeta / _match_cells_3fold directly from
+linear_optics.py (see the import at the top of this file) rather than
+re-implementing them, so this always matches whatever the actual build
+pipeline currently does.
 """
-
-import numpy as np
-import matplotlib.pyplot as plt
-import xtrack as xt
-import xobjects as xo
-import xutil_DA_CC.xsuite_utilities as xutil
-
-gamma0 = ring.particle_ref.gamma0[0]
-beta0 = ring.particle_ref.beta0[0]
-
-n_emittancex = 1.354177116369456e-6 * gamma0 * beta0
-n_emittancey = 1.420755089827341e-6 * gamma0 * beta0
 
 
 def get_DA_boundary(particles, num_r_steps, num_theta_steps, x_norm, y_norm):
@@ -709,11 +713,11 @@ def get_DA_boundary(particles, num_r_steps, num_theta_steps, x_norm, y_norm):
     else:
         max_turns = np.max(particles.filter(particles.at_element == 0).at_turn)
         part_at_turn = particles.at_turn
- 
+
     x_2d = x_norm.reshape(num_r_steps, num_theta_steps)
     y_2d = y_norm.reshape(num_r_steps, num_theta_steps)
     p_2d = part_at_turn.reshape(num_r_steps, num_theta_steps)
- 
+
     x_DA = np.full(num_theta_steps, np.nan)
     y_DA = np.full(num_theta_steps, np.nan)
     for jj in range(num_theta_steps):
@@ -721,212 +725,199 @@ def get_DA_boundary(particles, num_r_steps, num_theta_steps, x_norm, y_norm):
             if p_2d[ii, jj] != max_turns:
                 x_DA[jj], y_DA[jj] = x_2d[ii, jj], y_2d[ii, jj]
                 break
- 
+
     min_DA = np.nanmin(np.round(np.sqrt(x_DA ** 2 + y_DA ** 2), 1))
     return x_DA, y_DA, min_DA
- 
- 
-def match_tune(line, qx_target, qy_target, tune_knobs, tol=1e-6):
-    """Re-matches line's tunes to (qx_target, qy_target). Returns True if
-    the match converged, False (with a printed reason) otherwise -- a
-    failed match at some grid points is normal near resonances/edges of
-    the achievable tune space, not something that should crash the scan.
 
-    Disables radiation ENTIRELY before matching (not model='mean') --
-    confirmed via debug_tune_match() that 'mean' radiation alone breaks
-    compute_linear_normal_form() on this ring ("Invalid n1"), reproduced
-    even with NO match() involved at all, on a plain line.twiss6d() call.
-    'mean' radiation still adds a trajectory-dependent energy-loss term
-    to the one-turn map, making it non-symplectic -- exactly the case
-    _twiss_4d_radiation_safe() / scan_mux_muy_emittance() above already
-    work around for method='4d' by disabling radiation completely rather
-    than setting it to 'mean'. This mirrors that, restoring whatever
-    model was active afterward."""
-    had_radiation = getattr(line, '_radiation_model', None) is not None
-    if had_radiation:
-        SR_model = line._radiation_model
-        BS_model = line._beamstrahlung_model
-        line.configure_radiation(model=None, model_beamstrahlung=None)
 
+def match_tune_realistic(arc1R, cell_arc, cell_arc_opt, cell_tr, cell_tr_opt,
+                         qx_target, qy_target, n_periods=6,
+                         betay_DS_target=None):
+    """
+    Matches arc1R to (qx_target, qy_target) using the REAL production
+    sequence -- matchingWP then matchingBeta, exactly as
+    _run_standard_matching does in linear_optics.py -- instead of a
+    simplified direct match on ring.
+
+    Since ring and arc1R share the same pdr Environment variables, once
+    arc1R's knobs are set here, ring's own twiss()/track() reflect the
+    new tune automatically -- no separate match on ring itself is needed
+    or correct (the real build pipeline never matches ring directly).
+
+    Returns True if both matchingWP and matchingBeta completed without
+    raising; False (with a printed reason) otherwise. A failure near
+    resonances/the edge of the achievable tune space is normal, not
+    something that should crash the scan.
+    """
     try:
-        try:
-            line.match(
-                method='6d',
-                vary=[xt.VaryList(tune_knobs, step=1e-4)],
-                targets=[xt.TargetSet(qx=qx_target, qy=qy_target, tol=tol)],
-            )
-            return True
-        except Exception as e:
-            print(f"  Tune match FAILED at Qx={qx_target:.4f}, Qy={qy_target:.4f}: {e}")
-            return False
-    finally:
-        if had_radiation:
-            line.configure_radiation(model=SR_model, model_beamstrahlung=BS_model)
+        matchingWP(qx_target, qy_target, cell_arc_opt, cell_arc, arc1R,
+                  n_periods=n_periods)
+
+        tw_tr = cell_tr.twiss(method='4d')
+        mid = len(tw_tr.betx) // 2
+        matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
+                    cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
+                    betay_DS_target=betay_DS_target)
+        return True
+    except Exception as e:
+        print(f"  Realistic tune match FAILED at Qx={qx_target:.4f}, "
+              f"Qy={qy_target:.4f}: {type(e).__name__}: {e}")
+        return False
 
 
-def debug_tune_match(line, qx_target, qy_target, tune_knobs, tol=1e-6):
-    """Verifies the fix: disabling radiation ENTIRELY (not model='mean')
-    before twiss/match, confirmed via the traceback this produced last
-    time -- Step A alone reproduced "Invalid n1" with no match() involved,
-    proving 'mean' radiation itself breaks compute_linear_normal_form()
-    on this ring. Prints the FULL traceback if it's somehow still failing,
-    rather than a one-line summary, so any remaining issue is visible."""
-    import traceback
-    had_radiation = getattr(line, '_radiation_model', None) is not None
-    if had_radiation:
-        SR_model = line._radiation_model
-        BS_model = line._beamstrahlung_model
-        line.configure_radiation(model=None, model_beamstrahlung=None)
-
-    print(f"--- debug_tune_match(Qx={qx_target}, Qy={qy_target}) ---")
-
-    print("--- Step A: plain line.twiss6d() with radiation OFF (no match) ---")
-    try:
-        tw_check = line.twiss6d()
-        print(f"twiss6d() SUCCEEDED: qx={tw_check.qx:.6f}, qy={tw_check.qy:.6f}")
-    except Exception:
-        print("twiss6d() FAILED even with radiation off -- something else going on:")
-        traceback.print_exc()
-        if had_radiation:
-            line.configure_radiation(model=SR_model, model_beamstrahlung=BS_model)
-        return
-
-    print("--- Step B: line.match(...) with radiation OFF ---")
-    try:
-        line.match(
-            method='6d',
-            vary=[xt.VaryList(tune_knobs, step=1e-4)],
-            targets=[xt.TargetSet(qx=qx_target, qy=qy_target, tol=tol)],
-        )
-        print("--- match succeeded ---")
-    except Exception:
-        print("--- FULL traceback (not the one-line summary) ---")
-        traceback.print_exc()
-    finally:
-        if had_radiation:
-            line.configure_radiation(model=SR_model, model_beamstrahlung=BS_model)
- 
- 
-def performance_at_tune(line, qx_target, qy_target, tune_knobs,
-                         study_params_DA, context_tracking):
-    """Matches to (qx_target, qy_target), runs a DA study, returns min_DA
-    (np.nan if the tune match or tracking fails)."""
-    if not match_tune(line, qx_target, qy_target, tune_knobs):
+def performance_at_tune_realistic(ring, arc1R, cell_arc, cell_arc_opt,
+                                  cell_tr, cell_tr_opt, qx_target, qy_target,
+                                  n_periods, study_params_DA, context_tracking,
+                                  betay_DS_target=None):
+    """Matches to (qx_target, qy_target) via the real production process,
+    then runs a DA study on `ring` (which picks up the new tune through
+    its shared knobs with arc1R). Returns min_DA (np.nan if the tune
+    match or tracking fails)."""
+    if not match_tune_realistic(arc1R, cell_arc, cell_arc_opt, cell_tr,
+                                cell_tr_opt, qx_target, qy_target,
+                                n_periods=n_periods,
+                                betay_DS_target=betay_DS_target):
         return np.nan
- 
-    line.discard_tracker()
-    line.build_tracker(_context=context_tracking)
-    line.configure_radiation(model='mean')
- 
+
+    ring.discard_tracker()
+    ring.build_tracker(_context=context_tracking)
+    ring.configure_radiation(model='mean')
+
     try:
-        particles_DA, grid_DA = xutil.generate_particle_grid(line, study_params_DA)
-        line.track(particles_DA, num_turns=study_params_DA['number_of_turns'],
-                   turn_by_turn_monitor=False, time=True, with_progress=False)
+        particles_DA, grid_DA = xutil.generate_particle_grid(ring, study_params_DA)
+        ring.track(particles_DA, num_turns=study_params_DA['number_of_turns'],
+                  turn_by_turn_monitor=False, time=True, with_progress=False)
         particles_DA.sort(interleave_lost_particles=True)
         _, _, min_DA = get_DA_boundary(particles_DA, grid_DA['num_r_y_points'],
-                                        grid_DA['num_theta_x_points'],
-                                        grid_DA['x_normalized'], grid_DA['y_normalized'])
+                                       grid_DA['num_theta_x_points'],
+                                       grid_DA['x_normalized'], grid_DA['y_normalized'])
         return min_DA
     except Exception as e:
         print(f"  DA tracking FAILED at Qx={qx_target:.4f}, Qy={qy_target:.4f}: {e}")
         return np.nan
- 
- 
-def tune_scan(line, qx_range, qy_range, tune_knobs, n_emittancex, n_emittancey,
-              start_element, n_points=10, scan_turns=1000, scan_particles=200,
-              sanity_qx=None, sanity_qy=None):
-    """Coarse performance tune scan over a grid of (Qx, Qy). Returns
-    (QX, QY, DA_map), with DA_map[i,j] = np.nan wherever the tune match or
-    DA tracking failed at that point -- that's expected and normal near
-    integer/half-integer resonances, not something to treat as fatal.
-    Operates on a COPY of `line` -- your original line object is never
-    modified.
+
+
+def tune_scan_realistic(pdr, ring, arc1R, cell_arc, cell_tr, qx_range, qy_range,
+                        n_emittancex, n_emittancey, start_element,
+                        n_periods=6, mu_cell=0.25, betay_DS_target=None,
+                        n_points=10, scan_turns=1000, scan_particles=200,
+                        sanity_qx=None, sanity_qy=None):
+    """
+    Coarse performance tune scan over a grid of (Qx, Qy), matching via the
+    REAL production matchingWP/matchingBeta sequence at every grid point.
+
+    IMPORTANT -- safety / knob restoration: matchingWP/matchingBeta vary
+    kQFarcM, kQDarcM, kQFDS, kQDDS, kQFDoub, kQDDoub, AND the physical
+    length knobs l_trans/l_doub/l_trips. These are shared pdr-level
+    variables between arc1R and ring (a Line.copy() does NOT give an
+    independent Environment, so copying arc1R would NOT isolate this
+    scan). This function saves every one of these knobs' values before
+    scanning and restores them in a finally block, so your real
+    ring/arc1R are left EXACTLY as they were regardless of how the scan
+    goes -- do not remove this without re-adding equivalent protection.
+
+    mu_cell: the design's regular-arc-cell phase advance (fraction of
+    2*pi) -- used once, up front, to (re)build cell_arc_opt/cell_tr_opt
+    via _match_cells_3fold exactly as the real pipeline does. This is NOT
+    scanned here -- only the ring's global tune (via arc1R's insertion
+    knobs) is scanned at FIXED cell phase advance.
 
     sanity_qx/sanity_qy: pass your REAL, currently-valid working point
-    here for the pre-flight check. With a full 2-integer-wide window, the
-    window's geometric CENTER sits exactly on an integer tune in BOTH
-    planes simultaneously -- a genuinely resonant, often-unreachable
-    point, not a meaningful "this should definitely work" test anymore.
-    Testing your actual current tune instead is the only pre-flight check
-    that can reliably distinguish "real setup bug" from "yes, some grid
-    points are supposed to fail."
+    for the pre-flight check -- the ONLY check that can reliably tell
+    "real setup bug" from "this grid point is genuinely unreachable".
     """
-    scan_line = line.copy()
-    context_tracking = xo.ContextCpu(omp_num_threads=0)
-    scan_line.build_tracker(_context=context_tracking)
- 
-    if sanity_qx is not None and sanity_qy is not None:
-        if not match_tune(scan_line, sanity_qx, sanity_qy, tune_knobs):
-            raise RuntimeError(
-                f"Tune match failed at the KNOWN CURRENT WORKING POINT "
-                f"(Qx={sanity_qx:.4f}, Qy={sanity_qy:.4f}) -- since this is a "
-                f"real, already-valid tune, failing here means a genuine setup "
-                f"problem (wrong tune_knobs, or a method/radiation mismatch), "
-                f"not an unreachable point. Fix this before trusting the scan."
-            )
-    else:
-        qx_center = 0.5 * (qx_range[0] + qx_range[1])
-        qy_center = 0.5 * (qy_range[0] + qy_range[1])
-        if not match_tune(scan_line, qx_center, qy_center, tune_knobs):
-            print(f"[tune_scan] NOTE: sanity check at the window's geometric "
-                  f"center (Qx={qx_center:.4f}, Qy={qy_center:.4f}) failed. "
-                  f"With a 2-integer-wide window that center sits exactly on "
-                  f"an integer tune in both planes -- often GENUINELY "
-                  f"unreachable, not a setup bug. Continuing with the full "
-                  f"scan; pass sanity_qx/sanity_qy (your real current working "
-                  f"point) for a pre-flight check that can actually tell the "
-                  f"two apart.")
- 
-    # Reduced-resolution study params -- this is a fast screening pass,
-    # not a publication-quality DA study. Re-run at full resolution
-    # (like study_params_DA elsewhere in analysis.py) for whichever
-    # point(s) look best here.
-    study_params_DA = {
-        'ini_cond_type': 'grid_DA',
-        'output_dir': 'out',
-        'number_of_turns': scan_turns,
-        'number_of_particles': scan_particles,
-        'inv1': 0, 'inv2': 0,
-        'start_element': start_element,
-        'ini_cond_nemittance_x': n_emittancex,
-        'ini_cond_nemittance_y': n_emittancey,
-        'ini_cond_bunch_length': 4.8e-3,
-        'ini_cond_energy_spread': 2e-3,
-        'ini_cond_energy_offset': None,
-        'new_closed_orbit': None,
-        'covariance_dispertion_free': False,
-    }
- 
-    qx_vals = np.linspace(*qx_range, n_points)
-    qy_vals = np.linspace(*qy_range, n_points)
-    QX, QY = np.meshgrid(qx_vals, qy_vals)
-    DA_map = np.full_like(QX, np.nan)
- 
-    total = n_points * n_points
-    done = 0
-    n_failed = 0
-    for i in range(n_points):
-        for j in range(n_points):
-            DA_map[i, j] = performance_at_tune(
-                scan_line, QX[i, j], QY[i, j], tune_knobs, study_params_DA, context_tracking)
-            done += 1
-            if np.isnan(DA_map[i, j]):
-                n_failed += 1
-            print(f"[{done}/{total}] Qx={QX[i, j]:.4f} Qy={QY[i, j]:.4f} "
-                  f"-> min_DA={DA_map[i, j]}")
- 
-    print(f"[tune_scan] Done: {total - n_failed}/{total} points succeeded, "
-          f"{n_failed} failed/unreachable (shown as 0 DA in the plot).")
+    restore_knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
+                     'kQFDoub', 'kQDDoub', 'l_trans', 'l_doub', 'l_trips']
+    k0 = {kn: arc1R.vars[kn]._value for kn in restore_knobs
+         if kn in arc1R.vars}
 
-    return QX, QY, DA_map
- 
- 
+    context_tracking = xo.ContextCpu(omp_num_threads=0)
+
+    try:
+        cell_arc_opt, cell_tr_opt = _match_cells_3fold(
+            pdr, cell_arc, cell_tr, mu_cell=mu_cell)
+
+        if sanity_qx is not None and sanity_qy is not None:
+            if not match_tune_realistic(arc1R, cell_arc, cell_arc_opt,
+                                        cell_tr, cell_tr_opt,
+                                        sanity_qx, sanity_qy,
+                                        n_periods=n_periods,
+                                        betay_DS_target=betay_DS_target):
+                raise RuntimeError(
+                    f"Realistic tune match failed at the KNOWN CURRENT "
+                    f"WORKING POINT (Qx={sanity_qx:.4f}, Qy={sanity_qy:.4f}) -- "
+                    f"since this is a real, already-valid tune, failing here "
+                    f"means a genuine setup problem (wrong n_periods/mu_cell, "
+                    f"or arc1R/cell_arc not the right objects), not an "
+                    f"unreachable point. Fix this before trusting the scan."
+                )
+        else:
+            qx_center = 0.5 * (qx_range[0] + qx_range[1])
+            qy_center = 0.5 * (qy_range[0] + qy_range[1])
+            if not match_tune_realistic(arc1R, cell_arc, cell_arc_opt,
+                                        cell_tr, cell_tr_opt,
+                                        qx_center, qy_center,
+                                        n_periods=n_periods,
+                                        betay_DS_target=betay_DS_target):
+                print(f"[tune_scan_realistic] NOTE: sanity check at the "
+                      f"window's geometric center (Qx={qx_center:.4f}, "
+                      f"Qy={qy_center:.4f}) failed -- may be genuinely "
+                      f"unreachable rather than a setup bug. Continuing with "
+                      f"the full scan; pass sanity_qx/sanity_qy (your real "
+                      f"current working point) for a pre-flight check that "
+                      f"can tell the two apart.")
+
+        study_params_DA = {
+            'ini_cond_type': 'grid_DA',
+            'output_dir': 'out',
+            'number_of_turns': scan_turns,
+            'number_of_particles': scan_particles,
+            'inv1': 0, 'inv2': 0,
+            'start_element': start_element,
+            'ini_cond_nemittance_x': n_emittancex,
+            'ini_cond_nemittance_y': n_emittancey,
+            'ini_cond_bunch_length': 4.8e-3,
+            'ini_cond_energy_spread': 2e-3,
+            'ini_cond_energy_offset': None,
+            'new_closed_orbit': None,
+            'covariance_dispertion_free': False,
+        }
+
+        qx_vals = np.linspace(*qx_range, n_points)
+        qy_vals = np.linspace(*qy_range, n_points)
+        QX, QY = np.meshgrid(qx_vals, qy_vals)
+        DA_map = np.full_like(QX, np.nan)
+
+        total = n_points * n_points
+        done = 0
+        n_failed = 0
+        for i in range(n_points):
+            for j in range(n_points):
+                DA_map[i, j] = performance_at_tune_realistic(
+                    ring, arc1R, cell_arc, cell_arc_opt, cell_tr, cell_tr_opt,
+                    QX[i, j], QY[i, j], n_periods, study_params_DA,
+                    context_tracking, betay_DS_target=betay_DS_target)
+                done += 1
+                if np.isnan(DA_map[i, j]):
+                    n_failed += 1
+                print(f"[{done}/{total}] Qx={QX[i, j]:.4f} Qy={QY[i, j]:.4f} "
+                      f"-> min_DA={DA_map[i, j]}")
+
+        print(f"[tune_scan_realistic] Done: {total - n_failed}/{total} points "
+              f"succeeded, {n_failed} failed/unreachable.")
+
+        return QX, QY, DA_map
+
+    finally:
+        # Restore every knob matchingWP/matchingBeta touched, regardless
+        # of whether the scan finished cleanly or raised partway through.
+        for kn, v in k0.items():
+            arc1R.vars[kn] = v
+        print(f"[tune_scan_realistic] Restored {len(k0)} knobs to their "
+             f"pre-scan values: {list(k0.keys())}")
+
+
 def plot_tune_scan(QX, QY, DA_map, current_qx=None, current_qy=None):
-    # Failed/unreachable points are NaN in DA_map (so best_from_map can
-    # correctly exclude them from "best point" consideration) but plotted
-    # as 0 -- the worst possible DA, on the SAME colour scale as everything
-    # else -- rather than left blank, which pcolormesh would otherwise
-    # render as an easy-to-miss gap rather than an obviously bad point.
     plot_data = np.nan_to_num(DA_map, nan=0.0)
 
     fig, ax = plt.subplots(figsize=(8, 7))
@@ -934,47 +925,42 @@ def plot_tune_scan(QX, QY, DA_map, current_qx=None, current_qy=None):
     fig.colorbar(im, ax=ax, label=r'Minimum DA [$\sigma$] (0 = failed/unreachable)')
     if current_qx is not None:
         ax.plot(current_qx, current_qy, 'o', color='red', ms=10, mec='black',
-                label='Current working point')
+               label='Current working point')
         ax.legend()
     ax.set_xlabel('$Q_x$')
     ax.set_ylabel('$Q_y$')
-    ax.set_title('Performance Tune Scan: Minimum Dynamic Aperture')
+    ax.set_title('Performance Tune Scan (realistic matching): Minimum Dynamic Aperture')
     plt.tight_layout()
     return fig
 
 
 def best_from_map(QX, QY, DA_map):
-    """np.nanargmax raises on an all-NaN array instead of returning
-    something useful -- surface a clear message pointing back at the scan
-    output instead of a bare numpy traceback."""
     n_valid = np.sum(~np.isnan(DA_map))
     if n_valid == 0:
         raise RuntimeError(
             "Every point in the scan failed (DA_map is all NaN) -- there is no "
-            "'best' point to report. Check the 'Tune match FAILED' / 'DA tracking "
-            "FAILED' messages printed during the scan for the actual cause."
+            "'best' point to report. Check the 'Realistic tune match FAILED' / "
+            "'DA tracking FAILED' messages printed during the scan."
         )
     if n_valid < DA_map.size:
         print(f"Note: {DA_map.size - n_valid}/{DA_map.size} grid points failed "
-              f"and are excluded from this result.")
+             f"and are excluded from this result.")
     idx = np.unravel_index(np.nanargmax(DA_map), DA_map.shape)
     return QX[idx], QY[idx], DA_map[idx]
- 
 
 
 current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
 qx_range = two_integer_range(current_qx)
 qy_range = two_integer_range(current_qy)
 
-QX, QY, DA_map = tune_scan(
-        ring,
-        qx_range=qx_range, qy_range=qy_range,
-        tune_knobs=['kQFarcM', 'kQDarcM','kQFDS','kQDDS','kQFDoub','kQDDoub'],
-        n_emittancex=n_emittancex, n_emittancey=n_emittancey,
-        start_element='QD1_R1',
-        n_points=25, scan_turns=1000, scan_particles=200,
-        sanity_qx=current_qx, sanity_qy=current_qy,
-    )
+QX, QY, DA_map = tune_scan_realistic(
+    pdr, ring, arc1R, cell_arc, cell_tr,
+    qx_range=qx_range, qy_range=qy_range,
+    n_emittancex=n_emittancex, n_emittancey=n_emittancey,
+    start_element='QD1_R1', n_periods=6, mu_cell=0.25,
+    n_points=25, scan_turns=1000, scan_particles=200,
+    sanity_qx=current_qx, sanity_qy=current_qy,
+)
 plot_tune_scan(QX, QY, DA_map, current_qx=current_qx, current_qy=current_qy)
 plt.show()
 

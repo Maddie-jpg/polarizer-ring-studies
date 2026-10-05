@@ -1276,6 +1276,128 @@ run_energy_diagnostics(ring, ring_tw, mode, energies_to_track,
 print("\nDone: tracked average, nominal, and optimal reference energies.")
 
 # %%
+# %% DA and MA from the injected beam
+def beam_acceptance_scan(track_line, df_in, e_mev, mode_tag,
+                         scales=(1.0, 1.5, 2.0, 3.0, 4.0), n_turns=2000,
+                         radiation='mean', survival_target=0.99):
+    """Track the matched injected beam, blown up by each factor in `scales`,
+    from the injection marker, and record which particles survive.
+
+    Each particle is labelled by its initial betatron amplitude in units of the
+    injected beam's rms size (A_x, A_y) and its momentum deviation. Lost
+    particles in the (A_x, A_y) plane show the DA as seen by the beam; lost
+    particles in the (A_x, delta) plane show the MA. Scaling the beam up probes
+    where the boundary is; the largest scale that still keeps `survival_target`
+    of the beam is the injection margin.
+
+    Scaling multiplies the betatron coordinates and the momentum deviation from
+    the beam's mean by the same factor (i.e. a beam with s^2 the emittance and
+    s times the energy spread).
+    """
+    p0c_ref = e_mev * 1e6
+    ref_particle = xp.Particles(p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV)
+
+    # Optics and closed orbit at injection, with the radiation model used for tracking
+    track_line.configure_radiation(model='mean')
+    tw_inj = track_line.twiss6d()
+    track_line.configure_radiation(model=radiation)
+    row = tw_inj.rows[marker_name]
+    bx_r, ax_r, by_r, ay_r = row['betx'][0], row['alfx'][0], row['bety'][0], row['alfy'][0]
+    Dx_r, Dpx_r, Dy_r, Dpy_r = row['dx'][0], row['dpx'][0], row['dy'][0], row['dpy'][0]
+    gx_r, gy_r = (1 + ax_r**2) / bx_r, (1 + ay_r**2) / by_r
+
+    # Matched betatron coordinates (ideal transfer line), ring dispersion added below
+    xb, pxb, yb, pyb, delta, zeta = match_coordinates(
+        df_in, p0c_ref, ref_particle, 0.0, 0.0, 0.0, 0.0,
+        beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
+        beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
+        ring_optics_x=(bx_r, ax_r), ring_optics_y=(by_r, ay_r))
+
+    eps_x_m, eps_y_m = emittance_x * 1e-6, emittance_y * 1e-6   # [mm mrad] -> [m rad]
+    d0 = np.mean(delta)
+
+    folder_acc = mf.results_dir(design, config, phase, changes=changes,
+                                metric='InjectionEfficiency', sub=mode_tag,
+                                sub2='BeamAcceptance')
+    summary, per_scale = [], []
+
+    for s in scales:
+        xs, pxs, ys, pys = s * xb, s * pxb, s * yb, s * pyb
+        ds = d0 + s * (delta - d0)
+
+        # initial amplitudes in units of the injected beam's rms size
+        A_x = np.sqrt((gx_r * xs**2 + 2 * ax_r * xs * pxs + bx_r * pxs**2) / eps_x_m)
+        A_y = np.sqrt((gy_r * ys**2 + 2 * ay_r * ys * pys + by_r * pys**2) / eps_y_m)
+
+        p = xp.Particles(
+            p0c=p0c_ref, mass0=xp.ELECTRON_MASS_EV,
+            x=xs + Dx_r * ds + row['x'][0], px=pxs + Dpx_r * ds + row['px'][0],
+            y=ys + Dy_r * ds + row['y'][0], py=pys + Dpy_r * ds + row['py'][0],
+            zeta=zeta + row['zeta'][0], delta=ds)
+        track_line.track(p, num_turns=n_turns, ele_start=marker_name)
+        p.sort(by='particle_id', interleave_lost_particles=True)
+        alive = np.asarray(p.state) > 0
+        lost = ~alive
+
+        surv = alive.mean()
+        first_Ax = A_x[lost].min() if lost.any() else np.nan
+        first_Ay = A_y[lost].min() if lost.any() else np.nan
+        first_dd = np.abs(ds[lost] - d0).min() if lost.any() else np.nan
+        print(f'[{mode_tag}] scale {s:.2f}: survival {surv*100:.1f}% '
+              f'({lost.sum()} lost); smallest lost A_x={first_Ax:.2f}, '
+              f'A_y={first_Ay:.2f} sigma, |delta-<delta>|={first_dd*100:.2f}%')
+        summary.append({'scale': s, 'survival_%': 100 * surv, 'n_lost': int(lost.sum()),
+                        'max_A_x': A_x.max(), 'max_A_y': A_y.max(),
+                        'max_|ddelta|_%': 100 * np.abs(ds - d0).max(),
+                        'first_lost_A_x': first_Ax, 'first_lost_A_y': first_Ay,
+                        'first_lost_|ddelta|_%': 100 * first_dd})
+        per_scale.append((s, A_x, A_y, ds, alive))
+
+    df_acc = pd.DataFrame(summary)
+    df_acc.to_csv(f'{folder_acc}/beam_acceptance_{e_mev:.0f}MeV.csv', index=False)
+
+    # --- DA (A_x vs A_y) and MA (delta vs A_x) maps, one column per scale ---
+    n = len(per_scale)
+    fig, axs = plt.subplots(2, n, figsize=(3.6 * n, 7), squeeze=False)
+    for j, (s, A_x, A_y, ds, alive) in enumerate(per_scale):
+        a0, a1 = axs[0, j], axs[1, j]
+        a0.scatter(A_x[alive], A_y[alive], s=2, color='grey', alpha=0.5, label='survived')
+        a0.scatter(A_x[~alive], A_y[~alive], s=8, color='red', label='lost')
+        a0.set_title(f'scale {s:g}: {alive.mean()*100:.1f}% survive', fontsize=10)
+        a0.set_xlabel(r'$A_x$ [$\sigma_{x,inj}$]'); a0.grid(alpha=0.3)
+        a1.scatter(ds[alive] * 100, A_x[alive], s=2, color='grey', alpha=0.5)
+        a1.scatter(ds[~alive] * 100, A_x[~alive], s=8, color='red')
+        a1.set_xlabel(r'$\delta$ [%]'); a1.grid(alpha=0.3)
+    axs[0, 0].set_ylabel(r'$A_y$ [$\sigma_{y,inj}$]')
+    axs[1, 0].set_ylabel(r'$A_x$ [$\sigma_{x,inj}$]')
+    axs[0, 0].legend(fontsize='small', markerscale=2)
+    fig.suptitle(f'DA (top) and MA (bottom) from the injected beam -- {mode_tag}, '
+                 f'{e_mev:.1f} MeV, {n_turns} turns, radiation={radiation}')
+    fig.tight_layout()
+    fig.savefig(f'{folder_acc}/beam_DA_MA_maps_{e_mev:.0f}MeV.png', dpi=200)
+    plt.show()
+
+    # --- survival vs scale: the injection margin ---
+    ok = df_acc[df_acc['survival_%'] >= 100 * survival_target]
+    margin = ok.scale.max() if len(ok) else np.nan
+    plt.figure(figsize=(7, 4.5))
+    plt.plot(df_acc.scale, df_acc['survival_%'], 'o-', color='teal')
+    plt.axhline(100 * survival_target, color='red', ls='--', lw=1,
+                label=f'{survival_target*100:.0f}% target')
+    plt.xlabel('beam blow-up factor'); plt.ylabel('survival [%]')
+    plt.title(f'Injection margin = {margin:g}x ({mode_tag}, {e_mev:.1f} MeV)')
+    plt.grid(alpha=0.3); plt.legend()
+    plt.savefig(f'{folder_acc}/beam_margin_{e_mev:.0f}MeV.png', dpi=200, bbox_inches='tight')
+    plt.show()
+
+    print(df_acc.to_string(index=False))
+    print(f'[{mode_tag}] injection margin: {margin:g}x the injected beam')
+    return df_acc
+
+
+df_acceptance = df.sample(n=min(3000, len(df)), random_state=rand_num)
+acc_results = beam_acceptance_scan(ring, df_acceptance, best_energy_mev, mode)
+
 if mode == 'perfect':
     import LatticeBuild.misalignments_corrections as mc
     from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines

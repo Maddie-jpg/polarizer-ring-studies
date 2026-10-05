@@ -14,6 +14,7 @@ import matplotlib.patches as patches
 import xpart as xp
 import xobjects as xo
 import math
+import json
 from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 from prettytable import PrettyTable
 import xutil_DA_CC.xsuite_plot_functions as my_xpf
@@ -29,6 +30,14 @@ config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
 changes=os.environ.get('CHANGES',None)
+
+folder_beam = mf.results_dir(design, config, phase, changes=changes,
+                        metric='InjectionEfficiency', sub='BeamSource')
+with open(f'{folder_beam}/TwissResults.json') as f:
+    beam = json.load(f)
+
+beam_em_x = beam['x']['emittance_geo'] * 1e-6
+beam_em_y = beam['y']['emittance_geo'] * 1e-6
 
 
 # %%
@@ -602,6 +611,36 @@ ax2.set_xlabel(r'$J_y$ [m]'); ax2.set_ylabel(r'$\Delta Q$'); ax2.legend(); ax2.s
 fig.tight_layout()
 fig.savefig(f'{folder1}/amplitude_detuning_curves.png')
 # %%
+
+def insert_marker_in_drift(pdr, ring, drift_name='DrTripl', occurrence=0,
+                            marker_name='TripletInject'):
+    import re
+    names = ring.element_names
+    pattern = re.compile(rf'^{re.escape(drift_name)}(::\d+)?$')
+    indices = [i for i, n in enumerate(names) if pattern.match(n)]
+    if not indices:
+        raise ValueError(f"No element matching '{drift_name}' or '{drift_name}::N' found "
+                          f"in this ring. If this ring was built with a different lattice "
+                          f"function than three_fold_periodicity_long, the triplet drift may "
+                          f"have a different name -- check ring.element_names for "
+                          f"anything containing 'Tripl'.")
+    if occurrence >= len(indices):
+        raise ValueError(f"Requested occurrence {occurrence}, but only "
+                          f"{len(indices)} instance(s) matching '{drift_name}' exist "
+                          f"in this ring.")
+
+    idx = indices[occurrence]
+    s_positions = ring.get_s_position()
+    s_start = s_positions[idx]
+    length = ring.element_dict[names[idx]].length
+    s_center = s_start + length / 2
+
+    ring.insert(pdr.new(marker_name, xt.Marker), at=s_center)
+    return marker_name
+
+marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
+ring.cycle(name_first_element=marker_name, inplace=True)
+
 if mode=='perfect':
     line=ring
     line.config.XTRACK_USE_EXACT_DRIFTS = True
@@ -624,8 +663,8 @@ if mode=='perfect':
     gamma0 = ring.particle_ref.gamma0[0]
     beta0 = ring.particle_ref.beta0[0]
 
-    n_emittancex = 1.354177116369456e-6 * gamma0 * beta0
-    n_emittancey = 1.420755089827341e-6 * gamma0 * beta0
+    n_emittancex = beam_em_x * gamma0 * beta0
+    n_emittancey = beam_em_y * gamma0 * beta0
 
     parameters['study_parameters'] = {
         'ini_cond_type' : 'grid_DA', # grid_DA, grid_MA, distribution_matched, distribution_injected
@@ -634,7 +673,7 @@ if mode=='perfect':
         'number_of_particles' : 1000, 
         'inv1': 0, # np.arange(2)+1,
         'inv2': 0, # np.arange(2,2+3)+1,
-        'start_element' : 'QD1_R1', # 'ca1.1','ip' #'rf400'
+        'start_element' : marker_name, # 'ca1.1','ip' #'rf400'
         'ini_cond_nemittance_x':n_emittancex,
         'ini_cond_nemittance_y': n_emittancey,
         'ini_cond_bunch_length': 4.8e-3,
@@ -785,7 +824,7 @@ if mode=='perfect':
         'number_of_particles' : 1000, 
         'inv1': 0, # np.arange(2)+1,
         'inv2': 0, # np.arange(2,2+3)+1,
-        'start_element' : 'QD1_R1', # 'ca1.1','ip' #'rf400'
+        'start_element' : marker_name, # 'ca1.1','ip' #'rf400'
         'ini_cond_nemittance_x':n_emittancex,
         'ini_cond_nemittance_y': n_emittancey,
         'ini_cond_bunch_length': 4.8e-3,
@@ -827,7 +866,241 @@ if mode=='perfect':
     ax.set_ylim(None, 12)
     plt.savefig(f"{folder2}/MA_plot_{mode}_WP{current_wp}_zoom.png", dpi=300, bbox_inches='tight')
 
-   
+
+    # =====================================================================
+    # Physical aperture from the perfect-lattice DA, and pole-tip fields
+    # per magnet type. Placed after the perfect DA/MA scans and before the
+    # misaligned/corrected runs, where x_DA, y_DA still hold the DA boundary.
+    #
+    # The DA boundary (in sigma = sqrt(eps)) is converted to mm with the
+    # local beta function: x = x_hat*sqrt(beta_x*eps_x), y = y_hat*sqrt(beta_y*eps_y).
+    # The chamber is that contour pushed 5 mm outwards. Each magnet's chamber
+    # uses the largest beta inside the magnet, so every magnet gets its own
+    # DA-in-mm shape; the pole radius encloses it.
+    # =====================================================================
+    import pandas as pd
+
+    chamber_margin = 5e-3      # [m] DA contour -> chamber contour
+    delta_chamber = 0.0        # [-] optional momentum offset added horizontally:
+                               #     x -> x +/- |D_x|*delta (0 = on-momentum DA only)
+    wall_thickness = 0.0       # [m] chamber wall + clearance; pole radius = chamber + wall
+    B_limits = {'Bend': 1.5, 'Quadrupole': 1.1, 'Sextupole': 0.8}   # [T] flag above these
+    magnet_types = ('Bend', 'Quadrupole', 'Sextupole')
+    mu0 = 4e-7 * np.pi
+
+    folder_ap = mf.results_dir(design, config, phase, changes=changes,
+                               metric='PhysicalAperture', sub=mode)
+
+    # --- 1. DA boundary in normalised units [sqrt(eps)] -----------------------
+    gb = ring.particle_ref.gamma0[0] * ring.particle_ref.beta0[0]
+    eps_x = n_emittancex / gb          # geometric emittances the DA grid was built with
+    eps_y = n_emittancey / gb
+
+    x_hat, y_hat = np.asarray(x_DA, float), np.asarray(y_DA, float)
+    ok_da = np.isfinite(x_hat) & np.isfinite(y_hat)
+    if not np.all(ok_da):
+        print(f'  WARNING: {np.sum(~ok_da)} DA angle(s) had no losses within the scan; '
+              f'they are skipped, so the chamber there is a lower bound')
+    x_hat, y_hat = x_hat[ok_da], y_hat[ok_da]
+    order = np.argsort(np.arctan2(y_hat, x_hat))
+    x_hat, y_hat = x_hat[order], y_hat[order]
+    print(f'DA: {np.max(np.abs(x_hat)):.1f} sigma_x, {np.max(y_hat):.1f} sigma_y')
+
+    def da_contour_mm(betx, bety, dx=0.0):
+        """DA boundary in metres at a point with the given optics."""
+        X = x_hat * np.sqrt(betx * eps_x)
+        Y = y_hat * np.sqrt(bety * eps_y)
+        X = X + np.sign(X) * abs(dx) * delta_chamber
+        return X, Y
+
+    def offset_contour(X, Y, d):
+        """Push the contour outwards by d (radially)."""
+        r = np.hypot(X, Y)
+        r = np.where(r == 0, 1e-12, r)
+        return X * (r + d) / r, Y * (r + d) / r
+
+    def full_shape(X, Y):
+        """DA is scanned for y >= 0; mirror it to draw the closed shape."""
+        return np.concatenate([X, X[::-1]]), np.concatenate([Y, -Y[::-1]])
+
+    # --- 2. Optics sampled every 2 cm (deep copy, radiation off) --------------
+    ring_ap = ring.copy()
+    ring_ap.configure_radiation(model=None)
+    ds = 0.02
+    ring_ap.cut_at_s(np.arange(ds, ring_ap.get_length() - ds / 2, ds))
+    tw_ap = ring_ap.twiss4d()
+    s_ap = np.asarray(tw_ap.s)
+
+    # --- 3. Per-magnet chamber from the DA contour at that magnet -------------
+    tt_ap = ring.get_table()
+    rows = []
+    for name, etype, s0 in zip(tt_ap.name, tt_ap.element_type, tt_ap.s):
+        if etype not in magnet_types:
+            continue
+        el = ring[name]
+        s1 = s0 + el.length
+        i0, i1 = np.searchsorted(s_ap, s0 - 1e-9), np.searchsorted(s_ap, s1 + 1e-9)
+        sl = slice(i0, max(i1, i0 + 1))
+        bx, by = float(np.max(tw_ap.betx[sl])), float(np.max(tw_ap.bety[sl]))
+        dxm = float(np.max(np.abs(tw_ap.dx[sl])))
+        Xc, Yc = offset_contour(*da_contour_mm(bx, by, dxm), chamber_margin)
+        rows.append({'name': name, 'family': name.split('::')[0].split('_')[0],
+                     'type': etype, 's_start': s0, 's_end': s1, 'length': el.length,
+                     'betx_max': bx, 'bety_max': by, 'dx_max': dxm,
+                     'chamber_x': float(np.max(np.abs(Xc))),
+                     'chamber_y': float(np.max(np.abs(Yc))),
+                     'chamber_r': float(np.max(np.hypot(Xc, Yc))),
+                     'h': el.angle / el.length if etype == 'Bend' else 0.0,
+                     'k1': getattr(el, 'k1', 0.0), 'k2': getattr(el, 'k2', 0.0)})
+    df_mag = pd.DataFrame(rows)
+
+    # Distinct magnet types: name prefix + length + strength.
+    # Variants within a prefix (e.g. QFA vs the matching QFA_M...) get their own row.
+    df_mag['strength'] = np.where(df_mag.type == 'Bend', df_mag.h,
+                         np.where(df_mag.type == 'Quadrupole', df_mag.k1, df_mag.k2))
+    df_mag['key'] = list(zip(df_mag.family, df_mag.length.round(4), df_mag.strength.round(4)))
+
+    def _variant_tag(names):
+        """Leading letters shared by all name suffixes, e.g. 'M' for QFA_M1R7, QFA_M2L7."""
+        suffixes = [n.split('::')[0].split('_', 1)[1] if '_' in n else '' for n in names]
+        common = os.path.commonprefix(suffixes)
+        tag = ''
+        for ch in common:
+            if not ch.isalpha():
+                break
+            tag += ch
+        return tag
+
+    variant_of_key = {}
+    for fam, g in df_mag.groupby('family', sort=False):
+        keys = list(dict.fromkeys(g.key))           # order of appearance in the ring
+        if len(keys) == 1:
+            variant_of_key[keys[0]] = fam
+            continue
+        labels = {}
+        for k in keys:
+            tag = _variant_tag(g[g.key == k].name)
+            labels[k] = f'{fam}_{tag}' if tag else fam
+        if len(set(labels.values())) < len(keys):  # tags not unique: label by strength
+            labels = {k: f'{fam} ({k[2]:+.4g})' for k in keys}
+        variant_of_key.update(labels)
+    df_mag['variant'] = df_mag.key.map(variant_of_key)
+    df_mag.drop(columns='key').to_csv(f'{folder_ap}/chamber_per_magnet_{mode}.csv', index=False)
+
+    # --- 4. Plot: DA in mm at the tracking point, with the +5 mm chamber ------
+    s_track = tt_ap['s', marker_name]
+    i_tr = int(np.argmin(np.abs(s_ap - s_track)))
+    bx_tr, by_tr = tw_ap.betx[i_tr], tw_ap.bety[i_tr]
+    X, Y = da_contour_mm(bx_tr, by_tr, tw_ap.dx[i_tr])
+    Xc, Yc = offset_contour(X, Y, chamber_margin)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.plot(*[v * 1e3 for v in full_shape(X, Y)], 'r-', lw=1.5, label='DA')
+    ax.plot(*[v * 1e3 for v in full_shape(Xc, Yc)], 'k:', lw=1.5,
+            label=f'chamber (DA + {chamber_margin*1e3:.0f} mm)')
+    ax.set_xlabel('x [mm]'); ax.set_ylabel('y [mm]')
+    ax.set_aspect('equal'); ax.grid(alpha=0.3); ax.legend(loc='upper right')
+    ax.set_title(f'DA in physical units at {marker_name} '
+                 f'($\\beta_x$={bx_tr:.2f} m, $\\beta_y$={by_tr:.2f} m)')
+    fig.tight_layout()
+    fig.savefig(f'{folder_ap}/DA_mm_{marker_name}_{mode}.png', dpi=200, bbox_inches='tight')
+
+    # --- 5. Pole-tip fields per distinct magnet type ----------------------------
+    pole_rows, worst = [], {}
+    for var, g in df_mag.groupby('variant', sort=False):
+        t = g.type.iloc[0]
+        # bends: pole gap set by the vertical half-height of the chamber contour;
+        # quads/sexts: round bore that encloses the whole chamber contour
+        R = (g.chamber_y.max() if t == 'Bend' else g.chamber_r.max()) + wall_thickness
+        worst[var] = g.loc[g.chamber_r.idxmax()]
+        if t == 'Bend':
+            h, k1 = g.h.iloc[0], g.k1.iloc[0]
+            B = brho * (abs(h) + abs(k1) * R)        # dipole + gradient at the pole
+            strength = f'h = {h:.4f} 1/m' + (f', k1 = {k1:+.3f} 1/m2' if k1 != 0 else '')
+            NI = brho * abs(h) * R / mu0             # dipole part, per pole
+        elif t == 'Quadrupole':
+            k1 = g.k1.iloc[0]
+            B = brho * abs(k1) * R
+            strength = f'k1 = {k1:+.4f} 1/m2'
+            NI = B * R / (2 * mu0)
+        else:
+            k2 = g.k2.iloc[0]
+            B = brho * abs(k2) * R**2 / 2
+            strength = f'k2 = {k2:+.2f} 1/m3'
+            NI = B * R / (3 * mu0)
+        examples = ', '.join(g.name.iloc[:2]) + (', ...' if len(g) > 2 else '')
+        pole_rows.append({'Magnet type': var, 'Kind': t, 'N': len(g),
+                          'L [m]': f'{g.length.iloc[0]:.3f}', 'Strength': strength,
+                          'beta_x/y max [m]': f'{g.betx_max.max():.2f} / {g.bety_max.max():.2f}',
+                          'Chamber x/y [mm]': f'{g.chamber_x.max()*1e3:.1f} / {g.chamber_y.max()*1e3:.1f}',
+                          'R_pole [mm]': f'{R*1e3:.1f}', 'B_pole [T]': f'{B:.3f}',
+                          'NI/pole [kA-turns]': f'{NI*1e-3:.2f}',
+                          'Flag': 'ABOVE LIMIT' if B > B_limits[t] else '',
+                          'Examples': examples,
+                          '_R': R, '_B': B, '_t': t})
+    df_pole = pd.DataFrame(pole_rows)
+    df_pole.drop(columns=['_R', '_B', '_t']).to_csv(f'{folder_ap}/pole_tip_fields_{mode}.csv',
+                                                     index=False)
+
+    # --- 6. Plot: DA in mm at the worst location of each magnet type ----------
+    n_var = len(df_pole)
+    ncols = 4
+    nrows = int(np.ceil(n_var / ncols))
+    colors_ap = {'Bend': 'tab:blue', 'Quadrupole': 'tab:red', 'Sextupole': 'tab:green'}
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.4 * nrows), squeeze=False)
+    lim = 1.1 * max(df_pole['_R'].max(), df_mag.chamber_x.max()) * 1e3
+    for ax, (_, r) in zip(axs.flat, df_pole.iterrows()):
+        w = worst[r['Magnet type']]
+        X, Y = da_contour_mm(w.betx_max, w.bety_max, w.dx_max)
+        Xc, Yc = offset_contour(X, Y, chamber_margin)
+        ax.plot(*[v * 1e3 for v in full_shape(X, Y)], '-', color=colors_ap[r['_t']], lw=1.3)
+        ax.plot(*[v * 1e3 for v in full_shape(Xc, Yc)], 'k:', lw=1.3)
+        Rm = r['_R'] * 1e3
+        if r['_t'] == 'Bend':
+            ax.axhline(Rm, color='grey', lw=1); ax.axhline(-Rm, color='grey', lw=1)
+        else:
+            ax.add_patch(patches.Circle((0, 0), Rm, fill=False, color='grey', lw=1))
+        ax.set_title(f"{r['Magnet type']}  ({w['name']})\n"
+                     f"R = {Rm:.1f} mm, B$_{{pole}}$ = {r['_B']:.3f} T",
+                     fontsize=9, color='crimson' if r['Flag'] else 'black')
+        ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim)
+        ax.set_aspect('equal'); ax.grid(alpha=0.3)
+        ax.tick_params(labelsize=8)
+    for ax in list(axs.flat)[n_var:]:
+        ax.axis('off')
+    for ax in axs[-1]:
+        ax.set_xlabel('x [mm]', fontsize=9)
+    for ax in axs[:, 0]:
+        ax.set_ylabel('y [mm]', fontsize=9)
+    fig.suptitle(f'DA in mm (solid), chamber = DA + {chamber_margin*1e3:.0f} mm (dotted), '
+                 f'pole radius / gap (grey), at the largest-beta magnet of each type',
+                 fontsize=11)
+    fig.tight_layout()
+    fig.savefig(f'{folder_ap}/DA_mm_per_magnet_type_{mode}.png', dpi=200, bbox_inches='tight')
+
+    # --- 7. Table ---------------------------------------------------------------
+    df_show = df_pole.drop(columns=['_R', '_B', '_t'])
+    pt_pole = PrettyTable(list(df_show.columns))
+    for _, r in df_show.iterrows():
+        pt_pole.add_row(list(r.values))
+    print(f'\nBrho = {brho:.4f} T m, chamber margin = {chamber_margin*1e3:.0f} mm, '
+          f'wall = {wall_thickness*1e3:.1f} mm')
+    print(pt_pole)
+
+    cols_png = [c for c in df_show.columns if c != 'Examples']
+    fig, ax = plt.subplots(figsize=(16, 0.42 * len(df_show) + 1.2))
+    ax.axis('off')
+    tab = ax.table(cellText=df_show[cols_png].values.tolist(), colLabels=cols_png,
+                   cellLoc='center', loc='center')
+    tab.auto_set_font_size(False); tab.set_fontsize(9); tab.scale(1.1, 1.5)
+    for (r_, c_), cell in tab.get_celld().items():
+        if r_ == 0:
+            cell.set_text_props(weight='bold')
+        elif df_show.iloc[r_ - 1]['Flag']:
+            cell.set_facecolor('#fde0dc')
+    fig.savefig(f'{folder_ap}/pole_tip_fields_{mode}.png', dpi=200, bbox_inches='tight')
+
+
     import numpy as np
     import matplotlib.pyplot as plt
     import xobjects as xo
@@ -964,7 +1237,7 @@ if mode=='perfect':
         'number_of_particles': 1000,
         'inv1': 0,
         'inv2': 0,
-        'start_element': 'QD1_R1',
+        'start_element': marker_name,
         'ini_cond_nemittance_x': n_emittancex,
         'ini_cond_nemittance_y': n_emittancey,
         'ini_cond_bunch_length': 4.8e-3,

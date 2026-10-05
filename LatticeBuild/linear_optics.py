@@ -31,7 +31,7 @@ def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
 
 
 def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
-               betay_DS_target=None, MakePlot=False):
+               betay_DS_target=None, MakePlot=False,FDF=True):
     import numpy as np
 
     cell_arc_opt.run_jacobian(10)
@@ -63,11 +63,18 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
 
     BETA_MAX = 5.
     soft_beta = []
-    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
-                soft_beta += [
-                    xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                    xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                ]
+    if FDF==False:
+            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
+                            soft_beta += [
+                                xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                                xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                            ]
+    else:
+            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+                                    soft_beta += [
+                                        xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                                        xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                                    ]
     targets += soft_beta
 
     # Add decoupled DS betay knob/target if requested
@@ -98,7 +105,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
 
 def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
                  cell_tr_opt, cell_tr, arc1R, betay_DS_target=None,
-                 MakePlot=False):
+                 MakePlot=False, FDF=True):
     cell_arc_opt.run_jacobian(10)
     tw_cell = cell_arc.twiss(method='4d')
     cell_tr_opt.targets[0].value = betxS
@@ -123,11 +130,18 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
 
     BETA_MAX = 5.
     soft_beta = []
-    for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
-                    soft_beta += [
-                        xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                        xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                    ]
+    if FDF==False:
+        for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
+                        soft_beta += [
+                            xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                            xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                        ]
+    else:
+            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+                                soft_beta += [
+                                    xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                                    xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+                                ]
     targets += soft_beta
 
     # If decoupled DS betay quads are present, add them to vary
@@ -539,12 +553,15 @@ def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
 
 def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                             arc1R, wp_constants, n_periods=6,
-                            betay_DS_target=None):
+                            betay_DS_target=None, FDF=True):
     kQFtr_saved = arc1R.vars['kQFtr']._value
     kQDtr_saved = arc1R.vars['kQDtr']._value
 
-    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
-    
+    if FDF==True:
+        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=True)
+    if FDF==False:
+            matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=False)
+        
     # Check what we actually got
     tw_cell = cell_arc.twiss(method='4d')
     tw_check = arc1R.twiss(method='4d',
@@ -566,9 +583,17 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
     tw_tr = cell_tr.twiss(method='4d')
     mid   = len(tw_tr.betx) // 2
 
-    matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
+
+    if FDF==True:
+        matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
                  cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
-                 betay_DS_target=betay_DS_target)
+                 betay_DS_target=betay_DS_target, FDF=True)
+
+    if FDF==False:
+            matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
+                     cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
+                     betay_DS_target=betay_DS_target, FDF=False)
+            
     #matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
 
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):

@@ -1,0 +1,11 @@
+quantity,value_mm
+beam x amplitude (99.9%),62.56086538423669
+beam x amplitude + |D_x delta| (99.9%),62.5781763554949
+beam y amplitude (99.9%),37.01022600141647
+beam max x amplitude,70.47629737520404
+beam max y amplitude,69.32365671721055
+ring DA +x,13.582420572560196
+ring DA -x,13.582420572560196
+ring DA y,14.597768577346983
+ring chamber x (DA + margin),18.582420572560196
+ring chamber y (DA + margin),19.597768577346983

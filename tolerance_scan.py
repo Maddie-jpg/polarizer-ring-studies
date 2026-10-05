@@ -47,7 +47,7 @@ Usage (from the repo root):
     python tolerance_scan.py --aperture-mode fixed \
         --fixed-aperture '{"Bend":[30e-3,15e-3],"Quadrupole":[30e-3,30e-3],"Sextupole":[30e-3,30e-3]}'
 """
-
+#%%
 import os
 import sys
 import json
@@ -473,10 +473,12 @@ def injection_particles(line, tw, df, n_inj, seed, disp_match=True):
         px = px + tw.dpx[0] * delta
         y = y + tw.dy[0] * delta
         py = py + tw.dpy[0] * delta
-    return line.build_particles(x=x + tw.x[0], px=px + tw.px[0],
-                                y=y + tw.y[0], py=py + tw.py[0],
-                                zeta=zeta + tw.zeta[0], delta=delta,
-                                method='4d')
+    ref = line.particle_ref
+    return xt.Particles(_context=line._context,
+                        mass0=ref.mass0, q0=ref.q0, p0c=ref.p0c[0],
+                        x=x + tw.x[0], px=px + tw.px[0],
+                        y=y + tw.y[0], py=py + tw.py[0],
+                        zeta=zeta + tw.zeta[0], delta=delta)
 
 
 def track_injection(line, tw, df, n_inj, n_turns, seed):
@@ -558,7 +560,7 @@ def parse_args():
     ap.add_argument('--phase', type=int, default=int(env('PHASE', 90)))
     ap.add_argument('--changes', default=env('CHANGES', None))
     # beam / aperture
-    ap.add_argument('--dist', default='PositronBeam_2p86GeV/Beam_3GHzOption_2.86GeV_20260421.dat')
+    ap.add_argument('--dist', default='PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat')
     ap.add_argument('--containment', type=float, default=0.999,
                     help='beam fraction defining W_max and delta_max')
     ap.add_argument('--d-co', type=float, default=1e-3, help='orbit + alignment allowance [m]')
@@ -592,7 +594,8 @@ def parse_args():
     ap.add_argument('--delta-scan', type=float, default=0.04)
     ap.add_argument('--n-delta', type=int, default=20)
     ap.add_argument('--radiation', default='mean', choices=['mean', 'none'])
-    ap.add_argument('--threads', default='auto')
+    ap.add_argument('--threads', default='auto',
+                    help="OpenMP threads for tracking ('auto', N, or 0 = serial)")
     # pass criteria
     ap.add_argument('--da-required', type=float, default=1.0)
     ap.add_argument('--inj-required', type=float, default=0.95)
@@ -667,7 +670,9 @@ def main():
 
     scales = [float(s) for s in args.scales.split(',')]
     seeds = [args.seed0 + i for i in range(args.n_seeds)]
-    context = xo.ContextCpu(omp_num_threads=args.threads)
+    serial_context = xo.ContextCpu()
+    threads = int(args.threads) if str(args.threads).isdigit() else args.threads
+    context = serial_context if threads == 0 else xo.ContextCpu(omp_num_threads=threads)
 
     for scale in scales:
         for seed in seeds:
@@ -678,7 +683,9 @@ def main():
                    'delta_max': beam['delta_max'], 'inj_survival': np.nan}
             try:
                 line = base.copy()
-                line.build_tracker(_context=context)
+                # Serial tracker for twiss / orbit correction: Xsuite does not
+                # support twiss with radiation on an OpenMP context.
+                line.build_tracker(_context=serial_context)
                 apply_alignment_and_field_errors(line, mags, seed, args.sig_shift,
                                                  args.sig_rot, args.sig_field, args.cut)
                 apply_multipoles(line, mags, table, apertures, seed, scale, only, args.cut)
@@ -688,6 +695,13 @@ def main():
                     misalign_correctors(line, seed, args.sig_shift, args.cut)
                     correct_orbit(line, seed)
                 tw = line.twiss(method='6d' if args.radiation == 'mean' else '4d')
+                # Everything twiss-dependent is now in `tw`; switch to the
+                # tracking context (OpenMP if --threads != 0).
+                if context is not serial_context:
+                    line.discard_tracker()
+                    line.build_tracker(_context=context)
+                    if args.radiation == 'mean':
+                        line.configure_radiation(model='mean')
                 row.update({'qx': tw.qx, 'qy': tw.qy,
                             'orbit_rms_x': float(np.std(tw.x)), 'orbit_rms_y': float(np.std(tw.y))})
                 da = track_DA(line, tw, beam, gb, args.turns_da, args.n_angles, args.n_r, args.r_max)
