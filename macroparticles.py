@@ -28,7 +28,7 @@ changes=os.environ.get('CHANGES',None)
 ENERGY_COMPRESSOR_ON = os.environ.get('ENERGY_COMPRESSOR', 'false').strip().lower() not in ('0', 'false', 'off', 'no')
 
 # %%
-df = pd.read_csv('/home/mwatson/Documents/laughing-octo-bassoon/PositronBeam_2p86GeV/Beam_3GHzOption_2.86GeV_20260421.dat', sep=r'\s+')
+df = pd.read_csv('/home/mwatson/Documents/laughing-octo-bassoon/PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat', sep=r'\s+')
 print(list(df.columns))
 
 # %%
@@ -144,7 +144,7 @@ def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
     df_res = df_res.sort_values(by=['Efficiency_%', 'RMS_Spread_%'], ascending=[False, True])
     return df_res
 
-df_raw=filter_beam_core(df, n_sigma=8)
+df_raw=filter_beam_core(df, n_sigma=5)
 
 # %%
 '''
@@ -512,7 +512,7 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 # %%
 
-df_clean = filter_by_action_xy(df, n_sigma=8)
+df_clean = filter_by_action_xy(df, n_sigma=5)
 print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
 
 emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
@@ -673,6 +673,7 @@ ax_right.tick_params(axis='y', labelleft=False)
 plt.savefig(f'{folder}/longitudinal_phase_space.png')
 plt.show()
 
+plt.style.use('default')
 # %%
 
 plot_twiss_with_particles(df_clean, 'x[mm]', 'xp[mrad]', ax, bx, emittance_x)
@@ -696,6 +697,9 @@ beam_results = {
         "dispersion": float(dy),
         "dispersion_prime": float(ddy),
         "emittance_geo": float(emittance_y)
+    },
+    "longitudinal": {
+        "delta_rms": float(relative_spread / 100)
     },
     "metadata": {
         "particle_type": "positron",
@@ -766,6 +770,10 @@ else:
     
 ring=pdr.lines['ring']
 marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
+# Start the ring at the injection marker, so every track() call below begins
+# where the beam is injected (and matched). Without this, tracking starts at
+# element 0 even though the particles are matched to the optics at the marker.
+ring.cycle(name_first_element=marker_name, inplace=True)
 ring.element_dict['RFCav'].voltage = 8e6
 ring.element_dict['RFCav_1'].voltage = 8e6
 
@@ -869,6 +877,281 @@ for ax_i, pos_col, ang_col, beta_l, alpha_l, beta_r, alpha_r, eps, plane_label i
 plt.tight_layout()
 plt.savefig(f'{folder}/normalised_phase_space_density.png')
 plt.show()
+
+# %% Physical aperture and pole-tip fields from the injected beam's rms emittances
+import matplotlib.patches as mpatches
+
+
+def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
+                            n_sigma_beam=3, chamber_margin=5e-3, wall_thickness=0.0,
+                            B_limits=None, ds=0.02):
+    """Size the vacuum chamber and magnet bores from the injected beam, and
+    count how many rms emittances fit.
+ 
+      beam size      sigma_x(s) = sqrt(beta_x eps_x + (D_x sigma_delta)^2)
+                     sigma_y(s) = sqrt(beta_y eps_y)
+      envelope       n_sigma_beam * sigma
+      chamber        envelope + chamber_margin
+      fit count      N_sigma = chamber / sigma  (rms beam sizes that fit)
+                     N_eps   = N_sigma^2        (rms emittances that fit)
+ 
+    eps_x, eps_y are geometric rms emittances in m rad. Everything is local to
+    this function, so it doesn't touch the script's globals (ax, dx, ...).
+    Returns (df_mag, df_pole).
+    """
+    if B_limits is None:
+        B_limits = {'Bend': 1.5, 'Quadrupole': 1.1, 'Sextupole': 0.8}
+    magnet_types = ('Bend', 'Quadrupole', 'Sextupole')
+    mu0 = 4e-7 * np.pi
+    brho = ring.particle_ref.p0c[0] / 299792458.0
+    folder_ap = mf.results_dir(design, config, phase, changes=changes,
+                               metric='PhysicalAperture', sub=mode_tag)
+    print(f'Injected beam (rms): eps_x = {eps_x*1e6:.3f} um, eps_y = {eps_y*1e6:.3f} um, '
+          f'sigma_delta = {sigma_delta*100:.3f} % | envelope = {n_sigma_beam} sigma, '
+          f'chamber = envelope + {chamber_margin*1e3:.0f} mm')
+ 
+    # --- optics every ds metres (deep copy, radiation off) ---
+    ring_ap = ring.copy()
+    ring_ap.configure_radiation(model=None)
+    ring_ap.cut_at_s(np.arange(ds, ring_ap.get_length() - ds / 2, ds))
+    tw_ap = ring_ap.twiss4d()
+    s_ap = np.asarray(tw_ap.s)
+    sig_x = np.sqrt(tw_ap.betx * eps_x + (tw_ap.dx * sigma_delta)**2)
+    sig_y = np.sqrt(tw_ap.bety * eps_y + (tw_ap.dy * sigma_delta)**2)
+    env_x, env_y = n_sigma_beam * sig_x, n_sigma_beam * sig_y
+    C_x, C_y = env_x + chamber_margin, env_y + chamber_margin
+ 
+    # --- per magnet ---
+    tt_ap = ring.get_table()
+    rows = []
+    for name, etype, s0 in zip(tt_ap.name, tt_ap.element_type, tt_ap.s):
+        if etype not in magnet_types:
+            continue
+        el = ring[name]
+        s1 = s0 + el.length
+        i0, i1 = np.searchsorted(s_ap, s0 - 1e-9), np.searchsorted(s_ap, s1 + 1e-9)
+        sl = slice(i0, max(i1, i0 + 1))
+        ch_x, ch_y = float(C_x[sl].max()), float(C_y[sl].max())
+        sx_max, sy_max = float(sig_x[sl].max()), float(sig_y[sl].max())
+        rows.append({'name': name, 'family': name.split('::')[0].split('_')[0],
+                     'type': etype, 's_start': s0, 's_end': s1, 'length': el.length,
+                     'betx_max': float(np.max(tw_ap.betx[sl])),
+                     'bety_max': float(np.max(tw_ap.bety[sl])),
+                     'dx_max': float(np.max(np.abs(tw_ap.dx[sl]))),
+                     'sigma_x_max': sx_max, 'sigma_y_max': sy_max,
+                     'chamber_x': ch_x, 'chamber_y': ch_y, 'chamber_r': max(ch_x, ch_y),
+                     'N_sigma_x': ch_x / sx_max, 'N_sigma_y': ch_y / sy_max,
+                     'h': el.angle / el.length if etype == 'Bend' else 0.0,
+                     'k1': getattr(el, 'k1', 0.0), 'k2': getattr(el, 'k2', 0.0)})
+    df_mag = pd.DataFrame(rows)
+    df_mag['N_eps_x'] = df_mag.N_sigma_x**2
+    df_mag['N_eps_y'] = df_mag.N_sigma_y**2
+ 
+    # distinct magnet types: name prefix + length + strength
+    df_mag['strength'] = np.where(df_mag.type == 'Bend', df_mag.h,
+                         np.where(df_mag.type == 'Quadrupole', df_mag.k1, df_mag.k2))
+    df_mag['key'] = list(zip(df_mag.family, df_mag.length.round(4), df_mag.strength.round(4)))
+ 
+    def _variant_tag(names):
+        suffixes = [n.split('::')[0].split('_', 1)[1] if '_' in n else '' for n in names]
+        tag = ''
+        for ch in os.path.commonprefix(suffixes):
+            if not ch.isalpha():
+                break
+            tag += ch
+        return tag
+ 
+    variant_of_key = {}
+    for fam, g in df_mag.groupby('family', sort=False):
+        keys = list(dict.fromkeys(g.key))
+        if len(keys) == 1:
+            variant_of_key[keys[0]] = fam
+            continue
+        labels = {k_: (f'{fam}_{_variant_tag(g[g.key == k_].name)}'
+                       if _variant_tag(g[g.key == k_].name) else fam) for k_ in keys}
+        if len(set(labels.values())) < len(keys):
+            labels = {k_: f'{fam} ({k_[2]:+.4g})' for k_ in keys}
+        variant_of_key.update(labels)
+    df_mag['variant'] = df_mag.key.map(variant_of_key)
+    df_mag.drop(columns='key').to_csv(f'{folder_ap}/chamber_per_magnet_{mode_tag}.csv', index=False)
+ 
+    i_wx, i_wy = df_mag.N_sigma_x.idxmin(), df_mag.N_sigma_y.idxmin()
+    Nsx, Nsy = df_mag.N_sigma_x[i_wx], df_mag.N_sigma_y[i_wy]
+    print(f'Ring acceptance with chamber = {n_sigma_beam} sigma + {chamber_margin*1e3:.0f} mm:')
+    print(f'  x: {Nsx:.2f} rms beam sizes = {Nsx**2:.1f} rms emittances '
+          f'(limited by {df_mag.name[i_wx]}, sigma_x = {df_mag.sigma_x_max[i_wx]*1e3:.2f} mm)')
+    print(f'  y: {Nsy:.2f} rms beam sizes = {Nsy**2:.1f} rms emittances '
+          f'(limited by {df_mag.name[i_wy]}, sigma_y = {df_mag.sigma_y_max[i_wy]*1e3:.2f} mm)')
+ 
+    # --- plot along the ring ---
+    colors_ap = {'Bend': 'tab:blue', 'Quadrupole': 'tab:red', 'Sextupole': 'tab:green'}
+    fig, axs = plt.subplots(3, 1, figsize=(12, 9.5), sharex=True,
+                            gridspec_kw={'height_ratios': (1, 1, 0.8)})
+    for a, sig, env, C, lab in ((axs[0], sig_x, env_x, C_x, 'x'), (axs[1], sig_y, env_y, C_y, 'y')):
+        for _, r in df_mag.iterrows():
+            a.axvspan(r.s_start, r.s_end, color=colors_ap[r.type], alpha=0.15, lw=0)
+        a.plot(s_ap, sig * 1e3, color='grey', lw=0.8, label='1 $\\sigma$')
+        a.plot(s_ap, env * 1e3, 'k-', lw=1.2, label=f'{n_sigma_beam} $\\sigma$ beam envelope')
+        a.plot(s_ap, C * 1e3, 'k:', lw=1.3, label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
+        handles, _ = a.get_legend_handles_labels()
+        handles += [mpatches.Patch(color=c_, alpha=0.3, label=t_) for t_, c_ in colors_ap.items()]
+        a.legend(handles=handles, fontsize='small', ncol=6, loc='lower left',
+                 bbox_to_anchor=(0, 1.0), frameon=False)
+        a.set_ylabel(f'half-aperture {lab} [mm]')
+        a.set_ylim(0, None)
+        a.grid(alpha=0.3)
+    axs[2].plot(s_ap, C_x / sig_x, color='tab:red', lw=1, label='x')
+    axs[2].plot(s_ap, C_y / sig_y, color='tab:blue', lw=1, label='y')
+    axs[2].axhline(n_sigma_beam, color='k', ls='--', lw=0.8)
+    axs[2].set_ylabel('chamber / $\\sigma$')
+    axs[2].set_xlabel('s [m]')
+    axs[2].grid(alpha=0.3)
+    axs[2].legend(fontsize='small', loc='upper right')
+    fig.suptitle(f'Injected beam (rms $\\varepsilon_x$={eps_x*1e6:.2f} $\\mu$m, '
+                 f'$\\varepsilon_y$={eps_y*1e6:.2f} $\\mu$m, $\\sigma_\\delta$={sigma_delta*100:.2f} %): '
+                 f'acceptance {Nsx:.1f} $\\sigma_x$ / {Nsy:.1f} $\\sigma_y$', y=1.0)
+    fig.tight_layout()
+    fig.savefig(f'{folder_ap}/beam_envelope_chamber_{mode_tag}.png', dpi=200, bbox_inches='tight')
+    plt.show()
+ 
+    # --- 3D beam envelope along the ring (injected beam, n_sigma_beam) ---
+    from matplotlib import cm as mcm, colors as mcolors
+    stride = max(1, len(s_ap) // 3000)          # keep the surface light
+    s3, sx3, sy3 = s_ap[::stride], env_x[::stride] * 1e3, env_y[::stride] * 1e3   # [mm]
+    th3 = np.linspace(0, 2 * np.pi, 72)
+    S3, TH3 = np.meshgrid(s3, th3, indexing='ij')
+    X3 = sx3[:, None] * np.cos(TH3)
+    Y3 = sy3[:, None] * np.sin(TH3)
+    R3 = np.hypot(X3, Y3)
+    norm3 = mcolors.Normalize(R3.min(), R3.max())
+    fig = plt.figure(figsize=(12, 7))
+    a3 = fig.add_subplot(111, projection='3d')
+    a3.plot_surface(S3, X3, Y3, facecolors=mcm.viridis(norm3(R3)), rstride=2, cstride=1,
+                    linewidth=0, antialiased=False, shade=False)
+    a3.set_box_aspect((3, 1, 1))
+    a3.view_init(elev=25, azim=-60)
+    a3.set_xlabel('s [m]', labelpad=10)
+    a3.set_ylabel('x [mm]', labelpad=10)
+    a3.set_zlabel('y [mm]', labelpad=10)
+    fig.colorbar(mcm.ScalarMappable(norm=norm3, cmap=mcm.viridis), ax=a3, shrink=0.6, pad=0.1,
+                 label='Beam radius R(s,$\\theta$) [mm]')
+    a3.set_title(f'{n_sigma_beam}$\\sigma$ beam envelope (injected beam rms emittances, {mode_tag})')
+    fig.tight_layout()
+    fig.savefig(f'{folder_ap}/beam_envelope_3D_{mode_tag}.png', dpi=200, bbox_inches='tight')
+    plt.show()
+ 
+    # --- pole-tip fields per magnet type ---
+    pole_rows, worst = [], {}
+    for var, g in df_mag.groupby('variant', sort=False):
+        mtype = g.type.iloc[0]
+        R = (g.chamber_y.max() if mtype == 'Bend' else g.chamber_r.max()) + wall_thickness
+        worst[var] = g.loc[g.chamber_r.idxmax()]
+        if mtype == 'Bend':
+            h, k1 = g.h.iloc[0], g.k1.iloc[0]
+            B = brho * (abs(h) + abs(k1) * R)
+            strength = f'h = {h:.4f} 1/m' + (f', k1 = {k1:+.3f} 1/m2' if k1 != 0 else '')
+            NI = brho * abs(h) * R / mu0
+        elif mtype == 'Quadrupole':
+            k1 = g.k1.iloc[0]
+            B = brho * abs(k1) * R
+            strength = f'k1 = {k1:+.4f} 1/m2'
+            NI = B * R / (2 * mu0)
+        else:
+            k2 = g.k2.iloc[0]
+            B = brho * abs(k2) * R**2 / 2
+            strength = f'k2 = {k2:+.2f} 1/m3'
+            NI = B * R / (3 * mu0)
+        pole_rows.append({'Magnet type': var, 'Kind': mtype, 'N': len(g),
+                          'L [m]': f'{g.length.iloc[0]:.3f}', 'Strength': strength,
+                          'sigma x/y max [mm]': f'{g.sigma_x_max.max()*1e3:.2f} / {g.sigma_y_max.max()*1e3:.2f}',
+                          'Chamber x/y [mm]': f'{g.chamber_x.max()*1e3:.1f} / {g.chamber_y.max()*1e3:.1f}',
+                          'Fits x/y [sigma]': f'{g.N_sigma_x.min():.2f} / {g.N_sigma_y.min():.2f}',
+                          'Fits x/y [eps]': f'{g.N_eps_x.min():.1f} / {g.N_eps_y.min():.1f}',
+                          'R_pole [mm]': f'{R*1e3:.1f}', 'B_pole [T]': f'{B:.3f}',
+                          'NI/pole [kA-turns]': f'{NI*1e-3:.2f}',
+                          'Flag': 'ABOVE LIMIT' if B > B_limits[mtype] else '',
+                          'Examples': ', '.join(g.name.iloc[:2]) + (', ...' if len(g) > 2 else ''),
+                          '_R': R, '_B': B, '_t': mtype})
+    df_pole = pd.DataFrame(pole_rows)
+    df_show = df_pole.drop(columns=['_R', '_B', '_t'])
+    df_show.to_csv(f'{folder_ap}/pole_tip_fields_{mode_tag}.csv', index=False)
+ 
+    # --- cross-sections per magnet type ---
+    th = np.linspace(0, 2 * np.pi, 200)
+    n_var, ncols = len(df_pole), 4
+    nrows = int(np.ceil(n_var / ncols))
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.4 * nrows), squeeze=False)
+    lim = 1.1 * max(df_pole['_R'].max(), df_mag.chamber_x.max()) * 1e3
+    for a, (_, r) in zip(axs.flat, df_pole.iterrows()):
+        w = worst[r['Magnet type']]
+        ex, ey = n_sigma_beam * w.sigma_x_max, n_sigma_beam * w.sigma_y_max
+        X, Y = ex * np.cos(th), ey * np.sin(th)
+        rr = np.hypot(X, Y)
+        Xc, Yc = X * (rr + chamber_margin) / rr, Y * (rr + chamber_margin) / rr
+        a.plot(w.sigma_x_max * np.cos(th) * 1e3, w.sigma_y_max * np.sin(th) * 1e3,
+               color=colors_ap[r['_t']], lw=0.8, alpha=0.6)
+        a.plot(X * 1e3, Y * 1e3, '-', color=colors_ap[r['_t']], lw=1.4)
+        a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3)
+        Rm = r['_R'] * 1e3
+        if r['_t'] == 'Bend':
+            a.axhline(Rm, color='grey', lw=1)
+            a.axhline(-Rm, color='grey', lw=1)
+        else:
+            a.add_patch(mpatches.Circle((0, 0), Rm, fill=False, color='grey', lw=1))
+        a.set_title(f"{r['Magnet type']}  ({w['name']})\n"
+                    f"R = {Rm:.1f} mm, B$_{{pole}}$ = {r['_B']:.3f} T, "
+                    f"fits {w.N_sigma_x:.1f}/{w.N_sigma_y:.1f} $\\sigma$",
+                    fontsize=9, color='crimson' if r['Flag'] else 'black')
+        a.set_xlim(-lim, lim)
+        a.set_ylim(-lim, lim)
+        a.set_aspect('equal')
+        a.grid(alpha=0.3)
+        a.tick_params(labelsize=8)
+    for a in list(axs.flat)[n_var:]:
+        a.axis('off')
+    for a in axs[-1]:
+        a.set_xlabel('x [mm]', fontsize=9)
+    for a in axs[:, 0]:
+        a.set_ylabel('y [mm]', fontsize=9)
+    fig.suptitle(f'Injected beam: 1 $\\sigma$ (faint) and {n_sigma_beam} $\\sigma$ (solid), '
+                 f'chamber = {n_sigma_beam} $\\sigma$ + {chamber_margin*1e3:.0f} mm (dotted), '
+                 f'pole (grey), at the largest-beam magnet of each type', fontsize=11)
+    fig.tight_layout()
+    fig.savefig(f'{folder_ap}/beam_cross_section_per_magnet_type_{mode_tag}.png', dpi=200,
+                bbox_inches='tight')
+    plt.show()
+ 
+    # --- table ---
+    print(f'\nBrho = {brho:.4f} T m, envelope = {n_sigma_beam} sigma, '
+          f'chamber margin = {chamber_margin*1e3:.0f} mm, wall = {wall_thickness*1e3:.1f} mm')
+    print(df_show.drop(columns='Examples').to_string(index=False))
+    cols_png = [c_ for c_ in df_show.columns if c_ != 'Examples']
+    fig, a = plt.subplots(figsize=(19, 0.42 * len(df_show) + 1.2))
+    a.axis('off')
+    tab = a.table(cellText=df_show[cols_png].values.tolist(), colLabels=cols_png,
+                  cellLoc='center', loc='center')
+    tab.auto_set_font_size(False)
+    tab.set_fontsize(8)
+    tab.scale(1.05, 1.5)
+    for (r_, c_), cell in tab.get_celld().items():
+        if r_ == 0:
+            cell.set_text_props(weight='bold')
+        elif df_show.iloc[r_ - 1]['Flag']:
+            cell.set_facecolor('#fde0dc')
+    fig.savefig(f'{folder_ap}/pole_tip_fields_{mode_tag}.png', dpi=200, bbox_inches='tight')
+    plt.show()
+    print(f'Results in {folder_ap}')
+    return df_mag, df_pole
+
+
+
+
+
+# rms beam parameters computed above: emittances in mm mrad (= um), spread in %
+sigma_delta_for_aperture = relative_spread / 100   # whole beam incl. tails; set a core value if preferred
+aperture_mag, aperture_pole = physical_aperture_study(
+    ring, emittance_x * 1e-6, emittance_y * 1e-6, sigma_delta_for_aperture, mode,
+    n_sigma_beam=3, chamber_margin=5e-3)
 
 # %%
 rand_num = 74

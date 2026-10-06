@@ -51,7 +51,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
         xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
         #xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
-        xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
+        #xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
         
     ]
     targets = [
@@ -64,13 +64,13 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
     BETA_MAX = 5.
     soft_beta = []
     if FDF==False:
-            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
+            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QDTrip_xR1']:
                             soft_beta += [
                                 xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                                 xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                             ]
     else:
-            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QFTrip_xR1']:
                                     soft_beta += [
                                         xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                                         xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
@@ -131,13 +131,13 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     BETA_MAX = 5.
     soft_beta = []
     if FDF==False:
-        for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QFTrip_xR1']:
+        for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QDTrip_xR1']:
                         soft_beta += [
                             xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                             xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                         ]
     else:
-            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDTrip_xR1']:
+            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QFTrip_xR1']:
                                 soft_beta += [
                                     xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
                                     xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
@@ -559,9 +559,11 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
 
     if FDF==True:
         matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=True)
+        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=True)
     if FDF==False:
-            matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=False)
-        
+        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=False)
+        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=False)
+
     # Check what we actually got
     tw_cell = cell_arc.twiss(method='4d')
     tw_check = arc1R.twiss(method='4d',
@@ -594,8 +596,7 @@ def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                      cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
                      betay_DS_target=betay_DS_target, FDF=False)
             
-    #matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods)
-
+    
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
     """Register all lines in pdr.lines — same keys for all lattice functions."""
     pdr.lines['arc1R']    = arc1R
