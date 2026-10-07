@@ -31,7 +31,8 @@ def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
 
 
 def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
-               betay_DS_target=None, MakePlot=False,FDF=True):
+               betay_DS_target=None, MakePlot=False, FDF=True,
+               beta_weight=3.0, use_ctr_symmetry=False):
     import numpy as np
 
     cell_arc_opt.run_jacobian(10)
@@ -40,49 +41,42 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
               bety=cell_arc_tw.bety[0], alfy=cell_arc_tw.alfy[0],
               dx=cell_arc_tw.dx[0],     dpx=cell_arc_tw.dpx[0])
 
-    mux0 = arc1R.twiss(method='4d', **bc).mux[-1]
-    muy0 = arc1R.twiss(method='4d', **bc).muy[-1]
+    tw0 = arc1R.twiss(method='4d', **bc)
+    mux0, muy0 = tw0.mux[-1], tw0.muy[-1]
 
-    
+    knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF)
+    vary = [xt.Vary(k, step=1e-5, limits=(-15, 15)) for k in knob_names]
 
-    # Build vary and targets before creating opt
-    vary = [
-        xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4, limits=(-15, 15)),
-        xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4, limits=(-10, 10)),
-        xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4, limits=(-10, 10)),
-        #xt.VaryList(['kQFtr',   'kQDtr'],   step=1e-4, limits=(-10, 10)),
-        #xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
-        
-    ]
     targets = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
-        xt.TargetSet(mux=mux0, muy=muy0, at=xt.END, tol=1e-9, tag='phase'),
+        xt.TargetSet(mux=mux0, muy=muy0, at=xt.END, tol=1e-8, tag='phase'),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-        xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', tol=1e-9, weight=10.),
     ]
-
-    BETA_MAX = 5.
-    soft_beta = []
-    if FDF==False:
-            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QDTrip_xR1']:
-                            soft_beta += [
-                                xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                                xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                            ]
-    else:
-            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QFTrip_xR1']:
-                                    soft_beta += [
-                                        xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                                        xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                                    ]
-    targets += soft_beta
-
-    # Add decoupled DS betay knob/target if requested
-    '''if betay_DS_target is not None:
-        vary.append(xt.VaryList(['kQDDoubDS'], step=1e-4))
+    # alfx=alfy=0 at CtrS1 is a design preference (waist at the straight
+    # centre), not a periodicity requirement -- alfx=alfy=0 at END already
+    # closes the half-period. With it on, the problem is 8 hard targets at
+    # tol=1e-9 against 6 knobs and never converges, leaving ~0.4 of Qx for
+    # the global fine-tune to brute-force. Off by default.
+    if use_ctr_symmetry:
         targets.append(
-            xt.Target('bety', betay_DS_target,
-                      at='CtrS1_xR1', tol=1e-4, weight=0.1, tag='betay_DS'))'''
+            xt.TargetSet(alfx=0, alfy=0, at='CtrS1_xR1', tol=1e-9, weight=10.))
+
+    # Bound beta through the DS and the straight. These must carry real
+    # weight: at the old weight=0.02 they were effectively ignored and bety
+    # ran to 16 m in the dispersion suppressor. BETA_MAX below ~9 m collapses
+    # the horizontal plane instead (betx -> 30 m), so 10 m is the knee.
+    BETA_MAX = betay_DS_target if betay_DS_target else 10.
+    if BETA_MAX < 10.:
+        print(f'matchingWP: betay_DS_target={BETA_MAX:g} m is below the ~10 m '
+              f'knee for this lattice -- the match either misses it entirely '
+              f'(bety -> 16 m) or goes unstable. Clamping to 10.0 m; to go '
+              f'lower, change the straight geometry (l_tripl / l_trips) first.')
+        BETA_MAX = 10.
+    for mk in mk_list:
+        targets += [
+            xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
+            xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
+        ]
 
     opt = arc1R.match(
         method='4d', solve=False, verbose=False, **bc,
@@ -90,9 +84,13 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
 
     pt = [t for t in opt.targets if t.tag == 'phase']
 
+    target_mux = qx / n_periods
+    target_muy = qy / n_periods
+
+    # Ramping loop using increment steps relative to starting tune
     for frac in np.linspace(1/16, 1, 16):
-        pt[0].value = mux0 + frac * (qx/n_periods - mux0)
-        pt[1].value = muy0 + frac * (qy/n_periods - muy0)
+        pt[0].value = mux0 + frac * (target_mux - mux0)
+        pt[1].value = muy0 + frac * (target_muy - muy0)
         try:
             opt.solve(n_steps=40)
         except Exception:
@@ -104,8 +102,8 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
 
 
 def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
-                 cell_tr_opt, cell_tr, arc1R, betay_DS_target=None,
-                 MakePlot=False, FDF=True):
+                 cell_tr_opt, cell_tr, arc1R, qx_target=None, qy_target=None,
+                 n_periods=6, betay_DS_target=None, MakePlot=False, FDF=True):
     cell_arc_opt.run_jacobian(10)
     tw_cell = cell_arc.twiss(method='4d')
     cell_tr_opt.targets[0].value = betxS
@@ -113,44 +111,35 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     cell_tr_opt.run_jacobian(10)
     tw_tr = cell_tr.twiss(method='4d')
 
-    
-
-    vary = [xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
-            xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
-            xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
-            #xt.VaryList(['l_trans', 'l_doub','l_trips'],  step=1e-5, limits=(0.05, 0.9)),
-            ]
+    vary = [
+        xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
+        xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
+        xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
+    ]
 
     targets = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-        xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0],
-                     at=xt.END, tol=1e-6),
+        xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0], at=xt.END, tol=1e-6),
     ]
+
+    # Retain phase advance / WP matching constraint during beta matching
+    if qx_target is not None and qy_target is not None:
+        targets.extend([
+            xt.Target('mux', qx_target / n_periods, at=xt.END, tol=1e-8),
+            xt.Target('muy', qy_target / n_periods, at=xt.END, tol=1e-8),
+        ])
 
     BETA_MAX = 5.
     soft_beta = []
-    if FDF==False:
-        for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QDTrip_xR1']:
-                        soft_beta += [
-                            xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                            xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                        ]
-    else:
-            for mk in ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 'QFTrip_xR1']:
-                                soft_beta += [
-                                    xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                                    xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-                                ]
+    mk_list = ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 
+               'QFTrip_xR1' if FDF else 'QDTrip_xR1']
+    for mk in mk_list:
+        soft_beta += [
+            xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+            xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+        ]
     targets += soft_beta
-
-    # If decoupled DS betay quads are present, add them to vary
-    # and add an explicit bety target at the straight centre
-    ''' if betay_DS_target is not None:
-        vary.append(xt.VaryList(['kQDDoubDS'], step=1e-4))
-        targets.append(
-            xt.Target('bety', betay_DS_target,
-                      at='CtrS1_xR1', tol=1e-4, weight=0.1, tag='betay_DS'))'''
 
     opt = arc1R.match(
         method='4d', solve=True, assert_within_tol=False,
@@ -165,6 +154,7 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
                     betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
                     bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
                     dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0]).plot()
+    return opt
 
 def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
                           l_qy=None, frac=0.9):
@@ -217,9 +207,14 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
             off = qfds_half + frac * dlen
             plan.append((new_name, qfds, f'{sign}{off}', sign, round(off, 3)))
 
+        if 'kQDDoubDS' not in pdr.vars:
+            # Own knob, seeded from the doublet quad it used to share.
+            # Sharing kQDDoub left the DS with no independent handle on bety,
+            # which is why betay_DS_target could never be implemented.
+            pdr.vars['kQDDoubDS'] = pdr['kQDDoub']
         for new_name, qfds, at_expr, sign, off in plan:
             line.insert(
-                pdr.new(new_name, xt.Quadrupole, length=q_length, k1='kQDDoub'),
+                pdr.new(new_name, xt.Quadrupole, length=q_length, k1='kQDDoubDS'),
                 at=at_expr, from_=qfds, from_anchor='center')
 
         print(f"insert_DS_betay_quads [{line_label}]: inserted {len(plan)} quads "
@@ -237,6 +232,27 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
     for i, ln in enumerate(extra_lines):
         insert_into_line(ln, f'extra[{i}]')
     return pdr
+
+def _beta_bound_setup(arc1R, FDF=True):
+    """
+    Return (knob_names, marker_names) for the bounded sextant match.
+
+    Both are derived from the line rather than hard-coded, so they follow
+    N_cells_S and the triplet topology instead of silently going stale.
+    """
+    names = list(arc1R.element_names)
+    knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
+             'kQFDoub', 'kQDDoub', 'kQFtr', 'kQDtr']
+    if any(n.startswith('QDDoubDS_') for n in names):
+        knobs.append('kQDDoubDS')
+    pref = ('QFA_M', 'QDA_M', 'QFDS_', 'QDDS_', 'QDDoubDS_',
+            'QFDoub_', 'QDDoub_', 'QFTrip_' if FDF else 'QDTrip_')
+    seen, mks = set(), []
+    for n in names:
+        if n.startswith(pref) and n not in seen:
+            seen.add(n); mks.append(n)
+    return knobs, mks
+
 
 def _seed_arc_knobs(pdr, l_cell=None, l_quad=None, mu_cell=0.25):
     """
@@ -497,35 +513,112 @@ def _make_reference_cells(pdr, FDF=True):
     ])
     return cell_arc, cell_tr
 
-def _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R'):
-    """Insert RF cavity into ring. Call before any 6d matching."""
+def _straight_anchor(line, drift_base='DrTripl'):
+    """
+    Return the quadrupole immediately upstream of the first <drift_base>* drift.
+
+    This is QDDoub in a D-F-D straight and QFDoub in an F-D-F straight.
+    Resolving it from the lattice instead of hard-coding it is what stops a
+    change of triplet topology from silently misplacing the symmetry marker
+    and the RF cavity.
+    """
+    names = list(line.element_names)
+    d = next((n for n in names if n.startswith(drift_base)), None)
+    if d is None:
+        raise RuntimeError(f'_straight_anchor: no {drift_base}* drift in line')
+    anchor = names[names.index(d) - 1]
+    cls = line.element_dict[anchor].__class__.__name__
+    if cls != 'Quadrupole':
+        raise RuntimeError(
+            f'_straight_anchor: {anchor} (element before {d}) is a {cls}, '
+            f'not a Quadrupole. The at=(l_tripl+l_quad)/2 offset assumes the '
+            f'anchor quad is adjacent to the long drift.')
+    return anchor
+
+
+def _straight_drift_after(line, anchor, drift_base='DrTripl'):
+    """
+    Verify <anchor> really is adjacent to the long straight drift and return
+    (drift_name, drift_length). at='(l_tripl+l_quad)/2' lands on the drift
+    centre only if this holds -- if it does not, the placement is silently
+    wrong by the length of whatever sits in between.
+    """
+    names = list(line.element_names)
+    if anchor not in names:
+        raise RuntimeError(f'_straight_drift_after: {anchor} not in line')
+    nxt = names[names.index(anchor) + 1]
+    if not nxt.startswith(drift_base):
+        raise RuntimeError(
+            f'_straight_drift_after: element after {anchor} is {nxt}, not a '
+            f'{drift_base}* drift. at=(l_tripl+l_quad)/2 will NOT land on the '
+            f'drift centre -- update the anchor for this straight topology.')
+    return nxt, line.element_dict[nxt].length
+
+
+def _insert_rf(pdr, ring, U0, VRF, rf_from=None, rf_length=1.5):
+    """
+    Insert the RF cavity at the centre of the long straight drift.
+
+    rf_from=None (recommended) resolves the anchor from the lattice. Passing a
+    name explicitly is still honoured, but it is now validated: a cavity that
+    would not fit, or an anchor that is not adjacent to the long drift, raises
+    instead of letting xtrack resolve the overlap by slicing away part of a
+    quadrupole.
+    """
+    if rf_from is None:
+        rf_from = _straight_anchor(ring)
+    d_name, drift_len = _straight_drift_after(ring, rf_from)
+
+    if rf_length > drift_len:
+        raise RuntimeError(
+            f'_insert_rf: cavity is {rf_length:.3f} m but straight drift '
+            f'{d_name} is only {drift_len:.3f} m. Increase l_tripl.')
+
+    print(f'_insert_rf: RFCav_1 ({rf_length:.3f} m) at centre of {d_name} '
+          f'({drift_len:.3f} m), anchored on {rf_from}')
+
     fRev = 1. / ring.twiss(method='4d').T_rev0
     fRF  = fRev * round(4.e8 / fRev)
-    pdr.new('RFCav', xt.Cavity, length=1.5, frequency=fRF, voltage=VRF,
+    pdr.new('RFCav', xt.Cavity, length=rf_length, frequency=fRF, voltage=VRF,
             lag=(180/np.pi) * (np.pi - np.arcsin(U0/VRF)) - 1.8)
     ring.insert(pdr.new('RFCav_1', 'RFCav'),
                 at='(l_tripl+l_quad)/2', from_=rf_from)
 
+
 def _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                            period, U0, VRF, bend_edge,
-                           rf_from='QDDoub_1R'):
-    fRev = 1. / ring.twiss(method='4d').T_rev0
-    fRF  = fRev * round(4.e8 / fRev)
-    pdr.new('RFCav', xt.Cavity, length=1.5, frequency=fRF, voltage=VRF,
-            lag=(180/np.pi) * (np.pi - np.arcsin(U0/VRF)) - 1.8)
-    ring.insert(pdr.new('RFCav_1', 'RFCav'),
-                at='(l_tripl+l_quad)/2', from_=rf_from)
-    
+                           rf_from=None, rf_length=1.5):
+    """Insert the RF cavity and then actually finalise. The old version never
+    called _finalise, so configure_radiation / configure_bend_model were never
+    applied to the ring."""
+    _insert_rf(pdr, ring, U0, VRF, rf_from=rf_from, rf_length=rf_length)
+    _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
+
+
+def _register_lines(pdr, **lines):
+    """
+    Register lines in pdr.lines, tolerating names that are already present.
+
+    xtrack's EnvLines.__setitem__ raises ValueError('There is already a line
+    with name ...') for any existing key -- even when re-assigning the very
+    same object. Several lattice functions call _export_lines before matching,
+    so finalising afterwards would otherwise blow up on the second write.
+    """
+    for nm, ln in lines.items():
+        cur = pdr.lines.get(nm, None)
+        if cur is ln:
+            continue                      # already registered, nothing to do
+        if cur is not None:
+            del pdr.lines[nm]             # replace a stale object
+        pdr.lines[nm] = ln
+
 
 def _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge):
     """Configure radiation/bend model and register exported lines."""
     ring.configure_radiation(model='mean')
     ring.configure_bend_model(edge=bend_edge)
-    pdr.lines['arc1R']    = arc1R
-    pdr.lines['cell_arc'] = cell_arc
-    pdr.lines['cell_tr']  = cell_tr
-    pdr.lines['period']   = period
-    pdr.lines['ring']     = ring
+    _register_lines(pdr, arc1R=arc1R, cell_arc=cell_arc, cell_tr=cell_tr,
+                    period=period, ring=ring)
 
 def _sliced(line):
     sl = line.select()
@@ -551,59 +644,75 @@ def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
             xt.TargetSet(betx=2.50, bety=2.50, at='Mkr_cell_tr', tol=1.0e-6, tag='betas')] )
     return cell_arc_opt, cell_tr_opt
 
-def _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+def _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                             arc1R, wp_constants, n_periods=6,
-                            betay_DS_target=None, FDF=True):
-    kQFtr_saved = arc1R.vars['kQFtr']._value
-    kQDtr_saved = arc1R.vars['kQDtr']._value
+                            betay_DS_target=None, FDF=True, bounded=True):
+    # Step 1: Perform Working Point (Phase) matching
+    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,
+               n_periods=n_periods, FDF=FDF,
+               betay_DS_target=betay_DS_target)
 
-    if FDF==True:
-        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=True)
-        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=True)
-    if FDF==False:
-        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=False)
-        matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,n_periods=n_periods, FDF=False)
-
-    # Check what we actually got
+    # Check status after matchingWP
     tw_cell = cell_arc.twiss(method='4d')
     tw_check = arc1R.twiss(method='4d',
-                            betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
-                            bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
-                            dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0])
+                           betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
+                           bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
+                           dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0])
+    
+    qx_ring = n_periods * tw_check.mux[-1]
+    qy_ring = n_periods * tw_check.muy[-1]
     print(f'After matchingWP:')
-    print(f'  mux at END = {tw_check.mux[-1]:.6f}  '
-          f'(target {wp_constants[0]/6:.6f})')
-    print(f'  muy at END = {tw_check.muy[-1]:.6f}  '
-          f'(target {wp_constants[1]/6:.6f})')
-    print(f'  qx_ring = {n_periods*tw_check.mux[-1]:.6f}  (target {wp_constants[0]:.6f})')
-    print(f'  qy_ring = {n_periods*tw_check.muy[-1]:.6f}  (target {wp_constants[1]:.6f})')
+    print(f'  mux at END = {tw_check.mux[-1]:.6f} (target {wp_constants[0]/n_periods:.6f})')
+    print(f'  muy at END = {tw_check.muy[-1]:.6f} (target {wp_constants[1]/n_periods:.6f})')
+    print(f'  qx_ring = {qx_ring:.6f} (target {wp_constants[0]:.6f})')
+    print(f'  qy_ring = {qy_ring:.6f} (target {wp_constants[1]:.6f})')
 
-    '''arc1R.vars['kQFtr'] = kQFtr_saved
-    arc1R.vars['kQDtr'] = kQDtr_saved
-    cell_tr_opt.run_jacobian(20)'''
-
+    # Step 2: Perform Beta function matching while locking qx and qy targets
     tw_tr = cell_tr.twiss(method='4d')
-    mid   = len(tw_tr.betx) // 2
+    mid = len(tw_tr.betx) // 2
 
-
-    if FDF==True:
+    # matchingBeta pins betx/bety at END to the reference triplet cell. In the
+    # bounded scheme that over-constrains the problem and undoes the beta
+    # bounds, so it is skipped unless explicitly re-enabled with bounded=False.
+    if not bounded:
         matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
-                 cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
-                 betay_DS_target=betay_DS_target, FDF=True)
-
-    if FDF==False:
-            matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
                      cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
-                     betay_DS_target=betay_DS_target, FDF=False)
+                     qx_target=wp_constants[0], qy_target=wp_constants[1],
+                     n_periods=n_periods, betay_DS_target=betay_DS_target,
+                     FDF=FDF)
+
+    
+
+    # 1. Check ring Twiss
+    tw_ring = ring.twiss(method='4d')
+    print(f"Pre-fit Ring Tunes: Qx = {tw_ring.qx:.6f}, Qy = {tw_ring.qy:.6f}")
+
+    # 2. Global fine-tune on full ring line.
+    #    The arc-cell quads MUST be in the vary list. The sextant match
+    #    typically lands ~0.4 short in Qx; forcing that onto kQFarcM/kQDarcM
+    #    alone needs a ~23% gradient change, which breaks the arc->DS match
+    #    and blows betx from 6.6 m to 19 m and |dx| from 0.29 m to 0.60 m.
+    #    Spreading it over the arc cell as well costs ~3% and leaves the
+    #    optics intact for the same tunes.
+    ring.match(
+        method='4d',
+        vary=[
+            xt.Vary('kQFarc',  step=1e-5),
+            xt.Vary('kQDarc',  step=1e-5),
+            xt.Vary('kQFarcM', step=1e-5),
+            xt.Vary('kQDarcM', step=1e-5),
+        ],
+        targets=[
+            xt.Target('qx', wp_constants[0], tol=1e-6),
+            xt.Target('qy', wp_constants[1], tol=1e-6),
+        ]
+    )
             
     
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
     """Register all lines in pdr.lines — same keys for all lattice functions."""
-    pdr.lines['arc1R']    = arc1R
-    pdr.lines['cell_arc'] = cell_arc
-    pdr.lines['cell_tr']  = cell_tr
-    pdr.lines['period']   = period
-    pdr.lines['ring']     = ring
+    _register_lines(pdr, arc1R=arc1R, cell_arc=cell_arc, cell_tr=cell_tr,
+                    period=period, ring=ring)
 
 
 # ---------------------------------------------------------------------------
@@ -688,8 +797,14 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
             return pdr.new_line(components=comps)
 
     arc1R = makesextant('xR', 'symm')
+    # Marker at the centre of the long drift. The anchor is resolved from the
+    # lattice: QFDoub in this F-D-F straight, QDDoub in a D-F-D one. Hard-coding
+    # QDDoub here is what put the marker 0.55 m (l_doub + l_quad) upstream of
+    # the straight centre when the triplet was reordered to F-D-F.
+    _ctr_anchor = _straight_anchor(arc1R)
+    _straight_drift_after(arc1R, _ctr_anchor)          # validates adjacency
     arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
-                 at='(l_tripl+l_quad)/2', from_='QDDoub_xR')
+                 at='(l_tripl+l_quad)/2', from_=_ctr_anchor)
     arc1R_sliced = _sliced(arc1R)
     period       = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
     period_sliced = _sliced(period)
@@ -709,9 +824,9 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
 
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+    _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP, betay_DS_target=betay_DS_target)
-    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc_opt, cell_tr_opt,
+    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
     return pdr
 
@@ -793,10 +908,12 @@ def three_fold_periodicity_long(fringe_fields=True, matched=True,
         return pdr.new_line(components=comps)
  
     arc1R = makesextant('xR', 'symm')
-    # marker at the centre of the long drift -- now measured from QFDoub,
-    # which is the quad adjacent to it in the F-D-F arrangement
+    # Marker at the centre of the long drift; anchor resolved from the lattice
+    # (QFDoub here, since this straight is F-D-F).
+    _ctr_anchor = _straight_anchor(arc1R)
+    _straight_drift_after(arc1R, _ctr_anchor)          # validates adjacency
     arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
-                 at='(l_tripl+l_quad)/2', from_='QFDoub_xR')
+                 at='(l_tripl+l_quad)/2', from_=_ctr_anchor)
     arc1R_sliced  = _sliced(arc1R)
     period        = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
     period_sliced = _sliced(period)
@@ -816,9 +933,9 @@ def three_fold_periodicity_long(fringe_fields=True, matched=True,
  
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+    _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP, betay_DS_target=betay_DS_target)
-    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc_opt, cell_tr_opt,
+    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
     return pdr
 
@@ -959,7 +1076,7 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True, WP
 
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=0.25)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+    _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
@@ -1115,7 +1232,7 @@ def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True, W
 
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=1/3)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+    _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP)
 
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
@@ -1237,7 +1354,7 @@ def three_fold_periodicity_120_deg(fringe_fields=True, matched=True, WP=constant
     else:
         cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                         mu_cell=1/3)
-        _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+        _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                             arc1R, WP)
 
         _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
@@ -1394,7 +1511,7 @@ def two_fold_1straight(fringe_fields=True, matched=True,WP=constants.WP_D2, phas
  
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+    _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP, n_periods=4)
  
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R')
@@ -1545,7 +1662,7 @@ def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.W
 
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
-    _run_standard_matching(cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+    _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP, n_periods=4,betay_DS_target=betay_DS_target)
 
     _insert_rf(pdr, ring, U0, VRF, rf_from='QDDoub_1R_2')
