@@ -21,6 +21,8 @@ import xutil_DA_CC.xsuite_utilities as xutil
 import constants
 import my_functions as mf
 from matplotlib.backends.backend_pdf import PdfPages
+import lattice_Sketch as ls
+import LatticeBuild.misalignments_corrections as mc
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
@@ -91,6 +93,8 @@ else:
     mf.survey_plot(ring)
     #plt.tight_layout()
     plt.savefig(f'{folder}/ring_survey_{mode}.png')
+
+
 
 # %%
 print(ring.element_names)
@@ -631,6 +635,17 @@ def insert_marker_in_drift(pdr, ring, drift_name='DrTripl', occurrence=0,
 
 marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
 
+pdr_copy=pdr.copy()
+if design == 1 and config == 1:
+        mc.insert_BPMs_all_as_markers(pdr_copy)
+        mc.insert_correctors_var2(pdr_copy)
+        ls.sketch_all(pdr_copy, sextant='1R', outdir=folder)
+        
+else:
+        mc.insert_BPMs_all_as_markers(pdr_copy)
+        mc.insert_correctors(pdr_copy)
+        ls.sketch_all(pdr_copy, sextant='1R', outdir=folder)
+
 if mode=='perfect':
     line=ring
     line.config.XTRACK_USE_EXACT_DRIFTS = True
@@ -1132,6 +1147,7 @@ if mode=='perfect':
     if design == 1 and config == 1:
         mc.insert_BPMs_all_as_markers(pdr)
         mc.insert_correctors_var2(pdr)
+        
     else:
         mc.insert_BPMs_all_as_markers(pdr)
         mc.insert_correctors(pdr)
