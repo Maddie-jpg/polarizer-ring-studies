@@ -30,7 +30,7 @@ design=int(os.environ.get('DESIGN',1))
 config=int(os.environ.get('CONFIG',9))
 mode=os.environ.get('MODE','perfect')
 phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES',None)
+changes=os.environ.get('CHANGES','FDF')
 
 
 # %%

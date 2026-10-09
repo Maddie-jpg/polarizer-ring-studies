@@ -452,6 +452,103 @@ def _seed_triplet_knobs_FDF(pdr, cell_tr,
     return kf, kd
  
  
+ 
+ARC_KNOBS = ('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM')
+ 
+ 
+def make_sext_knobs(pdr, ring, prefixes=None, verbose=True):
+    """
+    Put every sextupole in `ring` onto a per-family knob so xt.Vary can reach it.
+ 
+    sextupole_configs sets k2 directly on the elements, so there is no knob to
+    vary -- that is what 'Variable `kSF_n` not found' means. This groups the
+    sextupoles, creates one knob per family seeded from the current k2, and
+    re-points the elements at it. Returns the knob names.
+ 
+    prefixes=None groups by name prefix (XF1, XF2, XD1, XD2, ...).
+    prefixes=('XF','XD') lumps them into two families instead.
+    """
+    if prefixes is None:
+        fams = {}
+        for n in set(ring.element_names):
+            if pdr.element_dict[n].__class__.__name__ != 'Sextupole':
+                continue
+            m = re.match(r'^([A-Za-z]+\d*)', n)
+            fams.setdefault(m.group(1) if m else n, []).append(n)
+    else:
+        fams = {p: [n for n in set(ring.element_names)
+                    if n.startswith(p)
+                    and pdr.element_dict[n].__class__.__name__ == 'Sextupole']
+                for p in prefixes}
+ 
+    knobs = []
+    for fam, names in sorted(fams.items()):
+        if not names:
+            continue
+        knob = f'k_{fam}'
+        if knob not in pdr.vars:
+            pdr.vars[knob] = float(pdr.element_dict[sorted(names)[0]].k2)
+        for n in names:
+            pdr.element_refs[n].k2 = pdr.vars[knob]
+        knobs.append(knob)
+        if verbose:
+            print(f'  {knob:10s} <- {len(names):3d} sextupoles, '
+                  f'k2 = {pdr.varval[knob]:+9.3f}')
+    return knobs
+ 
+ 
+def retune_qx(ring, sext_knobs, qx_target, qy_target, method='6d',
+              step=0.05, arc_knobs=ARC_KNOBS, verbose=True):
+    """
+    Walk Qx to qx_target in small steps, re-correcting chromaticity each step.
+ 
+    One big jump does not work: in 6d the tune match fails outright with
+    'Could not find point within tolerance', and in 4d it converges to a worse
+    solution (betx 14.66 m vs 10.48 m for the same final Qx). Stepping also
+    keeps the sextupoles tracking the changing optics instead of being corrected
+    once at the end.
+    """
+    qx0 = ring.twiss(method=method).qx
+    n = max(1, int(np.ceil(abs(qx_target - qx0) / step)))
+    reached = qx0
+    for qx in np.linspace(qx0, qx_target, n + 1)[1:]:
+        try:
+            ring.match(method=method,
+                       vary=[xt.Vary(k, step=1e-5) for k in arc_knobs],
+                       targets=[xt.Target('qx', float(qx), tol=1e-6),
+                                xt.Target('qy', qy_target, tol=1e-6)])
+            ring.match(method=method,
+                       vary=[xt.Vary(k, step=1e-3) for k in sext_knobs],
+                       targets=[xt.Target('dqx', 0., tol=1e-3),
+                                xt.Target('dqy', 0., tol=1e-3)])
+            reached = float(qx)
+        except Exception as e:
+            if verbose:
+                print(f'  stopped at Qx={reached:.4f}: '
+                      f'{type(e).__name__}: {str(e)[:50]}')
+            break
+        if verbose:
+            tw = ring.twiss(method=method)
+            print(f'  Qx={tw.qx:7.4f} Qy={tw.qy:7.4f} '
+                  f'dqx={tw.dqx:+6.3f} dqy={tw.dqy:+6.3f} '
+                  f'betx<={tw.betx.max():6.2f} bety<={tw.bety.max():6.2f}')
+    return reached
+ 
+ 
+def delta_range(ring, dmax=0.09, step=0.0025, method='4d'):
+    """Largest +/- delta for which the periodic solution still exists."""
+    hi = lo = 0.
+    for d in np.arange(step, dmax, step):
+        try:
+            ring.twiss(method=method, delta0=float(d)); hi = d
+        except Exception:
+            break
+    for d in np.arange(-step, -dmax, -step):
+        try:
+            ring.twiss(method=method, delta0=float(d)); lo = d
+        except Exception:
+            break
+    return lo, hi
 
 
 # ----------------
