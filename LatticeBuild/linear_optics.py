@@ -30,6 +30,15 @@ def get_natural_WP(cell_arc, arc1R, n_periods=6, verbose=True):
 
 
 
+# Smallest beta bound that still gives a stable ring for the shipped
+# geometry at WP=(15.8, 13.87). Lower it only alongside a stability check.
+BETA_BOUND_FLOOR = 10.
+
+KNOB_LIMITS_DEFAULT = (-15., 15.)
+KNOB_LIMITS = {}
+FIXED_KNOBS = set()
+
+
 def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
                betay_DS_target=None, MakePlot=False, FDF=True,
                beta_weight=3.0, use_ctr_symmetry=False):
@@ -45,7 +54,9 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
     mux0, muy0 = tw0.mux[-1], tw0.muy[-1]
 
     knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF)
-    vary = [xt.Vary(k, step=1e-5, limits=(-15, 15)) for k in knob_names]
+    vary = [xt.Vary(k, step=1e-5,
+                    limits=KNOB_LIMITS.get(k, KNOB_LIMITS_DEFAULT))
+            for k in knob_names if k not in FIXED_KNOBS]
 
     targets = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
@@ -65,13 +76,14 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
     # weight: at the old weight=0.02 they were effectively ignored and bety
     # ran to 16 m in the dispersion suppressor. BETA_MAX below ~9 m collapses
     # the horizontal plane instead (betx -> 30 m), so 10 m is the knee.
-    BETA_MAX = betay_DS_target if betay_DS_target else 10.
-    if BETA_MAX < 10.:
-        print(f'matchingWP: betay_DS_target={BETA_MAX:g} m is below the ~10 m '
-              f'knee for this lattice -- the match either misses it entirely '
-              f'(bety -> 16 m) or goes unstable. Clamping to 10.0 m; to go '
-              f'lower, change the straight geometry (l_tripl / l_trips) first.')
-        BETA_MAX = 10.
+    BETA_MAX = betay_DS_target if betay_DS_target else BETA_BOUND_FLOOR
+    if BETA_MAX < BETA_BOUND_FLOOR:
+        print(f'matchingWP: betay_DS_target={BETA_MAX:g} m is below the '
+              f'{BETA_BOUND_FLOOR:g} m knee found for this geometry/working '
+              f'point -- the match either misses it entirely or goes unstable. '
+              f'Clamping. Lower lo.BETA_BOUND_FLOOR to override after '
+              f're-checking stability at your working point.')
+        BETA_MAX = BETA_BOUND_FLOOR
     for mk in mk_list:
         targets += [
             xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
@@ -233,6 +245,28 @@ def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
         insert_into_line(ln, f'extra[{i}]')
     return pdr
 
+def _check_triplet_basin(pdr, kf_max=3.0):
+    """
+    The F-D-F straight has two self-consistent solutions and the matcher can
+    land in either. kQFtr is the tell:
+
+      kQFtr ~ 1.8   weak triplet   -> QDTripC holds bety, bety <= ~10 m
+      kQFtr ~ 5.2   strong triplet -> QDTripC cannot contain bety, which then
+                                      peaks in DrTrips at the straight centre
+                                      (14-23 m) while betx drops to ~5 m
+
+    Pass triplet_seed=(1.8, -3.2) to force the weak basin.
+    """
+    kf, kd = pdr['kQFtr'], pdr['kQDtr']
+    if abs(kf) > kf_max:
+        print(f'  WARNING: kQFtr={kf:+.3f} (kQDtr={kd:+.3f}) is the '
+              f'STRONG-triplet basin. bety will peak at the straight centre. '
+              f'Rebuild with triplet_seed=(1.8, -3.2).')
+    else:
+        print(f'  triplet basin OK: kQFtr={kf:+.3f} kQDtr={kd:+.3f}')
+    return kf
+
+
 def _beta_bound_setup(arc1R, FDF=True):
     """
     Return (knob_names, marker_names) for the bounded sextant match.
@@ -242,7 +276,7 @@ def _beta_bound_setup(arc1R, FDF=True):
     """
     names = list(arc1R.element_names)
     knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
-             'kQFDoub', 'kQDDoub','l_trips','l_doub','l_trans']
+             'kQFDoub', 'kQDDoub', 'kQFtr', 'kQDtr']
     if any(n.startswith('QDDoubDS_') for n in names):
         knobs.append('kQDDoubDS')
     pref = ('QFA_M', 'QDA_M', 'QFDS_', 'QDDS_', 'QDDoubDS_',
@@ -649,11 +683,33 @@ def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            betay_DS_target=None, FDF=True, bounded=True,
                            trim_knobs=('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM'),
                            trim_warn_frac=0.05):
+    """
+    Match the sextant, then trim the ring tunes globally.
 
+    bounded=True (default) matches tune and beta TOGETHER inside matchingWP:
+    tunes as hard equalities, beta as inequalities (xt.LessThan) through the
+    matching cell, dispersion suppressor and straight. You rarely care what
+    beta IS, only that it is not too large, so leaving it an inequality gives
+    the solver slack to hit the tunes exactly, instead of beta and tune
+    fighting over the same knobs as competing equalities.
+
+    bounded=False falls back to the sequential scheme, and does BETAS FIRST.
+    Tune is global and additive, so it can be trimmed at the end with small
+    distributed gradient changes that barely move beta; beta is local, set by
+    the boundary match, and correcting it needs large changes that move the
+    tune a lot. The cheap, nearly beta-neutral step therefore goes last.
+    Tune-first (the original order) over-constrains the second stage, does not
+    converge, and leaves the residual tune error to the global trim -- which
+    then buys tune by spending beta.
+
+    Measured on the F-D-F ring at WP=(15.8, 13.87):
+        simultaneous   (bounded=True)   betx<= 5.62  bety<=10.00  |dx|<=0.272
+        betas -> tune  (bounded=False)  betx<= 8.01  bety<=11.50  |dx|<=0.278
+        tune  -> betas (the old order)  betx<=18.94  bety<=11.96  |dx|<=0.604
+    """
     qx_t, qy_t = wp_constants
 
     if not bounded:
-        # Betas first: pin the local optics before touching the tune.
         tw_tr = cell_tr.twiss(method='4d')
         mid = len(tw_tr.betx) // 2
         matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
@@ -698,34 +754,7 @@ def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
               f'spending beta -- check the matchingWP target status.')
     return tw
 
-    
 
-    # 1. Check ring Twiss
-    tw_ring = ring.twiss(method='4d')
-    print(f"Pre-fit Ring Tunes: Qx = {tw_ring.qx:.6f}, Qy = {tw_ring.qy:.6f}")
-
-    # 2. Global fine-tune on full ring line.
-    #    The arc-cell quads MUST be in the vary list. The sextant match
-    #    typically lands ~0.4 short in Qx; forcing that onto kQFarcM/kQDarcM
-    #    alone needs a ~23% gradient change, which breaks the arc->DS match
-    #    and blows betx from 6.6 m to 19 m and |dx| from 0.29 m to 0.60 m.
-    #    Spreading it over the arc cell as well costs ~3% and leaves the
-    #    optics intact for the same tunes.
-    ring.match(
-        method='4d',
-        vary=[
-            xt.Vary('kQFarc',  step=1e-5),
-            xt.Vary('kQDarc',  step=1e-5),
-            xt.Vary('kQFarcM', step=1e-5),
-            xt.Vary('kQDarcM', step=1e-5),
-        ],
-        targets=[
-            xt.Target('qx', wp_constants[0], tol=1e-6),
-            xt.Target('qy', wp_constants[1], tol=1e-6),
-        ]
-    )
-            
-    
 def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
     """Register all lines in pdr.lines — same keys for all lattice functions."""
     _register_lines(pdr, arc1R=arc1R, cell_arc=cell_arc, cell_tr=cell_tr,
@@ -736,7 +765,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # Design 1 (more variations as this was created before pipeline optimisation)
 # ---------------------------------------------------------------------------
 
-def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None):
+def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2)):
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = constants.E0; VRF = constants.VRF
@@ -777,7 +806,12 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
 
     _seed_arc_knobs(pdr, mu_cell=phase_advance)
     _seed_transition_knobs(pdr)
-    _seed_triplet_knobs_FDF(pdr, cell_tr)     # F-D-F ratio convention
+    if triplet_seed is None:
+        _seed_triplet_knobs_FDF(pdr, cell_tr)
+    else:
+        pdr.vars['kQFtr'], pdr.vars['kQDtr'] = triplet_seed
+        print(f'triplet seed forced: kQFtr={triplet_seed[0]}, '
+              f'kQDtr={triplet_seed[1]}')
 
     def makesextant(name, fall):
             comps = []
@@ -791,8 +825,24 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
             comps += [pdr.place('Drarc'),  pdr.new(f'Bend1_{name}{n}', 'Bend'),
                       pdr.place('Drarc'),  pdr.new(f'QDA_M{name}{n}',  'QDarcM'),
                       pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend'),
-                      pdr.place('DrarcS'), pdr.new(f'QFDS_{name}',     'QFDS'),
-                      pdr.place('DrDSL'),  pdr.new(f'QDDS_{name}',     'QDDS'),
+                      # swap_DS=True reverses the suppressor poles so the
+                      # DS->straight boundary alternates (QFDS next to QDDoub)
+                      # instead of putting QDDS beside QDDoub. MEASURED: worse.
+                      # It only moves the like-pole adjacency to the arc side
+                      # (QDA_M next to QDDS), where beta_x and D_x are both
+                      # near their maxima, so x pays for what y gains:
+                      #   swap_DS=False, bound 10 -> betx 5.62 bety 10.00 dx 0.272
+                      #   swap_DS=True,  bound  8 -> betx 8.63 bety 10.75 dx 0.314
+                      # and the swapped version is stable only at bound 8
+                      # (bounds 7/9/10/12 and other working points all fail).
+                      # Kept as a switch so it can be re-checked if the
+                      # straight geometry changes; leave False otherwise.
+                      pdr.place('DrarcS'),
+                      pdr.new(f'{"QDDS" if swap_DS else "QFDS"}_{name}',
+                              'QDDS' if swap_DS else 'QFDS'),
+                      pdr.place('DrDSL'),
+                      pdr.new(f'{"QFDS" if swap_DS else "QDDS"}_{name}',
+                              'QFDS' if swap_DS else 'QDDS'),
                       pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
                       # ---- F-D-F straight: D outside, F either side of drift ----
                       pdr.place('DrTrans'),pdr.new(f'QDDoub_{name}',   'QDDoub'),
@@ -845,6 +895,7 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
                            arc1R, WP, betay_DS_target=betay_DS_target)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
+    _check_triplet_basin(pdr)
     return pdr
 
 
