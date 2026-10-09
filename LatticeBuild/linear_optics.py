@@ -242,7 +242,7 @@ def _beta_bound_setup(arc1R, FDF=True):
     """
     names = list(arc1R.element_names)
     knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
-             'kQFDoub', 'kQDDoub', 'kQFtr', 'kQDtr']
+             'kQFDoub', 'kQDDoub','l_trips','l_doub','l_trans']
     if any(n.startswith('QDDoubDS_') for n in names):
         knobs.append('kQDDoubDS')
     pref = ('QFA_M', 'QDA_M', 'QFDS_', 'QDDS_', 'QDDoubDS_',
@@ -644,42 +644,59 @@ def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
             xt.TargetSet(betx=2.50, bety=2.50, at='Mkr_cell_tr', tol=1.0e-6, tag='betas')] )
     return cell_arc_opt, cell_tr_opt
 
-def _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                            arc1R, wp_constants, n_periods=6,
-                            betay_DS_target=None, FDF=True, bounded=True):
-    # Step 1: Perform Working Point (Phase) matching
-    matchingWP(*wp_constants, cell_arc_opt, cell_arc, arc1R,
-               n_periods=n_periods, FDF=FDF,
-               betay_DS_target=betay_DS_target)
+def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
+                           arc1R, wp_constants, n_periods=6,
+                           betay_DS_target=None, FDF=True, bounded=True,
+                           trim_knobs=('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM'),
+                           trim_warn_frac=0.05):
 
-    # Check status after matchingWP
-    tw_cell = cell_arc.twiss(method='4d')
-    tw_check = arc1R.twiss(method='4d',
-                           betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
-                           bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
-                           dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0])
-    
-    qx_ring = n_periods * tw_check.mux[-1]
-    qy_ring = n_periods * tw_check.muy[-1]
-    print(f'After matchingWP:')
-    print(f'  mux at END = {tw_check.mux[-1]:.6f} (target {wp_constants[0]/n_periods:.6f})')
-    print(f'  muy at END = {tw_check.muy[-1]:.6f} (target {wp_constants[1]/n_periods:.6f})')
-    print(f'  qx_ring = {qx_ring:.6f} (target {wp_constants[0]:.6f})')
-    print(f'  qy_ring = {qy_ring:.6f} (target {wp_constants[1]:.6f})')
+    qx_t, qy_t = wp_constants
 
-    # Step 2: Perform Beta function matching while locking qx and qy targets
-    tw_tr = cell_tr.twiss(method='4d')
-    mid = len(tw_tr.betx) // 2
-
-    # matchingBeta pins betx/bety at END to the reference triplet cell. In the
-    # bounded scheme that over-constrains the problem and undoes the beta
-    # bounds, so it is skipped unless explicitly re-enabled with bounded=False.
     if not bounded:
+        # Betas first: pin the local optics before touching the tune.
+        tw_tr = cell_tr.twiss(method='4d')
+        mid = len(tw_tr.betx) // 2
         matchingBeta(tw_tr.betx[mid], tw_tr.bety[mid],
                      cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
-                     qx_target=wp_constants[0], qy_target=wp_constants[1],
-                     n_periods=n_periods, betay_DS_target=betay_DS_target,
-                     FDF=FDF)
+                     qx_target=None, qy_target=None, n_periods=n_periods,
+                     betay_DS_target=betay_DS_target, FDF=FDF)
+
+    matchingWP(qx_t, qy_t, cell_arc_opt, cell_arc, arc1R,
+               n_periods=n_periods, FDF=FDF, betay_DS_target=betay_DS_target)
+
+    tw_cell = cell_arc.twiss(method='4d')
+    tw_sx = arc1R.twiss(method='4d',
+                        betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
+                        bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
+                        dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0])
+    qx0, qy0 = n_periods * tw_sx.mux[-1], n_periods * tw_sx.muy[-1]
+    print(f'sextant match  -> Qx={qx0:9.6f} (miss {qx0 - qx_t:+.4f}), '
+          f'Qy={qy0:9.6f} (miss {qy0 - qy_t:+.4f})')
+
+    before = {k: ring.varval[k] for k in trim_knobs}
+    ring.match(
+        method='4d',
+        vary=[xt.Vary(k, step=1e-5) for k in trim_knobs],
+        targets=[xt.Target('qx', qx_t, tol=1e-6),
+                 xt.Target('qy', qy_t, tol=1e-6)],
+    )
+    worst, worst_k = 0.0, 'no change'
+    for k in trim_knobs:
+        rel = abs(ring.varval[k] - before[k]) / max(abs(before[k]), 1e-12)
+        if rel > worst:
+            worst, worst_k = rel, k
+
+    tw = ring.twiss(method='4d')
+    print(f'global trim    -> Qx={tw.qx:9.6f} Qy={tw.qy:9.6f}   '
+          f'largest gradient change {worst * 100:5.2f}% ({worst_k})')
+    print(f'                  betx<={tw.betx.max():6.2f} m  '
+          f'bety<={tw.bety.max():6.2f} m  |dx|<={np.abs(tw.dx).max():.4f} m')
+    if worst > trim_warn_frac:
+        print(f'  WARNING: the global trim moved {worst_k} by {worst * 100:.1f}%. '
+              f'It is meant to be a nudge. A change this large means the '
+              f'sextant match did not converge and the trim is buying tune by '
+              f'spending beta -- check the matchingWP target status.')
+    return tw
 
     
 
