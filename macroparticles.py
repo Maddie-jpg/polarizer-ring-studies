@@ -144,7 +144,7 @@ def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
     df_res = df_res.sort_values(by=['Efficiency_%', 'RMS_Spread_%'], ascending=[False, True])
     return df_res
 
-df_raw=filter_beam_core(df, n_sigma=5)
+df_raw=filter_beam_core(df, n_sigma=3)
 
 # %%
 '''
@@ -512,7 +512,7 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 # %%
 
-df_clean = filter_by_action_xy(df, n_sigma=5)
+df_clean = filter_by_action_xy(df, n_sigma=3)
 print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
 
 emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
