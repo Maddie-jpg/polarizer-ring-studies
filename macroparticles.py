@@ -893,6 +893,10 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
                             B_limits=None, ds=0.02):
     """Size the vacuum chamber and magnet bores from the injected beam, and
     count how many rms emittances fit.
+
+    This is the ONLY place the physical aperture is calculated. The result is
+    saved to PhysicalAperture/{mode_tag}/apertures.json, which tolerance_scan.py
+    reads (see save_apertures_json below).
  
       beam size      sigma_x(s) = sqrt(beta_x eps_x + (D_x sigma_delta)^2)
                      sigma_y(s) = sqrt(beta_y eps_y)
@@ -1146,8 +1150,52 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
             cell.set_facecolor('#fde0dc')
     fig.savefig(f'{folder_ap}/pole_tip_fields_{mode_tag}.png', dpi=200, bbox_inches='tight')
     plt.show()
+    save_apertures_json(df_mag, folder_ap, mode_tag, eps_x, eps_y, sigma_delta,
+                        n_sigma_beam, chamber_margin, wall_thickness)
     print(f'Results in {folder_ap}')
     return df_mag, df_pole
+
+
+def save_apertures_json(df_mag, folder_ap, mode_tag, eps_x, eps_y, sigma_delta,
+                        n_sigma_beam, chamber_margin, wall_thickness):
+    """Write one chamber size per magnet type to apertures.json for other scripts.
+
+    Per type (largest requirement over all magnets of that type):
+      Bend                elliptical chamber a = max chamber_x, b = max chamber_y,
+                          pole radius = b + wall (vertical half gap)
+      Quadrupole/Sextupole round bore a = b = max chamber_r, pole radius = a + wall
+    These match the pole radii used for the pole-tip field table above.
+
+    The 'beam' block expresses the same acceptance as Courant-Snyder invariants:
+    an n-sigma amplitude sqrt(beta W) = n sqrt(beta eps) gives W_max = n^2 eps,
+    and delta_max = n sigma_delta. tolerance_scan.py normalises DA to these.
+    """
+    apertures = {}
+    for t, g in df_mag.groupby('type'):
+        if t == 'Bend':
+            a, b = g.chamber_x.max(), g.chamber_y.max()
+            pole = b + wall_thickness
+        else:
+            a = b = g.chamber_r.max()
+            pole = a + wall_thickness
+        apertures[t] = {'chamber_a': float(a), 'chamber_b': float(b),
+                        'pole_radius': float(pole), 'n_magnets': int(len(g))}
+    out = {
+        'source': 'macroparticles.py physical_aperture_study',
+        'lattice_mode': mode_tag,
+        'n_sigma_beam': n_sigma_beam,
+        'chamber_margin': chamber_margin,
+        'wall_thickness': wall_thickness,
+        'beam': {'eps_rms_x': float(eps_x), 'eps_rms_y': float(eps_y),
+                 'sigma_delta': float(sigma_delta),
+                 'W_max_x': float(n_sigma_beam**2 * eps_x),
+                 'W_max_y': float(n_sigma_beam**2 * eps_y),
+                 'delta_max': float(n_sigma_beam * sigma_delta)},
+        'apertures': apertures,
+    }
+    with open(f'{folder_ap}/apertures.json', 'w') as f:
+        json.dump(out, f, indent=2)
+    print(f'Saved chamber sizes per magnet type to {folder_ap}/apertures.json')
 
 
 

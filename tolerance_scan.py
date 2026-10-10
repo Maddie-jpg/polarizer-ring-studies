@@ -2,34 +2,25 @@
 tolerance_scan.py
 =================
 
-Two-stage study for one lattice configuration (D{design}/C{config}/{phase}deg):
+Error tolerance scan for one lattice configuration (D{design}/C{config}/{phase}deg).
 
-Stage 1 -- physical aperture
-    * Takes the injected positron distribution (or CLIC-PDR fallback numbers),
-      finds the largest single-particle Courant-Snyder invariant W_max and
-      momentum deviation delta_max that contain a fraction `--containment` of
-      the beam.
-    * Computes the beam-stay-clear around the ring, sampled inside every magnet
-          R_x(s) = sqrt(beta_x W_max,x) + |D_x| delta_max + d_co
-          R_y(s) = sqrt(beta_y W_max,y) + |D_y| delta_max + d_co
-      (Antoniou, CLIC-Note-989, Eq. 6.6. NOTE: W is the Courant-Snyder
-      invariant, so the amplitude is sqrt(beta W). Antoniou writes
-      sqrt(2 beta eps_max); the two agree for W_max = 2 eps_max.)
-    * Chooses a vacuum-chamber aperture per magnet type ('required': rounded-up
-      requirement, or 'fixed': user values, e.g. the PDR's 30 mm), the pole
-      radius (chamber + wall) and the multipole reference radius
-      R_ref = ref_fraction * pole radius.
-    * Saves a per-magnet table, a plot and an aperture JSON.
+Physical aperture (input, not calculated here)
+    The chamber sizes come from macroparticles.py, which is the only script that
+    calculates the physical aperture. Run it first for the perfect lattice; it
+    writes Results/.../PhysicalAperture/perfect/apertures.json containing, per
+    magnet type, the chamber half-apertures and pole radius, plus the beam
+    acceptance (W_max, delta_max) the chamber was sized for.
+    Here, the multipole reference radius is R_ref = ref_fraction * pole radius.
 
-Stage 2 -- error tolerance scan
+Error tolerance scan
     For every scale factor and seed:
       misalignments + main-field errors (same draw for all scales)
       -> systematic + random multipole errors x scale (same unit draws for all scales)
-      -> orbit correction (your mc.orbit_correction)
+      -> orbit correction (mc.correct_orbit_with_fallback)
       -> DA, MA and injection survival of the real linac distribution, tracked
-         WITH the physical apertures from stage 1.
+         WITH the physical apertures from apertures.json.
     The DA is expressed in units of the required acceptance (x_norm = 1 <=>
-    W = W_max), so DA_ratio >= 1 means the injected beam fits.
+    W = W_max from apertures.json), so DA_ratio >= 1 means the beam fits.
     Results are appended to a CSV after every run, so an interrupted scan can
     be resumed by re-running the same command.
 
@@ -41,11 +32,9 @@ strength (including its main-field error):
 
 Usage (from the repo root):
     python tolerance_scan.py --design 1 --config 9 --phase 90
-    python tolerance_scan.py --aperture-only                # stage 1 only
     python tolerance_scan.py --scales 0,1,5,10,20 --n-seeds 20
     python tolerance_scan.py --only Quadrupole:b6,Quadrupole:b10   # screen harmonics
-    python tolerance_scan.py --aperture-mode fixed \
-        --fixed-aperture '{"Bend":[30e-3,15e-3],"Quadrupole":[30e-3,30e-3],"Sextupole":[30e-3,30e-3]}'
+    python tolerance_scan.py --apertures path/to/other/apertures.json
 """
 #%%
 import os
@@ -67,6 +56,7 @@ import xobjects as xo
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import LatticeBuild.misalignments_corrections as mc
 import paths
+import config as cfg
 
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
@@ -175,6 +165,31 @@ def insert_apertures(pdr, line, mags, apertures):
     line.insert(places)
 
 
+def load_apertures(path, ref_fraction):
+    """Read the chamber sizes written by macroparticles.py and add R_ref.
+
+    Returns (apertures, beam, meta): apertures[type] has chamber_a, chamber_b,
+    pole_radius and R_ref [m]; beam has W_max_x, W_max_y [m] and delta_max.
+    """
+    if not os.path.exists(path):
+        sys.exit(f'{path} not found.\nThe physical aperture is calculated by macroparticles.py: '
+                 f'run it for the perfect lattice first (or pass --apertures).')
+    with open(path) as f:
+        meta = json.load(f)
+    apertures = meta['apertures']
+    for a in apertures.values():
+        a['R_ref'] = ref_fraction * a['pole_radius']
+    return apertures, meta['beam'], meta
+
+
+def load_distribution(dist_file):
+    """Injected linac distribution for injection tracking (None if missing)."""
+    if dist_file and os.path.exists(dist_file):
+        return pd.read_csv(dist_file, sep=r'\s+')
+    log(f'Distribution file not found ({dist_file}); injection survival will not be tracked')
+    return None
+
+
 def insert_error_kicks(pdr, line, mags):
     """Thin multipoles (zero strength) at entry and exit of every magnet."""
     places = []
@@ -188,122 +203,7 @@ def insert_error_kicks(pdr, line, mags):
 
 
 # =============================================================================
-# Stage 1: injected beam and physical aperture
-# =============================================================================
-def injected_beam_requirements(dist_file, p0c, gamma_beta, containment,
-                               fallback_nemitt=7e-3, fallback_delta=0.03):
-    """W_max (Courant-Snyder invariant, m) per plane and delta_max."""
-    if dist_file and os.path.exists(dist_file):
-        df = pd.read_csv(dist_file, sep=r'\s+')
-        delta = (df['p[MeV/c]'].values * 1e6 - p0c) / p0c
-        dd = delta - delta.mean()
-        res = {'source': dist_file, 'n_particles': len(df)}
-        for plane, (pc, ac) in {'x': ('x[mm]', 'xp[mrad]'), 'y': ('y[mm]', 'yp[mrad]')}.items():
-            u = df[pc].values * 1e-3
-            up = df[ac].values * 1e-3
-            # remove the beam's own dispersive correlation before computing invariants
-            D = np.cov(u, dd)[0, 1] / np.var(dd)
-            Dp = np.cov(up, dd)[0, 1] / np.var(dd)
-            u = u - u.mean() - D * dd
-            up = up - up.mean() - Dp * dd
-            s11, s22, s12 = np.var(u), np.var(up), np.cov(u, up)[0, 1]
-            eps = np.sqrt(s11 * s22 - s12**2)
-            beta, alpha = s11 / eps, -s12 / eps
-            gamma = (1 + alpha**2) / beta
-            W = gamma * u**2 + 2 * alpha * u * up + beta * up**2
-            res[f'eps_rms_{plane}'] = eps
-            res[f'W_max_{plane}'] = float(np.quantile(W, containment))
-        res['delta_mean'] = float(delta.mean())
-        res['delta_max'] = float(np.quantile(np.abs(delta), containment))
-        return res, df
-    log(f'Distribution file not found ({dist_file}); using CLIC PDR fallback: '
-        f'eps_rms,n = {fallback_nemitt} m, W_max = 20 eps_rms, delta_max = {fallback_delta}')
-    eps = fallback_nemitt / gamma_beta
-    return {'source': 'CLIC PDR fallback (Antoniou, CLIC-Note-989)',
-            'eps_rms_x': eps, 'eps_rms_y': eps,
-            'W_max_x': 20 * eps, 'W_max_y': 20 * eps,
-            'delta_mean': 0.0, 'delta_max': fallback_delta}, None
-
-
-def required_aperture(line, mags, beam, d_co, ds=0.05):
-    """Beam-stay-clear sampled every ds metres; max taken inside each magnet."""
-    L = line.get_length()
-    s_grid = np.arange(ds, L - ds / 2, ds)
-    lc = line.copy(shallow=True)
-    lc.cut_at_s(s_grid)
-    tw = lc.twiss4d()
-    s = np.asarray(tw.s)
-    Rx = np.sqrt(tw.betx * beam['W_max_x']) + np.abs(tw.dx) * beam['delta_max'] + d_co
-    Ry = np.sqrt(tw.bety * beam['W_max_y']) + np.abs(tw.dy) * beam['delta_max'] + d_co
-
-    tt = line.get_table()
-    s_of = dict(zip(tt.name, tt.s))
-    rows = []
-    for t, names in mags.items():
-        for m in names:
-            s0 = s_of[m]
-            s1 = s0 + line[m].length
-            i0, i1 = np.searchsorted(s, s0 - 1e-9), np.searchsorted(s, s1 + 1e-9)
-            sl = slice(i0, max(i1, i0 + 1))
-            rows.append({'name': m, 'type': t, 's_start': s0, 's_end': s1,
-                         'betx_max': float(np.max(tw.betx[sl])),
-                         'bety_max': float(np.max(tw.bety[sl])),
-                         'dx_max': float(np.max(np.abs(tw.dx[sl]))),
-                         'R_req_x': float(np.max(Rx[sl])),
-                         'R_req_y': float(np.max(Ry[sl]))})
-    return pd.DataFrame(rows), (s, Rx, Ry)
-
-
-def choose_apertures(df_req, mode, fixed, wall, ref_fraction, round_to=1e-3):
-    """Chamber half-apertures, pole radius and R_ref per magnet type."""
-    ap = {}
-    for t in MAGNET_TYPES:
-        sub = df_req[df_req.type == t]
-        if len(sub) == 0:
-            continue
-        rx, ry = sub.R_req_x.max(), sub.R_req_y.max()
-        if mode == 'fixed':
-            a, b = fixed[t]
-        elif t == 'Bend':     # elliptical: wide horizontally, gap vertically
-            a = np.ceil(rx / round_to) * round_to
-            b = np.ceil(ry / round_to) * round_to
-        else:                 # round bore
-            a = b = np.ceil(max(rx, ry) / round_to) * round_to
-        # Bend: field quality is set by the vertical half gap
-        pole = (b if t == 'Bend' else max(a, b)) + wall
-        ap[t] = {'chamber_a': float(a), 'chamber_b': float(b),
-                 'R_req_x_max': float(rx), 'R_req_y_max': float(ry),
-                 'pole_radius': float(pole), 'R_ref': float(ref_fraction * pole),
-                 'margin_x': float(a - rx), 'margin_y': float(b - ry)}
-    return ap
-
-
-def plot_aperture(curves, df_req, apertures, out_png):
-    s, Rx, Ry = curves
-    fig, axs = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
-    for ax, R, key, lab in [(axs[0], Rx, 'chamber_a', 'x'), (axs[1], Ry, 'chamber_b', 'y')]:
-        ax.plot(s, R * 1e3, 'k-', lw=0.8, label=f'required $R_{lab}$')
-        colors = {'Bend': 'tab:blue', 'Quadrupole': 'tab:red', 'Sextupole': 'tab:green'}
-        for t, c in colors.items():
-            if t not in apertures:
-                continue
-            sub = df_req[df_req.type == t]
-            for _, r in sub.iterrows():
-                ax.plot([r.s_start, r.s_end], [apertures[t][key] * 1e3] * 2, color=c, lw=3)
-            ax.plot([], [], color=c, lw=3, label=f'{t} chamber')
-        ax.set_ylabel(f'half-aperture {lab} [mm]')
-        ax.grid(alpha=0.3)
-        ax.set_ylim(0, None)
-        ax.legend(fontsize='small', ncol=4, loc='lower left', bbox_to_anchor=(0, 1.0),
-                  frameon=False)
-    axs[1].set_xlabel('s [m]')
-    fig.tight_layout()
-    fig.savefig(out_png, dpi=200)
-    plt.close(fig)
-
-
-# =============================================================================
-# Stage 2: errors
+# Errors
 # =============================================================================
 def apply_alignment_and_field_errors(line, mags, seed, sig_shift, sig_rot,
                                      sig_field, cut):
@@ -389,7 +289,7 @@ def correct_orbit(line, seed):
 
 
 # =============================================================================
-# Stage 2: metrics
+# Metrics
 # =============================================================================
 def track_DA(line, tw, beam, gb, n_turns, n_angles, n_r, r_max):
     """DA in units of the required acceptance: x_norm = 1 <=> W = W_max."""
@@ -533,24 +433,23 @@ def summarise(df_res, args, out_dir):
 # Main
 # =============================================================================
 def parse_args():
-    env = os.environ.get
+    study = paths.study_from_env()   # DESIGN/CONFIG/... env vars, else config.DEFAULT_STUDY
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--design', type=int, default=int(env('DESIGN', 1)))
-    ap.add_argument('--config', type=int, default=int(env('CONFIG', 9)))
-    ap.add_argument('--phase', type=int, default=int(env('PHASE', 90)))
-    ap.add_argument('--changes', default=env('CHANGES', None))
+    ap.add_argument('--design', type=int, default=study['design'])
+    ap.add_argument('--config', type=int, default=study['config'])
+    ap.add_argument('--phase', type=int, default=study['phase'])
+    ap.add_argument('--changes', default=study['changes'],
+                    help="variant tag in the lattice file name; '' for none")
     # beam / aperture
-    ap.add_argument('--dist', default='PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat')
-    ap.add_argument('--containment', type=float, default=0.999,
-                    help='beam fraction defining W_max and delta_max')
-    ap.add_argument('--d-co', type=float, default=1e-3, help='orbit + alignment allowance [m]')
-    ap.add_argument('--wall', type=float, default=1.5e-3, help='chamber wall + clearance to pole [m]')
+    ap.add_argument('--dist', default=cfg.INJECTED_BEAM_FILE,
+                    help='injected distribution, used for injection-survival tracking')
+    ap.add_argument('--apertures', default=None,
+                    help='apertures.json from macroparticles.py (default: '
+                         'Results/.../PhysicalAperture/<--aperture-mode-from>/apertures.json)')
+    ap.add_argument('--aperture-mode-from', default='perfect',
+                    help='which macroparticles.py run to take the apertures from')
     ap.add_argument('--ref-fraction', type=float, default=2 / 3, help='R_ref / pole radius')
-    ap.add_argument('--aperture-mode', choices=['required', 'fixed'], default='required')
-    ap.add_argument('--fixed-aperture', default=None,
-                    help='JSON {type: [a, b]} chamber half-apertures [m] for --aperture-mode fixed')
-    ap.add_argument('--aperture-only', action='store_true')
     ap.add_argument('--start-element', default=None,
                     help='cycle the ring so tracking starts here (e.g. injection point)')
     # errors
@@ -587,12 +486,11 @@ def parse_args():
 
 def main():
     args = parse_args()
+    args.changes = args.changes or None
     only = set(args.only.split(',')) if args.only else None
     table = ERROR_TABLES[args.table]
     out_dir = results_dir(args.design, args.config, args.phase, changes=args.changes,
                              metric='ToleranceScan', sub=args.table + (f'_only_{args.only}' if only else ''))
-    ap_dir = results_dir(args.design, args.config, args.phase, changes=args.changes,
-                            metric='PhysicalAperture')
 
     # ---------------- lattice ----------------
     pdr = load_environment(args.design, args.config, args.phase, args.changes)
@@ -607,35 +505,18 @@ def main():
     p0c = ring.particle_ref.p0c[0]
     gb = ring.particle_ref.gamma0[0] * ring.particle_ref.beta0[0]
 
-    # ---------------- stage 1 ----------------
-    beam, dist_df = injected_beam_requirements(args.dist, p0c, gb, args.containment)
-    log('Injected beam: ' + ', '.join(f'{k}={v:.3g}' if isinstance(v, float) else f'{k}={v}'
-                                       for k, v in beam.items()))
-    df_req, curves = required_aperture(ring, mags, beam, args.d_co)
-    fixed = None
-    if args.aperture_mode == 'fixed':
-        if not args.fixed_aperture:
-            sys.exit('--aperture-mode fixed needs --fixed-aperture')
-        fixed = {k: tuple(v) for k, v in json.loads(args.fixed_aperture).items()}
-    apertures = choose_apertures(df_req, args.aperture_mode, fixed, args.wall, args.ref_fraction)
-
-    df_req.to_csv(f'{ap_dir}/required_aperture_per_magnet.csv', index=False)
-    with open(f'{ap_dir}/apertures.json', 'w') as f:
-        json.dump({'beam': beam, 'd_co': args.d_co, 'wall': args.wall,
-                   'containment': args.containment, 'mode': args.aperture_mode,
-                   'apertures': apertures}, f, indent=2)
-    plot_aperture(curves, df_req, apertures, f'{ap_dir}/required_aperture.png')
+    # ---------------- apertures (from macroparticles.py) ----------------
+    ap_path = args.apertures or str(paths.apertures_json_path(
+        args.design, args.config, args.phase, args.changes, args.aperture_mode_from))
+    apertures, beam, ap_meta = load_apertures(ap_path, args.ref_fraction)
+    log(f'Apertures from {ap_path} ({ap_meta["n_sigma_beam"]} sigma + '
+        f'{ap_meta["chamber_margin"]*1e3:.0f} mm margin)')
     for t, a in apertures.items():
-        log(f'{t:10s} chamber a/b = {a["chamber_a"]*1e3:.1f}/{a["chamber_b"]*1e3:.1f} mm '
-            f'(required {a["R_req_x_max"]*1e3:.1f}/{a["R_req_y_max"]*1e3:.1f} mm), '
+        log(f'{t:10s} chamber a/b = {a["chamber_a"]*1e3:.1f}/{a["chamber_b"]*1e3:.1f} mm, '
             f'pole {a["pole_radius"]*1e3:.1f} mm, R_ref {a["R_ref"]*1e3:.1f} mm')
-        if a['margin_x'] < 0 or a['margin_y'] < 0:
-            log(f'  WARNING: {t} chamber is smaller than the requirement somewhere')
-    log(f'Stage 1 written to {ap_dir}')
-    if args.aperture_only:
-        return
+    dist_df = load_distribution(args.dist)
 
-    # ---------------- stage 2 ----------------
+    # ---------------- scan ----------------
     insert_apertures(pdr, ring, mags, apertures)
     insert_error_kicks(pdr, ring, mags)
     base = ring.copy()
@@ -647,7 +528,8 @@ def main():
         done = set(zip(prev.scale, prev.seed))
         log(f'Resuming: {len(done)} runs already in {csv_path}')
     with open(f'{out_dir}/settings.json', 'w') as f:
-        json.dump({**vars(args), 'apertures': apertures, 'beam': beam}, f, indent=2, default=str)
+        json.dump({**vars(args), 'apertures_file': ap_path, 'apertures': apertures, 'beam': beam},
+                  f, indent=2, default=str)
 
     scales = [float(s) for s in args.scales.split(',')]
     seeds = [args.seed0 + i for i in range(args.n_seeds)]

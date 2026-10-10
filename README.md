@@ -94,7 +94,9 @@ Results/
         ├── Spin/
         │   ├── Scan/                     spin_tracking.py (misaligned vs corrected)
         │   └── Seed_{seed}/              spin_tracking_single_seed.py
-        └── PhysicalAperture/, ToleranceScan/   tolerance_scan.py
+        ├── PhysicalAperture/{mode}/      macroparticles.py: chamber sizing, pole-tip fields,
+        │                                 apertures.json (read by tolerance_scan.py)
+        └── ToleranceScan/                tolerance_scan.py
 ```
 
 
@@ -104,10 +106,10 @@ Results/
 |---|---|
 | `analysis.py` | Beam optics, tunes, damping, polarization, DA/MA. |
 | `spin_tracking.py`,`spin_tracking_single_seed.py` | Spin-tracking / depolarization studies (single seed or multiple cases). |
-| `macroparticles.py`| Injection efficiency simulations using the macroparticle distributions from the positron linac.|
+| `macroparticles.py`| Injection efficiency simulations using the macroparticle distributions from the positron linac. **The only place the physical aperture is calculated**; it writes `PhysicalAperture/{mode}/apertures.json`.|
 | `config.py` | **Single source** of beam energy, RF, default working points, error sigmas, seeds and the default study. (`constants.py` is a deprecated alias.) |
 | `paths.py` | Where lattices and results live: `lattice_json_path`, `load_lattice`, `results_dir`, `study_from_env`. Works from any directory. |
-| `tolerance_scan.py` | Alignment/field-error tolerance scan and physical-aperture study (`--help` for options). |
+| `tolerance_scan.py` | Alignment/field-error tolerance scan (`--help` for options). Uses the chamber sizes from `macroparticles.py`, so run that first for the perfect lattice. |
 | `wp_optimisation.py` | Working-point scans: cell phase advance, RDTs, realistic tune scan with DA. |
 | `my_functions.py`| Shared helpers (plotting, lattice utilities, resonance scans, spin tracking functions). |
 | `run_full_sims.py` | Batch driver: runs the scripts above for each lattice/mode. |
