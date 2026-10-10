@@ -1,11 +1,18 @@
-# %%
-import sys
-import os
+"""
+Detailed spin study of a single error seed.
 
-# Adds the parent directory to the search path
-parent_dir = os.path.abspath('..')
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+For one seed (SEED below) this runs: a spin-tune resonance scan on the perfect
+ring, n0 vs spin tune for the misaligned and corrected machine, the Qy-spin
+coupling comparison, and long tracking (mf.deep_track_single) of the
+misaligned and corrected machines.
+
+Inputs   lattice chosen by DESIGN/CONFIG/PHASE/CHANGES (see paths.study_from_env)
+Outputs  Results/.../Spin/Seed_<SEED>/
+
+Run:     python spin_tracking_single_seed.py   (or via run_full_sims.py)
+"""
+# %%
+import os
 
 import xtrack as xt
 import xpart as xp
@@ -17,42 +24,28 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import LatticeBuild.misalignments_corrections as mc
 import my_functions as mf
+import paths
 import random
 import csv
 
 
 #%%
 
-SEED = random.randint(0,int(1e6))
+# Fixed seed so results are reproducible; use random.randint(0, int(1e6)) for a new one.
 SEED = 283792
 
-design = int(os.environ.get('DESIGN', 1))
-config = int(os.environ.get('CONFIG', 9))
-phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES',None)
+study = paths.study_from_env()
+design, config, phase, changes = study['design'], study['config'], study['phase'], study['changes']
 
 long_scan_turns = 20000  
 
 # %%
-if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json")
-else:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_perfect_{phase}.json")
-
-energy=2.86e9
-pdr.lines['ring'].particle_ref.anomalous_magnetic_moment = 0.001159652181
-pdr.lines['ring'].particle_ref.kinetic_energy0 = energy
-
-if design == 1 and config == 1:
-    mc.insert_BPMs_all_as_markers(pdr)
-    mc.insert_correctors_var2(pdr)
-else:
-    mc.insert_BPMs_all_as_markers(pdr)
-    mc.insert_correctors(pdr)
-
+pdr = paths.load_lattice(design, config, 'perfect', phase, changes)
+mc.setup_spin_reference(pdr.lines['ring'])
+mc.insert_bpms_and_correctors(pdr, design, config)
 
 line = pdr.lines['ring']
-mc.misalignments_correctors(line,0.25e-3,SEED+1)
+# Corrector errors are applied per seed inside the mf.* helpers, not here.
 
 line.configure_spin('auto')
 

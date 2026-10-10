@@ -66,6 +66,7 @@ import xobjects as xo
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import LatticeBuild.misalignments_corrections as mc
+import paths
 
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
@@ -135,14 +136,7 @@ def truncnorm(rng, cut, size=None):
     return out
 
 
-def results_dir(design, config, phase, changes=None, metric=None, sub=None):
-    """Same layout as my_functions.results_dir (inlined to avoid its cpymad import)."""
-    base = f'Results/D{design}/C{config}/{phase}deg' + (f'_{changes}' if changes else '')
-    for part in (metric, sub):
-        if part:
-            base = f'{base}/{part}'
-    os.makedirs(base, exist_ok=True)
-    return base
+from paths import results_dir  # light-weight, no heavy imports
 
 
 def log(msg):
@@ -161,19 +155,11 @@ def magnet_names(line):
 # Lattice preparation
 # =============================================================================
 def load_environment(design, config, phase, changes):
-    tag = f'_{changes}' if changes else ''
-    path = f'JSON_Files/D{design}/C{config}/pdr_perfect_{phase}{tag}.json'
-    log(f'Loading {path}')
-    return xt.Environment.from_json(path)
+    log(f'Loading {paths.lattice_json_path(design, config, "perfect", phase, changes)}')
+    return paths.load_lattice(design, config, 'perfect', phase, changes)
 
 
-def insert_bpms_and_correctors(pdr, design, config):
-    """Same choice as analysis.py / spin_tracking.py."""
-    mc.insert_BPMs_all_as_markers(pdr)
-    if design == 1 and config == 1:
-        mc.insert_correctors_var2(pdr)
-    else:
-        mc.insert_correctors(pdr)
+insert_bpms_and_correctors = mc.insert_bpms_and_correctors  # shared rule
 
 
 def insert_apertures(pdr, line, mags, apertures):
@@ -399,12 +385,7 @@ def apply_multipoles(line, mags, table, apertures, seed, scale, only, cut):
 
 
 def correct_orbit(line, seed):
-    tw = line.twiss(method='6d')
-    try:
-        mc.orbit_correction(line, tw, threading=False, seed=seed)
-    except Exception as e:
-        log(f'  seed {seed}: closed-orbit correction failed ({e}); trying threading')
-        mc.orbit_correction(line, tw, threading=True, seed=seed)
+    mc.correct_orbit_with_fallback(line, line.twiss(method='6d'), seed)
 
 
 # =============================================================================

@@ -1,30 +1,41 @@
-import xtrack as xt
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+"""
+Shared analysis and plotting functions used by analysis.py, macroparticles.py
+and the spin-tracking scripts.
+
+Sections (search for the banner comments):
+  * Lattice sketches and survey plots      addSketchBL, SpuckParsAus, survey_plot
+  * Resonances                             plot_resonance_grid_red_blue,
+                                           analyse_verdier_resonances_from_line,
+                                           plot_dangerous_resonances
+  * Lifetime / detuning                    calculate_lifetime, detuning_scan
+  * Spin tracking                          spin_tune_resonance_scan, deep_track_single,
+                                           n0_vs_spin_tune_scan, check_qy_spin_coupling, ...
+
+Error seeds are applied with mc.prepare_seed_line (LatticeBuild/misalignments_corrections.py)
+so every function misaligns and corrects a machine the same way.
+"""
+import csv
 import os
+
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import nafflib as nl
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import xobjects as xo
+import xpart as xp
+import xtrack as xt
 from matplotlib.lines import Line2D
+from scipy.optimize import curve_fit
+
+import config as cfg
+import paths
+import LatticeBuild.misalignments_corrections as mc
 from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 from xutil_DA_CC.xsuite_plot_functions import DA_vs_turns
-import xpart as xp
-from scipy.optimize import curve_fit
-import csv
-import nafflib as nl
 
-pdr=xt.Environment()
-
-def results_dir(design, config, phase, changes=None, metric=None, sub=None,sub2=None):
-    base = f'Results/D{design}/C{config}/{phase}deg' + (f'_{changes}' if changes else '')
-    if metric:
-        base = f'{base}/{metric}'
-    if sub:
-        base = f'{base}/{sub}'
-    if sub2:
-        base = f'{base}/{sub2}'
-    os.makedirs(base, exist_ok=True)
-    return base
+# results_dir now lives in paths.py; kept here so existing mf.results_dir calls work.
+results_dir = paths.results_dir
 
 #-----------------------------------
 # FUNCTIONS FOR analysis.py SCRIPT
@@ -621,9 +632,6 @@ def detuning_scan(line, nemitt_x, nemitt_y, num_turns=256,
 # FUNCTIONS FOR spin_tracking.py SCRIPT
 #---------------------------------------
 
-import LatticeBuild.misalignments_corrections as mc
-import xobjects as xo
-
 def spin_tune_resonance_scan(ring, nu_min=5.0, nu_max=6.0, n_points=60,
                               misalign_sigma=None, seed=None):
     
@@ -644,9 +652,8 @@ def spin_tune_resonance_scan(ring, nu_min=5.0, nu_max=6.0, n_points=60,
         line.configure_spin('auto')
 
         if misalign_sigma is not None:
-            line.configure_radiation('mean')
-            line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-            line = mc.misalignments(line, misalign_sigma, seed=seed)
+            line = mc.prepare_seed_line(line, seed, correct=False,
+                                        sigma=misalign_sigma, copy=False)
 
         try:
             tw = line.twiss(method='6d', radiation_integrals=True,
@@ -722,33 +729,11 @@ def deep_track_single(base_line, seed_val,long_scan_turns, apply_correction, tra
     branch_label = 'corrected' if apply_correction else 'misaligned'
     print(f"Running deep track for Seed {seed_val} ({branch_label})...")
 
-    line = base_line.copy()
-
-    line.configure_radiation('mean')
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
-
+    line = mc.prepare_seed_line(base_line, seed_val, correct=apply_correction,
+                                report_orbit=True)
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
 
-    if apply_correction:
-        orbit_x_rms_before = np.std(tw.x)
-        orbit_y_rms_before = np.std(tw.y)
-        mc.misalignments_correctors(line,0.25e-3,seed_val+1)
-        try:
-            mc.orbit_correction(line, tw, threading=False,seed=seed_val)
-        except Exception as e:
-            print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
-                  f"{type(e).__name__}: {e} -- retrying with threading=True")
-            mc.orbit_correction(line, tw, threading=True,seed=seed_val)
-        # Re-twiss after correction so tw reflects the corrected lattice.
-        tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                        spin=True, polarization=True)
-        orbit_x_rms_after = np.std(tw.x)
-        orbit_y_rms_after = np.std(tw.y)
-        print(f"  [seed {seed_val}] orbit RMS x: {orbit_x_rms_before:.3e} -> {orbit_x_rms_after:.3e}, "
-              f"y: {orbit_y_rms_before:.3e} -> {orbit_y_rms_after:.3e}")
-        
     num_particles=300
 
     particles = xp.generate_matched_gaussian_bunch(
@@ -947,26 +932,9 @@ def plot_invariant_spin_vector(base_line,seed_val, apply_correction,out_path):
     branch_label = 'corrected' if apply_correction else 'misaligned'
     print(f"Plotting invariant spin vector for Seed {seed_val} ({branch_label})...")
 
-    line = base_line.copy()
-
-    line.configure_radiation('mean')
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
-
+    line = mc.prepare_seed_line(base_line, seed_val, correct=apply_correction)
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                     spin=True, polarization=True)
-
-    if apply_correction:
-        try:
-            mc.orbit_correction(line, tw, threading=False,seed=seed_val)
-        except Exception as e:
-            print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
-                  f"{type(e).__name__}: {e} -- retrying with threading=True")
-            mc.orbit_correction(line, tw, threading=True, seed=seed_val)
-        # Orbit correction changes the closed orbit/optics, so re-twiss to get
-        # the n0 vector consistent with the corrected lattice.
-        tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                        spin=True, polarization=True)
 
     s = tw.s
     sx = tw.spin_x
@@ -1009,22 +977,7 @@ def track_single_particle_nx1(base_line,seed_val, apply_correction, out_path):
                     spin=True, polarization=True)
 
     
-    line.configure_radiation('mean')
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
- 
-    tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                    spin=True, polarization=True)
- 
-    if apply_correction:
-        try:
-            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
-            mc.orbit_correction(line, tw, threading=False,seed=seed_val)
-        except Exception as e:
-            print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
-                  f"{type(e).__name__}: {e} -- retrying with threading=True")
-            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
-            mc.orbit_correction(line, tw, threading=True,seed=seed_val)
+    line = mc.prepare_seed_line(line, seed_val, correct=apply_correction, copy=False)
  
     tw_nx1 = line.twiss(start=tw_0.name[0], end=tw_0.name[-2], init_at=tw_0.name[0],
                         x=tw_0.x[0],       px=tw_0.px[0],
@@ -1071,28 +1024,9 @@ def track_single_particle_nx1(base_line,seed_val, apply_correction, out_path):
 
 def n0_vs_spin_tune_scan(base_line,seed_val, nu_min, nu_max, n_points=60,apply_correction=True, at_element=None):
 
-    line = base_line.copy()
-    
-    line.configure_radiation('mean')
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, 0.25e-3, seed=seed_val)
-    
+    line = mc.prepare_seed_line(base_line, seed_val, correct=apply_correction)
     tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                        spin=True, polarization=True)
-    
-    if apply_correction:
-            try:
-                mc.misalignments_correctors(line,0.25e-3,seed_val+1)
-                mc.orbit_correction(line, tw, threading=False,seed=seed_val)
-            except Exception as e:
-                print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
-                      f"{type(e).__name__}: {e} -- retrying with threading=True")
-                mc.misalignments_correctors(line,0.25e-3,seed_val+1)
-                mc.orbit_correction(line, tw, threading=True,seed=seed_val)
-            # Orbit correction changes the closed orbit/optics, so re-twiss to get
-            # the n0 vector consistent with the corrected lattice.
-            tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                            spin=True, polarization=True)
+                    spin=True, polarization=True)
     ring0 = line
     a_gyro = ring0.particle_ref.anomalous_magnetic_moment[0]
     mass0 = ring0.particle_ref.mass0  # eV
@@ -1224,7 +1158,7 @@ def check_qy_spin_coupling(line, dqy=1e-3, qy_knobs=('kQFarc', 'kQDarc'),
 
 
 def compare_qy_spin_coupling_across_branches(base_line, seed_val,
-                                             misalign_sigma=0.25e-3,
+                                             misalign_sigma=cfg.MISALIGN_SIGMA,
                                              dqy=1e-3, qy_knobs=('kQFarc', 'kQDarc'),
                                              max_order=5, results_dir=None):
     rows = {}
@@ -1234,26 +1168,12 @@ def compare_qy_spin_coupling_across_branches(base_line, seed_val,
     rows['perfect'] = check_qy_spin_coupling(
         line_perfect, dqy=dqy, qy_knobs=qy_knobs, max_order=max_order)
 
-    line_mis = base_line.copy()
-    line_mis.configure_radiation('mean')
-    line_mis.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line_mis = mc.misalignments(line_mis, misalign_sigma, seed=seed_val)
+    line_mis = mc.prepare_seed_line(base_line, seed_val, correct=False, sigma=misalign_sigma)
     print(f"\n=== Coupling check: MISALIGNED lattice (seed {seed_val}) ===")
     rows['misaligned'] = check_qy_spin_coupling(
         line_mis, dqy=dqy, qy_knobs=qy_knobs, max_order=max_order)
 
-    line_cor = base_line.copy()
-    line_cor.configure_radiation('mean')
-    line_cor.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line_cor = mc.misalignments(line_cor, misalign_sigma, seed=seed_val)
-    tw_cor = line_cor.twiss(method='6d', radiation_integrals=True,
-                            eneloss_and_damping=True, spin=True, polarization=True)
-    try:
-        mc.orbit_correction(line_cor, tw_cor, threading=False,seed=seed_val)
-    except Exception as e:
-        print(f"  [seed {seed_val}] orbit_correction(threading=False) raised: "
-              f"{type(e).__name__}: {e} -- retrying with threading=True")
-        mc.orbit_correction(line_cor, tw_cor, threading=True,seed=seed_val)
+    line_cor = mc.prepare_seed_line(base_line, seed_val, correct=True, sigma=misalign_sigma)
     print(f"\n=== Coupling check: CORRECTED lattice (seed {seed_val}) ===")
     rows['corrected'] = check_qy_spin_coupling(
         line_cor, dqy=dqy, qy_knobs=qy_knobs, max_order=max_order)
@@ -1290,26 +1210,12 @@ def compare_qy_spin_coupling_across_branches(base_line, seed_val,
 
 
 def assess_seed_resonance_excitation(seed_val, apply_correction, base_line,long_scan_turns,
-                                     misalign_sigma=0.25e-3, p_eq_suppression_flag=0.9,
+                                     misalign_sigma=cfg.MISALIGN_SIGMA, p_eq_suppression_flag=0.9,
                                      results_dir=None):
     branch_label = 'corrected' if apply_correction else 'misaligned'
 
-    line = base_line.copy()
-    line.configure_radiation('mean')
-    line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    line = mc.misalignments(line, misalign_sigma, seed=seed_val)
-
-    if apply_correction:
-        tw = line.twiss(method='6d', radiation_integrals=True,
-                        eneloss_and_damping=True, spin=True, polarization=True)
-        try:
-            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
-            mc.orbit_correction(line, tw, threading=False,seed=seed_val)
-        except Exception as e:
-            print(f"orbit_correction(threading=False) raised: {type(e).__name__}: {e}"
-                  f" -- retrying with threading=True")
-            mc.misalignments_correctors(line,0.25e-3,seed_val+1)
-            mc.orbit_correction(line, tw, threading=True, seed=seed_val)
+    line = mc.prepare_seed_line(base_line, seed_val, correct=apply_correction,
+                                sigma=misalign_sigma)
 
     coupling = check_qy_spin_coupling(line)
 
@@ -1358,7 +1264,7 @@ def assess_seed_resonance_excitation(seed_val, apply_correction, base_line,long_
 
 def assess_resonance_excitation_multi_seed(seed_list, apply_correction, deep_track_single_fn,
                                            check_qy_spin_coupling_fn, base_line,
-                                           misalign_sigma=0.25e-3, p_eq_suppression_flag=0.9,
+                                           misalign_sigma=cfg.MISALIGN_SIGMA, p_eq_suppression_flag=0.9,
                                            results_dir=None, out_name='resonance_excitation_summary.csv'):
     rows = []
     for seed_val in seed_list:

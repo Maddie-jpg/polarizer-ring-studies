@@ -1,11 +1,24 @@
-# %%
-import sys
-import os
+"""
+Main lattice analysis for one ring: optics, resonances, chromatic behaviour,
+dynamic aperture (DA) and momentum acceptance (MA).
 
-# Adds the parent directory to the search path
-parent_dir = os.path.abspath('..')
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+Sections (# %% cells, in order)
+  1. Ring optics, survey, parameter table, closed orbit
+  2. Working point on the tune diagram, dangerous resonances
+  3. Momentum-dependent tunes and beta-beating
+  4. Amplitude detuning / footprint
+  5. Lattice sketch with BPMs and correctors
+  6. DA and MA for the loaded lattice
+  7. DA/MA seed overlays for misaligned and corrected machines
+
+Inputs   JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}[_{changes}].json,
+         chosen by DESIGN/CONFIG/MODE/PHASE/CHANGES (see paths.study_from_env)
+Outputs  Results/D{design}/C{config}/{phase}deg[_{changes}]/LatticeOptics and /DA_MA
+
+Run:     python analysis.py   (or via run_full_sims.py)
+"""
+# %%
+import os
 
 import xtrack as xt
 import numpy as np
@@ -18,7 +31,8 @@ from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 from prettytable import PrettyTable
 import xutil_DA_CC.xsuite_plot_functions as my_xpf
 import xutil_DA_CC.xsuite_utilities as xutil
-import constants
+import config as cfg
+import paths
 import my_functions as mf
 from matplotlib.backends.backend_pdf import PdfPages
 import lattice_Sketch as ls
@@ -26,18 +40,16 @@ import LatticeBuild.misalignments_corrections as mc
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',9))
-mode=os.environ.get('MODE','perfect')
-phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES','FDF')
+study = paths.study_from_env()
+design, config, mode = study['design'], study['config'], study['mode']
+phase, changes = study['phase'], study['changes']
 
 
 # %%
 pdf_run=False
 
 if pdf_run is True:
-    pdf = PdfPages(f"Results/D{design}/C{config}/{mode}/AnalysisResults.pdf")
+    pdf = PdfPages(f"{paths.results_dir(design, config, phase, changes, metric=mode)}/AnalysisResults.pdf")
 
     _old_savefig = plt.savefig
 
@@ -48,21 +60,12 @@ if pdf_run is True:
     plt.savefig = _new_savefig
 
 # %%
-if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
-else:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
-
-ring=pdr.lines['ring']
-print(ring.element_names)
-period=pdr.lines['period']
-
-variable_name = f"WP_D{design}"
-
-current_wp = (23.38,21.33)
+pdr = paths.load_lattice(design, config, mode, phase, changes)
+ring = pdr.lines['ring']
+period = pdr.lines['period']
 
 # %%
-E0 = constants.E0; VRF = constants.VRF
+E0 = cfg.E0; VRF = cfg.VRF
 
 U0 = (0.88463e-31) * E0**4 * pdr['hBarc']
 
@@ -72,15 +75,15 @@ period_sliced.cut_at_s( np.linspace(.05, period.get_length()-.05, int(period.get
 
 ring.configure_radiation(model=None)
 fRev = 1./(ring.twiss(method='4d').T_rev0)
-fRF  = fRev*round(4.e8/fRev)  # at integer harmonics and close to 400 MHz
+fRF  = fRev*round(cfg.F_RF_TARGET/fRev)  # integer harmonic closest to 400 MHz
 
 # %%
 ring.configure_radiation(model='mean')
 ring_tw=ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
                    spin=True, polarization=True )
 
-# %%
-print(ring.element_names)
+# Working point of THIS lattice, used in output file names.
+current_wp = (round(float(ring_tw.qx), 2), round(float(ring_tw.qy), 2))
 
 
 # %%
@@ -635,16 +638,9 @@ def insert_marker_in_drift(pdr, ring, drift_name='DrTripl', occurrence=0,
 
 marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
 
-pdr_copy=pdr.copy()
-if design == 1 and config == 1:
-        mc.insert_BPMs_all_as_markers(pdr_copy)
-        mc.insert_correctors_var2(pdr_copy)
-        ls.sketch_all(pdr_copy, sextant='1R', outdir=folder)
-        
-else:
-        mc.insert_BPMs_all_as_markers(pdr_copy)
-        mc.insert_correctors(pdr_copy)
-        ls.sketch_all(pdr_copy, sextant='1R', outdir=folder)
+pdr_copy = pdr.copy()
+mc.insert_bpms_and_correctors(pdr_copy, design, config)
+ls.sketch_all(pdr_copy, sextant='1R', outdir=folder)
 
 if mode=='perfect':
     line=ring
@@ -1141,16 +1137,9 @@ if mode=='perfect':
     import xutil_DA_CC.xsuite_utilities as xutil
 
     context_tracking = xo.ContextCpu(omp_num_threads=0)
-    misalignment_val = 0.2e-3
+    misalignment_val = cfg.MISALIGN_SIGMA   # was 0.2e-3 here, 0.25e-3 everywhere else
 
-
-    if design == 1 and config == 1:
-        mc.insert_BPMs_all_as_markers(pdr)
-        mc.insert_correctors_var2(pdr)
-        
-    else:
-        mc.insert_BPMs_all_as_markers(pdr)
-        mc.insert_correctors(pdr)
+    mc.insert_bpms_and_correctors(pdr, design, config)
 
     # ---- lightweight boundary extractors (logic copied from xsuite_plot_functions,
     #      but with plotting stripped out so nothing pops open/gets thrown away) ----
@@ -1206,21 +1195,8 @@ if mode=='perfect':
     # ---- per-seed branch prep, mirrors prep_branch() in spin_tracking.py ----
 
     def prep_seed_line(base_line, seed, apply_correction):
-        seed_line = base_line.copy()
-        seed_line.configure_radiation(model='mean')
-        seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-        seed_line = mc.misalignments(seed_line, misalignment_val, seed=seed)
-
-        if apply_correction:
-            tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True)
-            mc.misalignments_correctors(seed_line, 0.2e-3, seed + 1)
-            try:
-                mc.orbit_correction(seed_line, tw, threading=False, seed=seed)
-            except Exception as e:
-                print(f"  [seed {seed}] orbit_correction(threading=False) raised: {e}")
-                mc.orbit_correction(seed_line, tw, threading=True, seed=seed)
-
-        return seed_line
+        return mc.prepare_seed_line(base_line, seed, correct=apply_correction,
+                                    sigma=misalignment_val, context=context_tracking)
 
 
     # ---- combined DA+MA for one seed: prep the line ONCE (misalign + optional
