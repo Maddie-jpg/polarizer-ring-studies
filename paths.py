@@ -55,12 +55,6 @@ def results_dir(design, config, phase, changes=None, metric=None, sub=None, sub2
     return str(path)
 
 
-def apertures_json_path(design, config, phase, changes=None, mode='perfect'):
-    """Chamber sizes written by macroparticles.py (physical_aperture_study)."""
-    return (RESULTS_DIR / f'D{design}' / f'C{config}' / f'{phase}deg{_tag(changes)}'
-            / 'PhysicalAperture' / mode / 'apertures.json')
-
-
 def load_lattice(design, config, mode='perfect', phase=90, changes=None):
     """Load a saved lattice and return the xtrack Environment.
 
