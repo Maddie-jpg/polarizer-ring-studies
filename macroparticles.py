@@ -1,11 +1,22 @@
+"""
+Injection-efficiency study with the measured injected positron beam.
+
+  1. Load the injected-beam distribution (config.INJECTED_BEAM_FILE), select the
+     main bunch, optionally apply the energy-compressor model.
+  2. Characterise it: emittances, moment-based and fitted Twiss, phase-space plots.
+  3. Match it to the ring at the injection marker and track: survival vs turns
+     at the nominal, optimal and bunch-average energies, and an energy scan.
+  4. For misaligned/corrected modes, repeat over several error seeds and overlay.
+
+Inputs   lattice chosen by DESIGN/CONFIG/MODE/PHASE/CHANGES (see paths.study_from_env)
+         ENERGY_COMPRESSOR=1 to use the compressed beam
+Outputs  Results/.../InjectionEfficiency/
+
+Run:     python macroparticles.py   (or via run_full_sims.py)
+"""
 # %%
-import sys
 import os
 
-parent_dir = os.path.abspath('..')
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-    
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,19 +27,19 @@ import xobjects as xo
 from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 import my_functions as mf
+import config as cfg
+import paths
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',9))
-mode=os.environ.get('MODE','perfect')
-phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES',None)
+study = paths.study_from_env()
+design, config, mode = study['design'], study['config'], study['mode']
+phase, changes = study['phase'], study['changes']
 
 ENERGY_COMPRESSOR_ON = os.environ.get('ENERGY_COMPRESSOR', 'false').strip().lower() not in ('0', 'false', 'off', 'no')
 
 # %%
-df = pd.read_csv('/home/mwatson/Documents/laughing-octo-bassoon/PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat', sep=r'\s+')
+df = pd.read_csv(cfg.INJECTED_BEAM_FILE, sep=r'\s+')
 print(list(df.columns))
 
 # %%
@@ -762,13 +773,8 @@ def insert_marker_in_drift(pdr, ring, drift_name='DrTripl', occurrence=0,
     return marker_name
 
 
-if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
-else:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
-
-    
-ring=pdr.lines['ring']
+pdr = paths.load_lattice(design, config, mode, phase, changes)
+ring = pdr.lines['ring']
 marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
 # Start the ring at the injection marker, so every track() call below begins
 # where the beam is injected (and matched). Without this, tracking starts at
@@ -1686,35 +1692,16 @@ if mode == 'perfect':
     from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 
     seeds = [100, 200, 300, 400, 500]
-    misalignment_val = 0.25e-3
+    misalignment_val = cfg.MISALIGN_SIGMA
     seed_energy_mev = best_energy_mev
 
     context_tracking = xo.ContextCpu(omp_num_threads=0)
 
-    if design == 1 and config == 1:
-        mc.insert_BPMs_all_as_markers(pdr)
-        mc.insert_correctors_var2(pdr)
-    else:
-        mc.insert_BPMs_all_as_markers(pdr)
-        mc.insert_correctors(pdr)
+    mc.insert_bpms_and_correctors(pdr, design, config)
 
     def prep_seed_line(base_line, seed, apply_correction):
-        seed_line = base_line.copy()
-        seed_line.configure_radiation(model='mean')
-        seed_line.build_tracker(_context=context_tracking)
-        seed_line = mc.misalignments(seed_line, misalignment_val, seed=seed)
-
-        if apply_correction:
-            tw = seed_line.twiss(method='6d', radiation_integrals=True,
-                                  eneloss_and_damping=True)
-            mc.misalignments_correctors(seed_line, misalignment_val, seed + 1)
-            try:
-                mc.orbit_correction(seed_line, tw, threading=False, seed=seed)
-            except Exception as e:
-                print(f"  [seed {seed}] orbit_correction(threading=False) raised: {e}")
-                mc.orbit_correction(seed_line, tw, threading=True, seed=seed)
-
-        return seed_line
+        return mc.prepare_seed_line(base_line, seed, correct=apply_correction,
+                                    sigma=misalignment_val, context=context_tracking)
 
     def track_seed_line(seed_line, e_mev):
         p0c_ref = e_mev * 1e6

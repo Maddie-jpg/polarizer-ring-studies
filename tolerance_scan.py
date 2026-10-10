@@ -19,7 +19,13 @@ Stage 1 -- physical aperture
       requirement, or 'fixed': user values, e.g. the PDR's 30 mm), the pole
       radius (chamber + wall) and the multipole reference radius
       R_ref = ref_fraction * pole radius.
-    * Saves a per-magnet table, a plot and an aperture JSON.
+    * Saves a per-magnet table (CSV) and an aperture JSON to
+      Results/.../ToleranceScan/BeamStayClear/ (no plots).
+    * This is deliberately different from the chamber sizing in
+      macroparticles.py (n * rms beam size + margin, used for magnet/pole-tip
+      design): here the aperture is the beam-stay-clear the error study needs,
+      i.e. it contains a fixed fraction of the real (non-Gaussian) injected
+      beam and includes an allowance d_co for the residual closed orbit.
 
 Stage 2 -- error tolerance scan
     For every scale factor and seed:
@@ -66,6 +72,8 @@ import xobjects as xo
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import LatticeBuild.misalignments_corrections as mc
+import paths
+import config as cfg
 
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
@@ -135,14 +143,7 @@ def truncnorm(rng, cut, size=None):
     return out
 
 
-def results_dir(design, config, phase, changes=None, metric=None, sub=None):
-    """Same layout as my_functions.results_dir (inlined to avoid its cpymad import)."""
-    base = f'Results/D{design}/C{config}/{phase}deg' + (f'_{changes}' if changes else '')
-    for part in (metric, sub):
-        if part:
-            base = f'{base}/{part}'
-    os.makedirs(base, exist_ok=True)
-    return base
+from paths import results_dir  # light-weight, no heavy imports
 
 
 def log(msg):
@@ -161,19 +162,11 @@ def magnet_names(line):
 # Lattice preparation
 # =============================================================================
 def load_environment(design, config, phase, changes):
-    tag = f'_{changes}' if changes else ''
-    path = f'JSON_Files/D{design}/C{config}/pdr_perfect_{phase}{tag}.json'
-    log(f'Loading {path}')
-    return xt.Environment.from_json(path)
+    log(f'Loading {paths.lattice_json_path(design, config, "perfect", phase, changes)}')
+    return paths.load_lattice(design, config, 'perfect', phase, changes)
 
 
-def insert_bpms_and_correctors(pdr, design, config):
-    """Same choice as analysis.py / spin_tracking.py."""
-    mc.insert_BPMs_all_as_markers(pdr)
-    if design == 1 and config == 1:
-        mc.insert_correctors_var2(pdr)
-    else:
-        mc.insert_correctors(pdr)
+insert_bpms_and_correctors = mc.insert_bpms_and_correctors  # shared rule
 
 
 def insert_apertures(pdr, line, mags, apertures):
@@ -265,7 +258,7 @@ def required_aperture(line, mags, beam, d_co, ds=0.05):
                          'dx_max': float(np.max(np.abs(tw.dx[sl]))),
                          'R_req_x': float(np.max(Rx[sl])),
                          'R_req_y': float(np.max(Ry[sl]))})
-    return pd.DataFrame(rows), (s, Rx, Ry)
+    return pd.DataFrame(rows)
 
 
 def choose_apertures(df_req, mode, fixed, wall, ref_fraction, round_to=1e-3):
@@ -290,30 +283,6 @@ def choose_apertures(df_req, mode, fixed, wall, ref_fraction, round_to=1e-3):
                  'pole_radius': float(pole), 'R_ref': float(ref_fraction * pole),
                  'margin_x': float(a - rx), 'margin_y': float(b - ry)}
     return ap
-
-
-def plot_aperture(curves, df_req, apertures, out_png):
-    s, Rx, Ry = curves
-    fig, axs = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
-    for ax, R, key, lab in [(axs[0], Rx, 'chamber_a', 'x'), (axs[1], Ry, 'chamber_b', 'y')]:
-        ax.plot(s, R * 1e3, 'k-', lw=0.8, label=f'required $R_{lab}$')
-        colors = {'Bend': 'tab:blue', 'Quadrupole': 'tab:red', 'Sextupole': 'tab:green'}
-        for t, c in colors.items():
-            if t not in apertures:
-                continue
-            sub = df_req[df_req.type == t]
-            for _, r in sub.iterrows():
-                ax.plot([r.s_start, r.s_end], [apertures[t][key] * 1e3] * 2, color=c, lw=3)
-            ax.plot([], [], color=c, lw=3, label=f'{t} chamber')
-        ax.set_ylabel(f'half-aperture {lab} [mm]')
-        ax.grid(alpha=0.3)
-        ax.set_ylim(0, None)
-        ax.legend(fontsize='small', ncol=4, loc='lower left', bbox_to_anchor=(0, 1.0),
-                  frameon=False)
-    axs[1].set_xlabel('s [m]')
-    fig.tight_layout()
-    fig.savefig(out_png, dpi=200)
-    plt.close(fig)
 
 
 # =============================================================================
@@ -399,12 +368,7 @@ def apply_multipoles(line, mags, table, apertures, seed, scale, only, cut):
 
 
 def correct_orbit(line, seed):
-    tw = line.twiss(method='6d')
-    try:
-        mc.orbit_correction(line, tw, threading=False, seed=seed)
-    except Exception as e:
-        log(f'  seed {seed}: closed-orbit correction failed ({e}); trying threading')
-        mc.orbit_correction(line, tw, threading=True, seed=seed)
+    mc.correct_orbit_with_fallback(line, line.twiss(method='6d'), seed)
 
 
 # =============================================================================
@@ -552,15 +516,16 @@ def summarise(df_res, args, out_dir):
 # Main
 # =============================================================================
 def parse_args():
-    env = os.environ.get
+    study = paths.study_from_env()   # DESIGN/CONFIG/... env vars, else config.DEFAULT_STUDY
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--design', type=int, default=int(env('DESIGN', 1)))
-    ap.add_argument('--config', type=int, default=int(env('CONFIG', 9)))
-    ap.add_argument('--phase', type=int, default=int(env('PHASE', 90)))
-    ap.add_argument('--changes', default=env('CHANGES', None))
+    ap.add_argument('--design', type=int, default=study['design'])
+    ap.add_argument('--config', type=int, default=study['config'])
+    ap.add_argument('--phase', type=int, default=study['phase'])
+    ap.add_argument('--changes', default=study['changes'],
+                    help="variant tag in the lattice file name; '' for none")
     # beam / aperture
-    ap.add_argument('--dist', default='PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat')
+    ap.add_argument('--dist', default=cfg.INJECTED_BEAM_FILE)
     ap.add_argument('--containment', type=float, default=0.999,
                     help='beam fraction defining W_max and delta_max')
     ap.add_argument('--d-co', type=float, default=1e-3, help='orbit + alignment allowance [m]')
@@ -606,12 +571,15 @@ def parse_args():
 
 def main():
     args = parse_args()
+    args.changes = args.changes or None
     only = set(args.only.split(',')) if args.only else None
     table = ERROR_TABLES[args.table]
     out_dir = results_dir(args.design, args.config, args.phase, changes=args.changes,
                              metric='ToleranceScan', sub=args.table + (f'_only_{args.only}' if only else ''))
+    # Beam-stay-clear used by this scan. Kept separate from PhysicalAperture/,
+    # which holds the chamber/pole-tip design study from macroparticles.py.
     ap_dir = results_dir(args.design, args.config, args.phase, changes=args.changes,
-                            metric='PhysicalAperture')
+                         metric='ToleranceScan', sub='BeamStayClear')
 
     # ---------------- lattice ----------------
     pdr = load_environment(args.design, args.config, args.phase, args.changes)
@@ -630,7 +598,7 @@ def main():
     beam, dist_df = injected_beam_requirements(args.dist, p0c, gb, args.containment)
     log('Injected beam: ' + ', '.join(f'{k}={v:.3g}' if isinstance(v, float) else f'{k}={v}'
                                        for k, v in beam.items()))
-    df_req, curves = required_aperture(ring, mags, beam, args.d_co)
+    df_req = required_aperture(ring, mags, beam, args.d_co)
     fixed = None
     if args.aperture_mode == 'fixed':
         if not args.fixed_aperture:
@@ -643,7 +611,6 @@ def main():
         json.dump({'beam': beam, 'd_co': args.d_co, 'wall': args.wall,
                    'containment': args.containment, 'mode': args.aperture_mode,
                    'apertures': apertures}, f, indent=2)
-    plot_aperture(curves, df_req, apertures, f'{ap_dir}/required_aperture.png')
     for t, a in apertures.items():
         log(f'{t:10s} chamber a/b = {a["chamber_a"]*1e3:.1f}/{a["chamber_b"]*1e3:.1f} mm '
             f'(required {a["R_req_x_max"]*1e3:.1f}/{a["R_req_y_max"]*1e3:.1f} mm), '

@@ -1,6 +1,2 @@
-E0 = 2.86e9
-VRF = 8.000e6 
-WP_D1=(15.42,15.38)
-WP_D1_120=(18.43,18.36)
-WP_D2=(11.72, 11.375)
-WP_D3=(16.53,16.35)
+"""Deprecated: kept so old notebooks keep working. Import config instead."""
+from config import *  # noqa: F401,F403

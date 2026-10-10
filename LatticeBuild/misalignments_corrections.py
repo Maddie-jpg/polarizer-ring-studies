@@ -1,5 +1,36 @@
-import xtrack as xt
+"""
+Magnet errors, BPMs, correctors and closed-orbit correction.
+
+Typical use from an analysis script:
+
+    import LatticeBuild.misalignments_corrections as mc
+    mc.insert_bpms_and_correctors(pdr, design, config)
+    line = mc.prepare_seed_line(pdr.lines['ring'], seed=42, correct=True)
+
+Contents
+--------
+Instrumentation  insert_BPMs*, insert_correctors*, insert_bpms_and_correctors
+Errors           misalignments (magnets), misalignments_correctors, bpm_reading_errors
+Correction       orbit_correction, report_eigenvector_counts
+Workflow         prepare_seed_line  - misalign + (optionally) correct one seed
+                 setup_spin_reference - set g-2 and energy for spin tracking
+
+All error sigmas are in m (shifts) and rad (rolls). Defaults live in config.py.
+"""
+
+import re
+import sys
+from pathlib import Path
+
 import numpy as np
+import xtrack as xt
+import xobjects as xo
+
+# Make the repository root importable (for config.py) however this file is reached.
+_REPO_ROOT = str(Path(__file__).resolve().parents[1])
+if _REPO_ROOT not in sys.path:
+    sys.path.append(_REPO_ROOT)
+import config as cfg
 
 def get_safe_insertion(ring, prefix, elem, sign, default_offset):
     
@@ -156,9 +187,6 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 
    return pdr
 
-
-
-import re
 
 
 def insert_correctors(pdr):
@@ -658,3 +686,93 @@ def bpm_reading_errors(bpm_names, sigma, rng, cut=2.5):
         }
         for name in bpm_names
     }
+
+
+# =============================================================================
+# Shared workflow helpers - use these instead of copying the steps into scripts
+# =============================================================================
+
+def insert_bpms_and_correctors(pdr, design, config):
+    """Insert BPM markers and orbit correctors into pdr.lines['ring'] in place.
+
+    D1 C1 uses the original corrector layout (insert_correctors_var2); every
+    other lattice uses insert_correctors. This is the rule the analysis,
+    macroparticle, spin and tolerance scripts all used individually.
+    """
+    insert_BPMs_all_as_markers(pdr)
+    if design == 1 and config == 1:
+        insert_correctors_var2(pdr)
+    else:
+        insert_correctors(pdr)
+    return pdr
+
+
+def setup_spin_reference(line, kinetic_energy=cfg.E0):
+    """Set the anomalous magnetic moment and energy needed for spin tracking."""
+    line.particle_ref.anomalous_magnetic_moment = cfg.ANOMALOUS_MAGNETIC_MOMENT
+    line.particle_ref.kinetic_energy0 = kinetic_energy
+    return line
+
+
+def correct_orbit_with_fallback(line, twiss, seed, **kwargs):
+    """Run orbit_correction; if the closed orbit cannot be found, retry with
+    trajectory threading. Extra kwargs (rcond_x, rcond_y, ...) are passed on.
+    """
+    try:
+        orbit_correction(line, twiss, threading=False, seed=seed, **kwargs)
+    except Exception as e:
+        print(f"  [seed {seed}] orbit_correction(threading=False) raised "
+              f"{type(e).__name__}: {e} -- retrying with threading=True")
+        orbit_correction(line, twiss, threading=True, seed=seed, **kwargs)
+    return line
+
+
+def prepare_seed_line(base_line, seed, correct, *,
+                      sigma=cfg.MISALIGN_SIGMA,
+                      corrector_sigma=cfg.CORRECTOR_SIGMA,
+                      radiation='mean',
+                      context=None,
+                      copy=True,
+                      report_orbit=False):
+    """Return a line with one random error seed applied, optionally corrected.
+
+    Steps:
+      1. copy base_line (unless copy=False), set radiation model, build tracker
+      2. misalignments(sigma, seed)                  - magnet shifts, rolls, field errors
+      3. if correct:
+           twiss 6d of the misaligned machine
+           misalignments_correctors(corrector_sigma, seed + 1)
+           orbit correction, falling back to threading if needed
+
+    Corrector errors use seed + 1 so they are independent of the magnet errors
+    but still reproducible. base_line must already contain BPMs and correctors
+    if correct=True (see insert_bpms_and_correctors).
+
+    Parameters
+    ----------
+    base_line : xt.Line       The perfect ring.
+    seed : int                Random seed for this machine.
+    correct : bool            Apply orbit correction after misaligning.
+    sigma, corrector_sigma    RMS errors [m, rad]; defaults from config.py.
+    radiation : str or None   Radiation model while preparing ('mean' by default).
+    context                   xobjects context; defaults to CPU with OpenMP.
+    copy : bool               Work on a copy (True) or modify base_line in place.
+    report_orbit : bool       Print RMS closed orbit before/after correction
+                              (costs one extra twiss).
+    """
+    line = base_line.copy() if copy else base_line
+    line.configure_radiation(model=radiation)
+    line.build_tracker(_context=context or xo.ContextCpu(omp_num_threads=0))
+    misalignments(line, sigma, seed=seed)
+
+    if correct:
+        tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True)
+        misalignments_correctors(line, corrector_sigma, seed + 1)
+        correct_orbit_with_fallback(line, tw, seed)
+
+        if report_orbit:
+            tw_after = line.twiss(method='6d')
+            print(f"  [seed {seed}] orbit RMS x: {np.std(tw.x):.3e} -> {np.std(tw_after.x):.3e}, "
+                  f"y: {np.std(tw.y):.3e} -> {np.std(tw_after.y):.3e}")
+
+    return line

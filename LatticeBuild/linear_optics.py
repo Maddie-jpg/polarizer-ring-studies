@@ -1,13 +1,38 @@
+"""
+Linear optics builders for the polarizer ring.
+
+Each public builder (three_fold_periodicity, two_fold_1straight,
+two_fold_racetrack_3straight, ...) creates an xtrack Environment `pdr` with
+lines 'ring', 'period', 'cell_arc', 'cell_tr' and 'arc1R', matches the arc
+and straight cells, matches the ring to the requested working point WP and
+adds the RF cavity. Sextupoles are added afterwards by a config_D*_C*
+function in sextupole_configs.py.
+
+Builders (default working point from config.py in brackets):
+    three_fold_periodicity           3 arcs + 3 straights, 90 deg cells   (WP_D1)
+    three_fold_periodicity_long      as above, longer cells/straights     (WP_D1)
+    three_fold_periodicity_*_120*    120 deg arc cells                     (WP_D1_120)
+    two_fold_1straight               two-fold, one long straight           (WP_D2)
+    two_fold_racetrack_3straight     two-fold racetrack                    (WP_D3)
+Which builder + sextupole config each D/C lattice used is listed in README.md.
+
+Module-level helpers prefixed with "_" are internal steps shared by the
+builders (element creation, knob seeding, matching, RF insertion).
+
+Default energies, RF voltage and working points come from config.py.
+"""
 import sys
-import os
+from pathlib import Path
 
-parent_dir = os.path.abspath('..')
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+# Make the repository root importable (config.py) however this file is reached.
+_REPO_ROOT = str(Path(__file__).resolve().parents[1])
+if _REPO_ROOT not in sys.path:
+    sys.path.append(_REPO_ROOT)
 
-import xtrack as xt
 import numpy as np
-import constants
+import xtrack as xt
+
+import config
 
 
 # ----------------------
@@ -862,10 +887,10 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # Design 1 (more variations as this was created before pipeline optimisation)
 # ---------------------------------------------------------------------------
 
-def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2)):
+def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2)):
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = constants.E0; VRF = constants.VRF
+    E0 = config.E0; VRF = config.VRF
 
     '''pdr.vars({
         'l_cell':   3.4,    'l_bend':   0.40,   'l_bendDS': 0.55,
@@ -997,11 +1022,11 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=constants.WP_D1,p
 
 
 def three_fold_periodicity_long(fringe_fields=True, matched=True,
-                                WP=constants.WP_D1, phase_advance=0.25,
+                                WP=config.WP_D1, phase_advance=0.25,
                                 betay_DS_target=None):
  
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = constants.E0; VRF = constants.VRF
+    E0 = config.E0; VRF = config.VRF
  
     pdr.vars({
         'l_cell':   3.6,    'l_bend':   0.40,   'l_bendDS': 0.40,
@@ -1109,10 +1134,10 @@ def three_fold_periodicity_long(fringe_fields=True, matched=True,
 
 
 
-def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True, WP=constants.WP_D1):
+def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True, WP=config.WP_D1):
    
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = constants.E0; VRF = constants.VRF
+    E0 = config.E0; VRF = config.VRF
 
     '''pdr.vars({
         'l_cell':   3.5,    'l_bend':   0.40,   'l_bendDS': 0.55,
@@ -1250,10 +1275,10 @@ def three_fold_periodicity_90_deg_many_sext(fringe_fields=True, matched=True, WP
 
 
 
-def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True, WP=constants.WP_D1_120):
+def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True, WP=config.WP_D1_120):
   
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = constants.E0; VRF = constants.VRF
+    E0 = config.E0; VRF = config.VRF
 
     pdr.vars({
         'l_cell':   3.5,    'l_bend':   0.40,   'l_bendDS': 0.55,
@@ -1410,10 +1435,10 @@ def three_fold_periodicity_120_deg_many_sext(fringe_fields=True, matched=True, W
     _finalise(pdr, ring, arc1R, cell_arc, cell_tr, period, bend_edge)
     return pdr
 
-def three_fold_periodicity_120_deg(fringe_fields=True, matched=True, WP=constants.WP_D1_120):
+def three_fold_periodicity_120_deg(fringe_fields=True, matched=True, WP=config.WP_D1_120):
 
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = constants.E0; VRF = constants.VRF
+    E0 = config.E0; VRF = config.VRF
 
     pdr.vars({
         'l_cell':   3.5,    'l_bend':   0.40,   'l_bendDS': 0.55,
@@ -1531,11 +1556,11 @@ def three_fold_periodicity_120_deg(fringe_fields=True, matched=True, WP=constant
 # Design 2
 #------------------
 
-def two_fold_1straight(fringe_fields=True, matched=True,WP=constants.WP_D2, phase_advance=0.25):
+def two_fold_1straight(fringe_fields=True, matched=True,WP=config.WP_D2, phase_advance=0.25):
 
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = constants.E0            # use the shared constants (16 MV RF), see note
-    VRF = constants.VRF
+    E0 = config.E0            # shared values from config.py
+    VRF = config.VRF
  
     pdr.vars({
         'l_cell':   3.0,    'l_bend':   0.40,   'l_bendDS': 0.4,
@@ -1687,7 +1712,7 @@ def two_fold_1straight(fringe_fields=True, matched=True,WP=constants.WP_D2, phas
 # Design 3
 #-------------
 
-def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=constants.WP_D3, phase_advance=0.25,betay_DS_target=True):
+def two_fold_racetrack_3straight(fringe_fields=True, matched=True,WP=config.WP_D3, phase_advance=0.25,betay_DS_target=True):
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = 2.86e9; VRF = 4.0e6
 
