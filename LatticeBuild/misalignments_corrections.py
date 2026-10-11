@@ -102,6 +102,9 @@ def get_safe_insertion(ring, prefix, elem, sign, default_offset):
 
     # Neither side is a plain, long-enough-to-fit open drift -> hug the
     # quad's own edge instead (small, fixed offset, cannot overshoot).
+    # The returned anchor is the point ON THE QUAD the offset is measured
+    # from (passed to ring.insert as from_anchor), so the kicker centre ends
+    # up l_kick/2 outside the quad edge, never inside the quad.
     if sign == '-':
         return ref_element, 'start', '-l_kick/2'
     else:
@@ -240,15 +243,18 @@ def insert_correctors(pdr):
         computation rather than the caller's generic drift_map guess.
 
         get_safe_insertion returns (ref_element, anchor, offset) -- the
-        element to anchor against, which point on it to anchor from, and
-        the (string, deferred-expression) offset to place new_element at.
-        We just hand those straight to ring.insert().
+        element to anchor against, which point ON IT to measure from, and
+        the (string, deferred-expression) offset to place new_element's
+        centre at. The anchor is therefore ring.insert's from_anchor.
+        (It used to be passed as `anchor`, i.e. the kicker's own anchor,
+        which measured the edge offsets from the quad centre and put 62
+        correctors inside their quads.)
         """
         ref_element, anchor, insertion_offset = get_safe_insertion(
             ring, prefix, elem, sign, default_offset)
 
-        ring.insert(new_element, at=insertion_offset, anchor=anchor,
-                     from_=ref_element)
+        ring.insert(new_element, at=insertion_offset, from_=ref_element,
+                    from_anchor=anchor)
 
     # ---- vertical correctors on QD-type quads ----
     for prefix in ['QDA_', 'QDA_M', 'QDDoub_', 'QDDS_', 'QDTrip_']:

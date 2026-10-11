@@ -132,6 +132,9 @@ _DIAG_STYLES = [
 _DIAG_KINDS = {'inj', 'bpm', 'bpm_h', 'bpm_v'}
 # Kinds drawn as floating indicators rather than in-line hardware.
 _BPM_KINDS = {'bpm', 'bpm_h', 'bpm_v'}
+# Corrector kinds: thin kicks in the lattice, drawn at their physical length.
+_CORR_KINDS = {'corr', 'corr_h', 'corr_v'}
+CORR_MIN_LENGTH = 0.1   # [m] drawn length if a corrector carries no length
 
 # Human-readable names for the legend, keyed by kind.
 _KIND_LABEL = {
@@ -210,25 +213,45 @@ def _base_name(name):
 
 def _merge_slices(rows):
     """
-    Collapse consecutive rows belonging to one sliced element into a single
-    row carrying the parent name, its start s and its total length.
+    Collapse rows belonging to one sliced element into a single row carrying
+    the parent name, its start s and its total length.
+
+    A thin element placed inside a magnet (e.g. a corrector kick or marker
+    inserted part-way along a quad) splits it into pieces with the same base
+    name. Those pieces are merged too, and the thin element is kept as its
+    own row after the magnet, so the magnet is drawn once at full length.
     """
     out, i, n = [], 0, len(rows)
     while i < n:
         base = _base_name(rows[i]['name'])
         j = i
-        while j + 1 < n and _base_name(rows[j + 1]['name']) == base:
-            j += 1
-        if j == i and rows[i]['name'] == base:
-            out.append(rows[i])                      # untouched element
+        inside = []                                  # thin elements within the magnet
+        while j + 1 < n:
+            if _base_name(rows[j + 1]['name']) == base:
+                j += 1
+                continue
+            # look past zero-length elements for another piece of `base`
+            k = j + 1
+            while k < n and rows[k].get('thin', rows[k]['length'] == 0) \
+                    and _base_name(rows[k]['name']) != base:
+                k += 1
+            if k < n and k > j + 1 and _base_name(rows[k]['name']) == base \
+                    and not rows[i]['is_drift']:
+                inside.extend(rows[j + 1:k])
+                j = k
+                continue
+            break
+        grp = [r for r in rows[i:j + 1] if r not in inside]
+        if len(grp) == 1 and grp[0]['name'] == base:
+            out.append(grp[0])                       # untouched element
         else:
-            grp = rows[i:j + 1]
             kind, colour, h, y0, hatch = _classify(base)
             out.append(dict(name=base,
                             s=min(r['s'] for r in grp),
                             length=sum(r['length'] for r in grp),
                             kind=kind, colour=colour, half_h=h, y0=y0,
                             hatch=hatch, is_drift=_is_drift(base, None)))
+        out.extend(inside)
         i = j + 1
     return out
 
@@ -301,7 +324,15 @@ def _element_rows(line, merge_slices=True):
 
         drift = _is_drift(nm, el)
         kind, colour, h, y0, hatch = _classify(nm)
-        rows.append(dict(name=nm, s=float(svals[i]), length=L,
+        s_start = float(svals[i])
+        thin = (L == 0)
+        if kind in _CORR_KINDS and L == 0:
+            # Correctors are thin kicks (zero s-length), but the element
+            # carries the physical corrector length (l_kick). Draw it at that
+            # length, centred on the kick, so it is visible and dimensioned.
+            L = float(getattr(el, 'length', 0.0) or 0.0) or CORR_MIN_LENGTH
+            s_start -= L / 2.0
+        rows.append(dict(name=nm, s=s_start, length=L, thin=thin,
                          kind=kind, colour=colour, half_h=h, y0=y0,
                          hatch=hatch, is_drift=drift))
     if merge_slices:
@@ -446,7 +477,10 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
                          2 * r['half_h'],
                          facecolor=r['colour'], edgecolor='black',
                          hatch=r.get('hatch', ''),
-                         linewidth=0.8, zorder=3)
+                         linewidth=0.8,
+                         # correctors on top, so one that overlaps a magnet
+                         # (older lattices) is still visible
+                         zorder=4 if r['kind'] in _CORR_KINDS else 3)
         ax.add_patch(rect)
 
     # ---- diagnostics band: BPMs, correctors, injection ----------------
