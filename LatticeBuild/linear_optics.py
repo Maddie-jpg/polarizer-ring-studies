@@ -140,57 +140,73 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
 
 def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
                  cell_tr_opt, cell_tr, arc1R, qx_target=None, qy_target=None,
-                 n_periods=6, betay_DS_target=None, MakePlot=False, FDF=True):
+                 n_periods=6, betay_DS_target=None, MakePlot=False, FDF=True,
+                 beta_weight=3.0, match_end_betas=False):
+    """Match the sextant optics (no tune targets unless qx/qy_target given).
+
+    Hard targets at the sextant END (the straight-section symmetry point):
+        dx = dpx = 0      dispersion-free straight
+        alfx = alfy = 0   mirror symmetry -> the half-period closes
+    plus upper bounds beta <= BETA_MAX through the matching cell, DS and
+    straight (same knobs, bound and weight as matchingWP, so the WP match
+    can start from this solution).
+
+    The phase advance is left free, so the ring keeps whatever tunes these
+    optics give; match them afterwards with matchingWP if needed.
+
+    Previously this also required betx/bety at END to equal the straight
+    cell's values, varied only 6 knobs (no triplet) and bounded beta at 5 m.
+    That is over-constrained for the F-D-F straight: it ended with Dx = 22 mm
+    and alfa != 0 at the straight, and the period had no stable solution
+    ('Invalid n1/n2'). match_end_betas=True restores those END beta targets
+    (betxS/betyS from the straight cell) as soft targets.
+    """
     cell_arc_opt.run_jacobian(10)
     tw_cell = cell_arc.twiss(method='4d')
-    cell_tr_opt.targets[0].value = betxS
-    cell_tr_opt.targets[1].value = betyS
-    cell_tr_opt.run_jacobian(10)
-    tw_tr = cell_tr.twiss(method='4d')
+    bc = dict(betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
+              bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
+              dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0])
 
-    vary = [
-        xt.VaryList(['kQFarcM', 'kQDarcM'], step=1e-4),
-        xt.VaryList(['kQFDS',   'kQDDS'],   step=1e-4),
-        xt.VaryList(['kQFDoub', 'kQDDoub'], step=1e-4),
-    ]
+    knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF)
+    vary = [xt.Vary(k, step=1e-5, limits=KNOB_LIMITS.get(k, KNOB_LIMITS_DEFAULT))
+            for k in knob_names if k not in FIXED_KNOBS]
 
     targets = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-        xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0], at=xt.END, tol=1e-6),
     ]
-
-    # Retain phase advance / WP matching constraint during beta matching
+    if match_end_betas:
+        cell_tr_opt.targets[0].value = betxS
+        cell_tr_opt.targets[1].value = betyS
+        cell_tr_opt.run_jacobian(10)
+        tw_tr = cell_tr.twiss(method='4d')
+        targets.append(xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0],
+                                    at=xt.END, tol=1e-3, weight=0.1))
     if qx_target is not None and qy_target is not None:
-        targets.extend([
-            xt.Target('mux', qx_target / n_periods, at=xt.END, tol=1e-8),
-            xt.Target('muy', qy_target / n_periods, at=xt.END, tol=1e-8),
-        ])
+        targets.append(xt.TargetSet(mux=qx_target / n_periods,
+                                    muy=qy_target / n_periods, at=xt.END, tol=1e-8))
 
-    BETA_MAX = 5.
-    soft_beta = []
-    mk_list = ['QFDS_xR', 'QDDS_xR', 'QFDoub_xR', 'QDDoub_xR', 'QDDoubDS_xR', 
-               'QFTrip_xR1' if FDF else 'QDTrip_xR1']
+    BETA_MAX = max(betay_DS_target or 0, BETA_BOUND_FLOOR)
     for mk in mk_list:
-        soft_beta += [
-            xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
-            xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=0.02),
+        targets += [
+            xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
+            xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
         ]
-    targets += soft_beta
 
-    opt = arc1R.match(
-        method='4d', solve=True, assert_within_tol=False,
-        betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
-        bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
-        dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0],
-        vary=vary, targets=targets)
-    opt.run_jacobian(30)
+    opt = arc1R.match(method='4d', solve=False, verbose=False, **bc,
+                      vary=vary, targets=targets, assert_within_tol=False)
+    try:
+        opt.solve(n_steps=60)
+    except Exception:
+        opt.step(60, broyden=True, rcond=1e-4)
 
+    tw = arc1R.twiss(method='4d', **bc)
+    print(f'matchingBeta   -> END dx={tw.dx[-1]:+.2e} alfx={tw.alfx[-1]:+.2e} '
+          f'alfy={tw.alfy[-1]:+.2e}; sextant mux={tw.mux[-1]:.4f} muy={tw.muy[-1]:.4f} '
+          f'(ring {n_periods * tw.mux[-1]:.3f}, {n_periods * tw.muy[-1]:.3f}); '
+          f'betx<={tw.betx.max():.2f} bety<={tw.bety.max():.2f}')
     if MakePlot:
-        arc1R.twiss(method='4d',
-                    betx=tw_cell.betx[0], alfx=tw_cell.alfx[0],
-                    bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
-                    dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0]).plot()
+        tw.plot()
     return opt
 
 def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
@@ -804,7 +820,7 @@ def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, wp_constants, n_periods=6,
                            betay_DS_target=None, FDF=True, bounded=True,
                            trim_knobs=('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM'),
-                           trim_warn_frac=0.05):
+                           trim_warn_frac=0.05, match_WP=True):
     """
     Match the sextant, then trim the ring tunes globally.
 
@@ -828,6 +844,10 @@ def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
         simultaneous   (bounded=True)   betx<= 5.62  bety<=10.00  |dx|<=0.272
         betas -> tune  (bounded=False)  betx<= 8.01  bety<=11.50  |dx|<=0.278
         tune  -> betas (the old order)  betx<=18.94  bety<=11.96  |dx|<=0.604
+
+    match_WP=False (only with bounded=False) stops after the beta match: no
+    tune match and no global trim, so the ring keeps whatever tunes the
+    beta-matched optics give. Those tunes are printed and returned in tw.
     """
     qx_t, qy_t = wp_constants
 
@@ -838,6 +858,15 @@ def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                      cell_arc_opt, cell_arc, cell_tr_opt, cell_tr, arc1R,
                      qx_target=None, qy_target=None, n_periods=n_periods,
                      betay_DS_target=betay_DS_target, FDF=FDF)
+
+    if not match_WP:
+        if bounded:
+            raise ValueError('match_WP=False needs bounded=False (betas matched first)')
+        tw = ring.twiss(method='4d')
+        print(f'beta match only (WP not matched) -> Qx={tw.qx:9.6f} Qy={tw.qy:9.6f}')
+        print(f'                  betx<={tw.betx.max():6.2f} m  '
+              f'bety<={tw.bety.max():6.2f} m  |dx|<={np.abs(tw.dx).max():.4f} m')
+        return tw
 
     matchingWP(qx_t, qy_t, cell_arc_opt, cell_arc, arc1R,
                n_periods=n_periods, FDF=FDF, betay_DS_target=betay_DS_target)
@@ -888,13 +917,16 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # ---------------------------------------------------------------------------
 
 def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
-                           betas_first=False):
+                           match_WP=True):
     """Three-fold (D1) ring with F-D-F straights.
 
-    betas_first : False (default) matches tune and beta together (beta as
-        upper bounds). True matches the betas through the matching cell, DS
-        and straight first, then the working point, then a small global tune
-        trim -- see _run_standard_matching for measured results of each.
+    Matching order (always): arc and straight cells, then the betas through
+    the matching cell, dispersion suppressor and straight, then -- only if
+    match_WP=True -- the working point WP and a small global tune trim.
+
+    match_WP : True (default) matches the ring to WP after the betas.
+        False keeps the tunes the beta-matched optics give (WP is ignored);
+        they are printed so you can see where the lattice sits.
     """
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
@@ -1023,7 +1055,7 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
                                                     mu_cell=phase_advance)
     _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, WP, betay_DS_target=betay_DS_target,
-                           bounded=not betas_first)
+                           bounded=False, match_WP=match_WP)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
     _check_triplet_basin(pdr)
