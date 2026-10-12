@@ -901,7 +901,12 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
       fit count      N_sigma = chamber / sigma  (rms beam sizes that fit)
                      N_eps   = N_sigma^2        (rms emittances that fit)
  
-    eps_x, eps_y are geometric rms emittances in m rad. Everything is local to
+    eps_x, eps_y are geometric rms emittances in m rad.
+
+    Pole-tip fields use the MAD/xtrack strengths directly: quad B = Brho k1 R,
+    sextupole B = Brho k2 R^2 / 2. xtrack's k2 is k' = B''/Brho (an offset
+    dx in a sextupole gives a gradient k1 = k2 dx), checked against the
+    thin-lens chromaticity formula dQ'_x = (1/4pi) sum(beta_x D k2 L). Everything is local to
     this function, so it doesn't touch the script's globals (ax, dx, ...).
     Returns (df_mag, df_pole).
     """
@@ -998,7 +1003,8 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
             a.axvspan(r.s_start, r.s_end, color=colors_ap[r.type], alpha=0.15, lw=0)
         a.plot(s_ap, sig * 1e3, color='grey', lw=0.8, label='1 $\\sigma$')
         a.plot(s_ap, env * 1e3, 'k-', lw=1.2, label=f'{n_sigma_beam} $\\sigma$ beam envelope')
-        a.plot(s_ap, C * 1e3, 'k:', lw=1.3, label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
+        if chamber_margin > 0:
+            a.plot(s_ap, C * 1e3, 'k:', lw=1.3, label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
         handles, _ = a.get_legend_handles_labels()
         handles += [mpatches.Patch(color=c_, alpha=0.3, label=t_) for t_, c_ in colors_ap.items()]
         a.legend(handles=handles, fontsize='small', ncol=6, loc='lower left',
@@ -1098,8 +1104,9 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
                color=col, lw=0.8, alpha=0.6, label='1 $\\sigma$ beam')
         a.plot(X * 1e3, Y * 1e3, '-', color=col, lw=1.4,
                label=f'{n_sigma_beam} $\\sigma$ beam envelope')
-        a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3,
-               label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
+        if chamber_margin > 0:
+            a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3,
+                   label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
         Rm = r['_R'] * 1e3
         if r['_t'] == 'Bend':
             a.axhline(Rm, color='grey', lw=1, label=f'pole (half gap {Rm:.1f} mm)')
@@ -1184,11 +1191,18 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
 
 
 
-# rms beam parameters computed above: emittances in mm mrad (= um), spread in %
-sigma_delta_for_aperture = relative_spread / 100   # whole beam incl. tails; set a core value if preferred
+# Physical aperture = 5 sigma of the injected beam, no extra margin:
+#     A_x = 5 * sqrt(beta_x * eps_x + (D_x * sigma_delta)^2)       (~20 mm expected)
+# eps_x, eps_y: rms emittances of the beam core computed above (mm mrad = um).
+# sigma_delta: rms momentum spread of the MAIN BUNCH. The whole-distribution
+# spread (relative_spread, ~5 % with the tails) would give ~60 mm instead.
+_main = select_main_bunch(df)
+sigma_delta_for_aperture = float(np.std(_main['p[MeV/c]']) / np.mean(_main['p[MeV/c]']))
+print(f'Aperture uses sigma_delta = {sigma_delta_for_aperture*1e3:.2f} per mil (main bunch), '
+      f'eps_x = {emittance_x:.3f} um, eps_y = {emittance_y:.3f} um')
 aperture_mag, aperture_pole = physical_aperture_study(
     ring, emittance_x * 1e-6, emittance_y * 1e-6, sigma_delta_for_aperture, mode,
-    n_sigma_beam=3, chamber_margin=5e-3)
+    n_sigma_beam=5, chamber_margin=0.0)
 
 # %%
 rand_num = 74
