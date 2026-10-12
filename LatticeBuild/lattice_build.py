@@ -72,11 +72,16 @@ elif mode == 'corrected':
     mc.insert_correctors_var2(pdr)
     mc.misalignments_correctors(ring, cfg.CORRECTOR_SIGMA, SEED)
 
-    twiss = ring.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                       spin=True, polarization=True)
+    # Response matrix from the perfect lattice with the same BPMs/correctors.
+    # The misaligned ring may have no closed orbit until it is threaded, so
+    # it cannot provide its own twiss here.
+    pdr_ref = paths.load_lattice(design, config, 'perfect', phase, changes)
+    mc.insert_BPMs_all_as_markers(pdr_ref)
+    mc.insert_correctors_var2(pdr_ref)
+    twiss_ref = pdr_ref.lines['ring'].twiss(method='6d')
+
     ring.discard_tracker()
-    mc.correct_orbit_with_fallback(ring, twiss, SEED,
-                                   rcond_x=cfg.RCOND_X, rcond_y=cfg.RCOND_Y)
+    mc.correct_orbit_with_fallback(ring, twiss_ref, SEED)
 
 else:
     raise ValueError(f"Unknown mode {mode!r}; use one of {paths.MODES}")

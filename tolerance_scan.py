@@ -367,8 +367,10 @@ def apply_multipoles(line, mags, table, apertures, seed, scale, only, cut):
                         k.ksl[n - 1] = KL * fac
 
 
-def correct_orbit(line, seed):
-    mc.correct_orbit_with_fallback(line, line.twiss(method='6d'), seed)
+def correct_orbit(line, seed, tw_ref):
+    """tw_ref: twiss of the perfect machine (response matrix); the errored
+    machine may have no closed orbit until it has been threaded."""
+    mc.correct_orbit_with_fallback(line, tw_ref, seed)
 
 
 # =============================================================================
@@ -641,6 +643,13 @@ def main():
     threads = int(args.threads) if str(args.threads).isdigit() else args.threads
     context = serial_context if threads == 0 else xo.ContextCpu(omp_num_threads=threads)
 
+    # Response matrix for orbit correction: perfect machine, computed once.
+    _ref = base.copy()
+    _ref.build_tracker(_context=serial_context)
+    if args.radiation == 'mean':
+        _ref.configure_radiation(model='mean')
+    tw_ref = _ref.twiss(method='6d' if args.radiation == 'mean' else '4d')
+
     for scale in scales:
         for seed in seeds:
             if (scale, seed) in done:
@@ -660,7 +669,7 @@ def main():
                     line.configure_radiation(model='mean')
                 if not args.no_correction:
                     misalign_correctors(line, seed, args.sig_shift, args.cut)
-                    correct_orbit(line, seed)
+                    correct_orbit(line, seed, tw_ref)
                 tw = line.twiss(method='6d' if args.radiation == 'mean' else '4d')
                 # Everything twiss-dependent is now in `tw`; switch to the
                 # tracking context (OpenMP if --threads != 0).

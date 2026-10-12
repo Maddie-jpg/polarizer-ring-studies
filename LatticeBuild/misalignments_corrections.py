@@ -741,6 +741,10 @@ def setup_spin_reference(line, kinetic_energy=cfg.E0):
 def correct_orbit_with_fallback(line, twiss, seed, **kwargs):
     """Run orbit_correction; if the closed orbit cannot be found, retry with
     trajectory threading. Extra kwargs (rcond_x, rcond_y, ...) are passed on.
+
+    `twiss` provides the response matrix. Pass the twiss of the PERFECT
+    machine (with the same BPMs/correctors), not of the misaligned one: the
+    misaligned machine may have no closed orbit until it has been threaded.
     """
     try:
         orbit_correction(line, twiss, threading=False, seed=seed, **kwargs)
@@ -787,16 +791,22 @@ def prepare_seed_line(base_line, seed, correct, *,
     line = base_line.copy() if copy else base_line
     line.configure_radiation(model=radiation)
     line.build_tracker(_context=context or xo.ContextCpu(omp_num_threads=0))
+
+    # Response matrix from the PERFECT machine, computed before the errors go
+    # in -- as in a real machine. The misaligned ring often has no closed
+    # orbit before correction (e.g. the F-D-F lattice: 8/10 seeds at 0.25 mm),
+    # so a twiss of it here would fail before threading could ever run.
+    tw_ref = line.twiss(method='6d' if radiation else '4d') if correct else None
+
     misalignments(line, sigma, seed=seed)
 
     if correct:
-        tw = line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True)
         misalignments_correctors(line, corrector_sigma, seed + 1)
-        correct_orbit_with_fallback(line, tw, seed)
+        correct_orbit_with_fallback(line, tw_ref, seed)
 
         if report_orbit:
-            tw_after = line.twiss(method='6d')
-            print(f"  [seed {seed}] orbit RMS x: {np.std(tw.x):.3e} -> {np.std(tw_after.x):.3e}, "
-                  f"y: {np.std(tw.y):.3e} -> {np.std(tw_after.y):.3e}")
+            tw_after = line.twiss(method='6d' if radiation else '4d')
+            print(f"  [seed {seed}] corrected orbit RMS x: {np.std(tw_after.x):.3e}, "
+                  f"y: {np.std(tw_after.y):.3e}")
 
     return line
