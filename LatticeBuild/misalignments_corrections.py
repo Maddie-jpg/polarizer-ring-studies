@@ -1,5 +1,36 @@
-import xtrack as xt
+"""
+Magnet errors, BPMs, correctors and closed-orbit correction.
+
+Typical use from an analysis script:
+
+    import LatticeBuild.misalignments_corrections as mc
+    mc.insert_bpms_and_correctors(pdr, design, config)
+    line = mc.prepare_seed_line(pdr.lines['ring'], seed=42, correct=True)
+
+Contents
+--------
+Instrumentation  insert_BPMs*, insert_correctors*, insert_bpms_and_correctors
+Errors           misalignments (magnets), misalignments_correctors, bpm_reading_errors
+Correction       orbit_correction, report_eigenvector_counts
+Workflow         prepare_seed_line  - misalign + (optionally) correct one seed
+                 setup_spin_reference - set g-2 and energy for spin tracking
+
+All error sigmas are in m (shifts) and rad (rolls). Defaults live in config.py.
+"""
+
+import re
+import sys
+from pathlib import Path
+
 import numpy as np
+import xtrack as xt
+import xobjects as xo
+
+# Make the repository root importable (for config.py) however this file is reached.
+_REPO_ROOT = str(Path(__file__).resolve().parents[1])
+if _REPO_ROOT not in sys.path:
+    sys.path.append(_REPO_ROOT)
+import config as cfg
 
 def get_safe_insertion(ring, prefix, elem, sign, default_offset):
     
@@ -71,6 +102,9 @@ def get_safe_insertion(ring, prefix, elem, sign, default_offset):
 
     # Neither side is a plain, long-enough-to-fit open drift -> hug the
     # quad's own edge instead (small, fixed offset, cannot overshoot).
+    # The returned anchor is the point ON THE QUAD the offset is measured
+    # from (passed to ring.insert as from_anchor), so the kicker centre ends
+    # up l_kick/2 outside the quad edge, never inside the quad.
     if sign == '-':
         return ref_element, 'start', '-l_kick/2'
     else:
@@ -158,9 +192,6 @@ def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 
 
 
-import re
-
-
 def insert_correctors(pdr):
 
     offset = (pdr['l_quad'] + pdr['l_drift']) / 2
@@ -212,15 +243,18 @@ def insert_correctors(pdr):
         computation rather than the caller's generic drift_map guess.
 
         get_safe_insertion returns (ref_element, anchor, offset) -- the
-        element to anchor against, which point on it to anchor from, and
-        the (string, deferred-expression) offset to place new_element at.
-        We just hand those straight to ring.insert().
+        element to anchor against, which point ON IT to measure from, and
+        the (string, deferred-expression) offset to place new_element's
+        centre at. The anchor is therefore ring.insert's from_anchor.
+        (It used to be passed as `anchor`, i.e. the kicker's own anchor,
+        which measured the edge offsets from the quad centre and put 62
+        correctors inside their quads.)
         """
         ref_element, anchor, insertion_offset = get_safe_insertion(
             ring, prefix, elem, sign, default_offset)
 
-        ring.insert(new_element, at=insertion_offset, anchor=anchor,
-                     from_=ref_element)
+        ring.insert(new_element, at=insertion_offset, from_=ref_element,
+                    from_anchor=anchor)
 
     # ---- vertical correctors on QD-type quads ----
     for prefix in ['QDA_', 'QDA_M', 'QDDoub_', 'QDDS_', 'QDTrip_']:
@@ -280,14 +314,22 @@ def report_eigenvector_counts(ring, twiss, rcond_x=1e-4, rcond_y=1e-2):
 
 
 def orbit_correction(ring, twiss, threading=False,
-                      rcond_x=1e-4, rcond_y=1e-2,
-                      n_eig_x=None, n_eig_y=None,
-                      bpm_error=True, sigma=0.25e-3, seed=1234):
-    """
-    n_eig_x / n_eig_y: number of singular values (eigenvectors) to keep
-    for the x / y correction, respectively. Can be an int, or a (low, high)
-    tuple to select a specific window of singular values. If None (default),
-    falls back to the existing rcond-based cutoff.
+                      rcond_x=cfg.RCOND_X, rcond_y=cfg.RCOND_Y,
+                      n_eig_x=cfg.N_EIG_X, n_eig_y=cfg.N_EIG_Y,
+                      eig_fraction=None,
+                      bpm_error=True, sigma=cfg.BPM_SIGMA, seed=1234):
+    """SVD closed-orbit correction with BPM reading errors.
+
+    How many singular values (eigenvectors) are kept in each plane, in order
+    of precedence:
+      n_eig_x / n_eig_y   count for that plane (default config.N_EIG_X /
+                          N_EIG_Y = 15); capped at the number available
+      eig_fraction        if the count is None: that fraction of the
+                          available singular values, rounded down
+      rcond_x / rcond_y   only if both of the above are None: drop singular
+                          values below rcond * largest
+    When a count is used the rcond cut is switched off, so the count alone
+    decides. The numbers used are printed for each correction.
     """
     tt = ring.get_table()
     bpm_names_x = tt.rows['BPMx.*'].name
@@ -307,12 +349,22 @@ def orbit_correction(ring, twiss, threading=False,
         monitor_align = bpm_reading_errors(BPMs, sigma, rng)
 
     def run_correction(corr_handler):
-        corr_handler.x_correction.rcond = rcond_x
-        corr_handler.y_correction.rcond = rcond_y
-        if n_eig_x is not None or n_eig_y is not None:
-            corr_handler.correct(n_singular_values=(n_eig_x, n_eig_y))
-        else:
-            corr_handler.correct()
+        for plane, n_eig, rcond in (('x', n_eig_x, rcond_x), ('y', n_eig_y, rcond_y)):
+            corr = getattr(corr_handler, f'{plane}_correction')
+            n_avail = len(corr.singular_values)
+            if n_eig is None and eig_fraction is not None:
+                n_eig = max(1, int(np.floor(eig_fraction * n_avail)))
+            if n_eig is not None:
+                n_eig = min(int(n_eig), n_avail)
+                corr.n_singular_values = n_eig
+                corr.rcond = None
+                print(f"  orbit correction {plane}: {n_eig} of {n_avail} singular values")
+            else:
+                corr.n_singular_values = None
+                corr.rcond = rcond
+                kept = int(np.sum(corr.singular_values >= rcond * corr.singular_values[0]))
+                print(f"  orbit correction {plane}: rcond={rcond:g} keeps {kept} of {n_avail}")
+        corr_handler.correct()
 
     if threading is False:
         corr_handler = ring.correct_trajectory(twiss_table=twiss, run=False,
@@ -658,3 +710,103 @@ def bpm_reading_errors(bpm_names, sigma, rng, cut=2.5):
         }
         for name in bpm_names
     }
+
+
+# =============================================================================
+# Shared workflow helpers - use these instead of copying the steps into scripts
+# =============================================================================
+
+def insert_bpms_and_correctors(pdr, design, config):
+    """Insert BPM markers and orbit correctors into pdr.lines['ring'] in place.
+
+    D1 C1 uses the original corrector layout (insert_correctors_var2); every
+    other lattice uses insert_correctors. This is the rule the analysis,
+    macroparticle, spin and tolerance scripts all used individually.
+    """
+    insert_BPMs_all_as_markers(pdr)
+    if design == 1 and config == 1:
+        insert_correctors_var2(pdr)
+    else:
+        insert_correctors(pdr)
+    return pdr
+
+
+def setup_spin_reference(line, kinetic_energy=cfg.E0):
+    """Set the anomalous magnetic moment and energy needed for spin tracking."""
+    line.particle_ref.anomalous_magnetic_moment = cfg.ANOMALOUS_MAGNETIC_MOMENT
+    line.particle_ref.kinetic_energy0 = kinetic_energy
+    return line
+
+
+def correct_orbit_with_fallback(line, twiss, seed, **kwargs):
+    """Run orbit_correction; if the closed orbit cannot be found, retry with
+    trajectory threading. Extra kwargs (rcond_x, rcond_y, ...) are passed on.
+
+    `twiss` provides the response matrix. Pass the twiss of the PERFECT
+    machine (with the same BPMs/correctors), not of the misaligned one: the
+    misaligned machine may have no closed orbit until it has been threaded.
+    """
+    try:
+        orbit_correction(line, twiss, threading=False, seed=seed, **kwargs)
+    except Exception as e:
+        print(f"  [seed {seed}] orbit_correction(threading=False) raised "
+              f"{type(e).__name__}: {e} -- retrying with threading=True")
+        orbit_correction(line, twiss, threading=True, seed=seed, **kwargs)
+    return line
+
+
+def prepare_seed_line(base_line, seed, correct, *,
+                      sigma=cfg.MISALIGN_SIGMA,
+                      corrector_sigma=cfg.CORRECTOR_SIGMA,
+                      radiation='mean',
+                      context=None,
+                      copy=True,
+                      report_orbit=False):
+    """Return a line with one random error seed applied, optionally corrected.
+
+    Steps:
+      1. copy base_line (unless copy=False), set radiation model, build tracker
+      2. misalignments(sigma, seed)                  - magnet shifts, rolls, field errors
+      3. if correct:
+           twiss 6d of the misaligned machine
+           misalignments_correctors(corrector_sigma, seed + 1)
+           orbit correction, falling back to threading if needed
+
+    Corrector errors use seed + 1 so they are independent of the magnet errors
+    but still reproducible. base_line must already contain BPMs and correctors
+    if correct=True (see insert_bpms_and_correctors).
+
+    Parameters
+    ----------
+    base_line : xt.Line       The perfect ring.
+    seed : int                Random seed for this machine.
+    correct : bool            Apply orbit correction after misaligning.
+    sigma, corrector_sigma    RMS errors [m, rad]; defaults from config.py.
+    radiation : str or None   Radiation model while preparing ('mean' by default).
+    context                   xobjects context; defaults to CPU with OpenMP.
+    copy : bool               Work on a copy (True) or modify base_line in place.
+    report_orbit : bool       Print RMS closed orbit before/after correction
+                              (costs one extra twiss).
+    """
+    line = base_line.copy() if copy else base_line
+    line.configure_radiation(model=radiation)
+    line.build_tracker(_context=context or xo.ContextCpu(omp_num_threads=0))
+
+    # Response matrix from the PERFECT machine, computed before the errors go
+    # in -- as in a real machine. The misaligned ring often has no closed
+    # orbit before correction (e.g. the F-D-F lattice: 8/10 seeds at 0.25 mm),
+    # so a twiss of it here would fail before threading could ever run.
+    tw_ref = line.twiss(method='6d' if radiation else '4d') if correct else None
+
+    misalignments(line, sigma, seed=seed)
+
+    if correct:
+        misalignments_correctors(line, corrector_sigma, seed + 1)
+        correct_orbit_with_fallback(line, tw_ref, seed)
+
+        if report_orbit:
+            tw_after = line.twiss(method='6d' if radiation else '4d')
+            print(f"  [seed {seed}] corrected orbit RMS x: {np.std(tw_after.x):.3e}, "
+                  f"y: {np.std(tw_after.y):.3e}")
+
+    return line

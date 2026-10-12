@@ -1,0 +1,23 @@
+# Core simulation stack. Pin the versions you actually use with
+#   pip freeze | grep -iE "xsuite|xtrack|xpart|xobjects|xfields" >> requirements.txt
+# so results can be reproduced later (xtrack behaviour changes between releases).
+xsuite
+xtrack
+xpart
+xobjects
+xfields
+xcoll
+numpy
+scipy
+pandas
+matplotlib
+nafflib
+prettytable
+# Needed by xutil_DA_CC/
+cpymad
+pymadng
+xplt
+h5py
+mpmath
+tqdm
+pyyaml

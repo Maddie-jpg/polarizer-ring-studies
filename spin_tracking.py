@@ -1,11 +1,19 @@
-# %%
-import sys
-import os
+"""
+Multi-seed spin-tracking scan: equilibrium polarisation, misaligned vs corrected.
 
-# Adds the parent directory to the search path
-parent_dir = os.path.abspath('..')
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+For each of `num_seeds` random error seeds the ring is misaligned (and, in a
+second pass, orbit-corrected), a matched bunch is tracked with quantum
+radiation for `scan_turns`, and the polarisation build-up is fitted to get
+P_eq and the build-up time. Then the best/worst seeds are tracked again with
+mf.deep_track_single for detailed plots.
+
+Inputs   lattice chosen by DESIGN/CONFIG/PHASE/CHANGES (see paths.study_from_env)
+Outputs  Results/.../Spin/Scan/SpinTrackingResults_MisalignedVsCorrected.dat + plots
+
+Run:     python spin_tracking.py   (or via run_full_sims.py)
+"""
+# %%
+import os
 
 import xtrack as xt
 import xpart as xp
@@ -15,34 +23,22 @@ import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import json
-import os
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 import LatticeBuild.misalignments_corrections as mc
 import my_functions as mf
+import config as cfg
+import paths
 
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',9))
-phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES',None)
+study = paths.study_from_env()
+design, config, phase, changes = study['design'], study['config'], study['phase'], study['changes']
 
 # %%
-if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_perfect_{phase}_{changes}.json")
-else:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_perfect_{phase}.json")
-
-pdr.lines['ring'].particle_ref.anomalous_magnetic_moment=0.001159652181
-pdr.lines['ring'].particle_ref.kinetic_energy0=2.86e9
-
-if design == 1 and config == 1:
-    mc.insert_BPMs_all_as_markers(pdr)
-    mc.insert_correctors_var2(pdr)
-else:
-    mc.insert_BPMs_all_as_markers(pdr)
-    mc.insert_correctors(pdr,debug_check=True)
+pdr = paths.load_lattice(design, config, 'perfect', phase, changes)
+mc.setup_spin_reference(pdr.lines['ring'])
+mc.insert_bpms_and_correctors(pdr, design, config)
 
 
 line=pdr.lines['ring']
@@ -55,7 +51,7 @@ num_seeds=20
 seeds = np.random.randint(0, max_seed_value, size=num_seeds)
 scan_turns=20000
 
-misalignment_val=0.25e-3
+misalignment_val = cfg.MISALIGN_SIGMA
 
 base_line = line.copy()
 
@@ -65,33 +61,13 @@ results_path = f'{results_dir}/SpinTrackingResults_MisalignedVsCorrected.dat'
 
 
 def prep_branch(seed, apply_correction):
-    
-    seed_line = base_line.copy()
-
-    seed_line.configure_radiation('mean')
-    seed_line.build_tracker(_context=xo.ContextCpu(omp_num_threads=0))
-    seed_line = mc.misalignments(seed_line, misalignment_val, seed=seed)
-
+    """Misalign (and optionally correct) one seed, then build a matched bunch
+    with spins along n0. Returns (particles, twiss, line) with the line left in
+    quantum-radiation mode, ready to track."""
+    seed_line = mc.prepare_seed_line(base_line, seed, correct=apply_correction,
+                                     sigma=misalignment_val, report_orbit=True)
     tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                    spin=True, polarization=True)
-
-    if apply_correction:
-        orbit_x_rms_before = np.std(tw.x)
-        orbit_y_rms_before = np.std(tw.y)
-        mc.misalignments_correctors(seed_line,0.25e-3,seed+1)
-        try:
-            mc.orbit_correction(seed_line, tw, threading=False,seed=seed)
-        except Exception as e:
-            print(f"  [seed {seed}] orbit_correction(threading=False) raised: "
-                  f"{type(e).__name__}: {e} -- retrying with threading=True")
-            mc.orbit_correction(seed_line, tw, threading=True,seed=seed)
-        # Re-twiss after correction so tw reflects the corrected orbit/optics.
-        tw = seed_line.twiss(method='6d', radiation_integrals=True, eneloss_and_damping=True,
-                        spin=True, polarization=True)
-        orbit_x_rms_after = np.std(tw.x)
-        orbit_y_rms_after = np.std(tw.y)
-        print(f"  [seed {seed}] orbit RMS x: {orbit_x_rms_before:.3e} -> {orbit_x_rms_after:.3e}, "
-              f"y: {orbit_y_rms_before:.3e} -> {orbit_y_rms_after:.3e}")
+                         spin=True, polarization=True)
 
     # Generate the matched bunch while still in 'mean' mode -- matched bunch
     # generation can twiss internally, which fails under 'quantum'.

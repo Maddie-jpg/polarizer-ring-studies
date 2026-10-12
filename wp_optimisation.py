@@ -1,3 +1,13 @@
+"""
+Working-point optimisation studies for one lattice.
+
+Sections (# %% cells):
+  1. Arc-cell phase-advance scan (mux, muy) -> emittance and chromaticity maps
+  2. Resonance driving terms (RDTs) over the tune diagram -> best working point
+  3. Realistic tune scan: rematch the ring at each (Qx, Qy) and compute DA
+
+Lattice chosen by DESIGN/CONFIG/PHASE/CHANGES (see paths.study_from_env).
+"""
 #%%
 #---------------------------------------------------------------------------
 # Setup -- load the lattice once, used by all three sections below
@@ -9,14 +19,13 @@ import xtrack as xt
 import xobjects as xo
 from math import factorial
 
-# Adjust this import path to wherever linear_optics.py actually lives
-# relative to this script (e.g. 'LatticeBuild.linear_optics' if it's in a
-# LatticeBuild package, matching the sys.path setup at the top of
-# linear_optics.py itself).
+import paths
 from LatticeBuild.linear_optics import matchingWP, matchingBeta, _match_cells_3fold
 import xutil_DA_CC.xsuite_utilities as xutil
 
-pdr = xt.Environment.from_json('/home/mwatson/Documents/laughing-octo-bassoon/JSON_Files/D1/C9/pdr_perfect_90.json')
+study = paths.study_from_env()
+pdr = paths.load_lattice(study['design'], study['config'], 'perfect',
+                         study['phase'], study['changes'])
 ring = pdr.lines['ring']
 cell_arc = pdr.lines['cell_arc']
 arc1R = pdr.lines['arc1R']

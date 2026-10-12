@@ -1,8 +1,30 @@
 """
-Sextupole configs to be paired with linear optics script
-Each function should include a description of the configuration
+Sextupole configurations, applied to a lattice built by linear_optics.py.
 
+Each config_D{design}_C{config}(pdr) function defines the sextupole families,
+inserts them next to the arc quadrupoles of pdr.lines['ring'] (in place) and
+matches their strengths to zero linear chromaticity with ChromCorrect.
 
+Index (SF = focusing, SD = defocusing sextupoles; "half-arc" = arc{n}L or arc{n}R)
+  D1_C1      8 SF + 8 SD per half-arc, 2 families
+  D1_C1_120  as C1 for the 120 deg arc cells
+  D1_C2      per period: 2 SF pairs (2 families) + 1 SD pair, 180 deg apart
+  D1_C3      2 sextupoles per family, 180 deg apart
+  D1_C4      6 sextupoles per half-arc
+  D1_C5      4 SF + 4 SD per half-arc
+  D1_C6      8 SF + 8 SD per half-arc, 4 families
+  D1_C7      7 SF + 7 SD per half-arc
+  D1_C8      per period: 2 SD pairs + 1 SF pair, 180 deg apart
+  D1_C9      8 SF + 8 SD per half-arc, each family split into +/- delta pairs
+  D1_C10     7 SF + 8 SD per half-arc
+  D1_C11     8 SF + 8 SD per half-arc, 4 independent families, alternating
+  D2_C1      SF/SD mapped onto the 10-cell two-fold layout
+  D2_C2      3 families on the 10-cell layout
+  D2_C3      180 deg phase-advance pairs for D2
+  D2_C4      4 families (2 SF, 2 SD)
+
+To add a configuration: copy the closest one, give it a docstring saying
+what changed, and add a line to this index.
 """
 
 import numpy as np
@@ -13,12 +35,18 @@ import xtrack as xt
 #-----------------
 
 def _quad_name(prefix, sext, ref_cell):
+    """Name of the quad a sextupole sits next to, e.g. ('QDA', '1R', '3') -> 'QDA_1R3'.
+    Cell '8' is the matching cell and gets an 'M' prefix: 'QDA_M1R8'."""
     if ref_cell == '8':
         return f'{prefix}_M{sext}{ref_cell}'
     else:
         return f'{prefix}_{sext}{ref_cell}'
 
 def ChromCorrect(ring, pdr, variables, MakePlot=False):
+    """Match the sextupole knobs in `variables` to zero linear chromaticity
+    (dqx = dqy = 0, 6d twiss with mean radiation). With more than two knobs
+    it then iterates to reduce the second-order chromaticity ddqx, ddqy.
+    Returns pdr; the knob values are updated in place."""
     ring.configure_radiation(model='mean')
     
     
@@ -87,6 +115,8 @@ def ChromCorrect(ring, pdr, variables, MakePlot=False):
     return pdr
 
 def ChromCorrect_ddq(ring, pdr, ksf, ksd,ksf2,ksd2,ddqx_val,ddqy_val,tol_val, MakePlot=False):
+    """Match four sextupole knobs to dqx = dqy = 0 and the given second-order
+    chromaticities ddqx_val, ddqy_val (tolerance tol_val)."""
         
     opt_chrom = ring.match(
     solve=True,
@@ -500,6 +530,10 @@ def config_D1_C6(pdr):
 
 
 def config_D1_C1_120(pdr, fringe_fields=True):
+    """
+    C1 layout (8 SF + 8 SD per half-arc) for the 120 deg arc-cell lattices.
+    Quad names are read from the line table rather than assumed.
+    """
 
     def _ordered_quads(tt, prefix, sext):
         """Real, cell-order list of {prefix}_{sext}* quad names for one
@@ -786,7 +820,7 @@ def config_D1_C9(pdr):
     pdr.new('XF1arc',  xt.Sextupole, length='l_sext',    k2='k2XFarc+k2XFarc_delta' , edge_entry_active=True, edge_exit_active=True)
     pdr.new('XF2arc',  xt.Sextupole, length='l_sext',    k2='k2XFarc-k2XFarc_delta' , edge_entry_active=True, edge_exit_active=True)
     pdr.new('XD1arc',  xt.Sextupole, length='l_sext',    k2='k2XDarc+k2XDarc_delta' , edge_entry_active=True, edge_exit_active=True)
-    pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XDarc-+k2XDarc_delta' , edge_entry_active=True, edge_exit_active=True)
+    pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XDarc-k2XDarc_delta' , edge_entry_active=True, edge_exit_active=True)
 
 
     
@@ -1323,6 +1357,10 @@ def config_D2_C3(pdr):
         
 
 def config_D2_C4(pdr):
+    """
+    Four families: two focusing (XF2arc, XF2arc2) and two defocusing
+    (XD2arc, XD2arc2).
+    """
 
     ring = pdr.lines['ring']
     period = pdr.lines['period']

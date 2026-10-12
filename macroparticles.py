@@ -1,11 +1,22 @@
+"""
+Injection-efficiency study with the measured injected positron beam.
+
+  1. Load the injected-beam distribution (config.INJECTED_BEAM_FILE), select the
+     main bunch, optionally apply the energy-compressor model.
+  2. Characterise it: emittances, moment-based and fitted Twiss, phase-space plots.
+  3. Match it to the ring at the injection marker and track: survival vs turns
+     at the nominal, optimal and bunch-average energies, and an energy scan.
+  4. For misaligned/corrected modes, repeat over several error seeds and overlay.
+
+Inputs   lattice chosen by DESIGN/CONFIG/MODE/PHASE/CHANGES (see paths.study_from_env)
+         ENERGY_COMPRESSOR=1 to use the compressed beam
+Outputs  Results/.../InjectionEfficiency/
+
+Run:     python macroparticles.py   (or via run_full_sims.py)
+"""
 # %%
-import sys
 import os
 
-parent_dir = os.path.abspath('..')
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-    
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,19 +27,19 @@ import xobjects as xo
 from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 import my_functions as mf
+import config as cfg
+import paths
 xo.context_cpu.allow_no_prebuilt_kernel = True
 
 # %%
-design=int(os.environ.get('DESIGN',1))
-config=int(os.environ.get('CONFIG',9))
-mode=os.environ.get('MODE','perfect')
-phase=int(os.environ.get('PHASE',90))
-changes=os.environ.get('CHANGES',None)
+study = paths.study_from_env()
+design, config, mode = study['design'], study['config'], study['mode']
+phase, changes = study['phase'], study['changes']
 
 ENERGY_COMPRESSOR_ON = os.environ.get('ENERGY_COMPRESSOR', 'false').strip().lower() not in ('0', 'false', 'off', 'no')
 
 # %%
-df = pd.read_csv('/home/mwatson/Documents/laughing-octo-bassoon/PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat', sep=r'\s+')
+df = pd.read_csv(cfg.INJECTED_BEAM_FILE, sep=r'\s+')
 print(list(df.columns))
 
 # %%
@@ -762,13 +773,8 @@ def insert_marker_in_drift(pdr, ring, drift_name='DrTripl', occurrence=0,
     return marker_name
 
 
-if changes is not None:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}_{changes}.json")
-else:
-    pdr= xt.Environment.from_json(f"JSON_Files/D{design}/C{config}/pdr_{mode}_{phase}.json")
-
-    
-ring=pdr.lines['ring']
+pdr = paths.load_lattice(design, config, mode, phase, changes)
+ring = pdr.lines['ring']
 marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
 # Start the ring at the injection marker, so every track() call below begins
 # where the beam is injected (and matched). Without this, tracking starts at
@@ -895,7 +901,12 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
       fit count      N_sigma = chamber / sigma  (rms beam sizes that fit)
                      N_eps   = N_sigma^2        (rms emittances that fit)
  
-    eps_x, eps_y are geometric rms emittances in m rad. Everything is local to
+    eps_x, eps_y are geometric rms emittances in m rad.
+
+    Pole-tip fields use the MAD/xtrack strengths directly: quad B = Brho k1 R,
+    sextupole B = Brho k2 R^2 / 2. xtrack's k2 is k' = B''/Brho (an offset
+    dx in a sextupole gives a gradient k1 = k2 dx), checked against the
+    thin-lens chromaticity formula dQ'_x = (1/4pi) sum(beta_x D k2 L). Everything is local to
     this function, so it doesn't touch the script's globals (ax, dx, ...).
     Returns (df_mag, df_pole).
     """
@@ -992,7 +1003,8 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
             a.axvspan(r.s_start, r.s_end, color=colors_ap[r.type], alpha=0.15, lw=0)
         a.plot(s_ap, sig * 1e3, color='grey', lw=0.8, label='1 $\\sigma$')
         a.plot(s_ap, env * 1e3, 'k-', lw=1.2, label=f'{n_sigma_beam} $\\sigma$ beam envelope')
-        a.plot(s_ap, C * 1e3, 'k:', lw=1.3, label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
+        if chamber_margin > 0:
+            a.plot(s_ap, C * 1e3, 'k:', lw=1.3, label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
         handles, _ = a.get_legend_handles_labels()
         handles += [mpatches.Patch(color=c_, alpha=0.3, label=t_) for t_, c_ in colors_ap.items()]
         a.legend(handles=handles, fontsize='small', ncol=6, loc='lower left',
@@ -1078,49 +1090,88 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
  
     # --- cross-sections per magnet type ---
     th = np.linspace(0, 2 * np.pi, 200)
-    n_var, ncols = len(df_pole), 4
-    nrows = int(np.ceil(n_var / ncols))
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.4 * nrows), squeeze=False)
-    lim = 1.1 * max(df_pole['_R'].max(), df_mag.chamber_x.max()) * 1e3
-    for a, (_, r) in zip(axs.flat, df_pole.iterrows()):
+
+    def _draw_cross_section(a, r, lim, fs=9, lim_y=None):
+        """Beam (1 and n sigma), chamber and pole for one magnet type, at the
+        magnet of that type with the largest beam (`worst`)."""
         w = worst[r['Magnet type']]
+        col = colors_ap[r['_t']]
         ex, ey = n_sigma_beam * w.sigma_x_max, n_sigma_beam * w.sigma_y_max
         X, Y = ex * np.cos(th), ey * np.sin(th)
         rr = np.hypot(X, Y)
         Xc, Yc = X * (rr + chamber_margin) / rr, Y * (rr + chamber_margin) / rr
         a.plot(w.sigma_x_max * np.cos(th) * 1e3, w.sigma_y_max * np.sin(th) * 1e3,
-               color=colors_ap[r['_t']], lw=0.8, alpha=0.6)
-        a.plot(X * 1e3, Y * 1e3, '-', color=colors_ap[r['_t']], lw=1.4)
-        a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3)
-        Rm = r['_R'] * 1e3
-        if r['_t'] == 'Bend':
-            a.axhline(Rm, color='grey', lw=1)
-            a.axhline(-Rm, color='grey', lw=1)
-        else:
-            a.add_patch(mpatches.Circle((0, 0), Rm, fill=False, color='grey', lw=1))
-        a.set_title(f"{r['Magnet type']}  ({w['name']})\n"
-                    f"R = {Rm:.1f} mm, B$_{{pole}}$ = {r['_B']:.3f} T, "
-                    f"fits {w.N_sigma_x:.1f}/{w.N_sigma_y:.1f} $\\sigma$",
-                    fontsize=9, color='crimson' if r['Flag'] else 'black')
+               color=col, lw=0.8, alpha=0.6, label='1 $\\sigma$ beam')
+        a.plot(3 * w.sigma_x_max * np.cos(th) * 1e3, 3 * w.sigma_y_max * np.sin(th) * 1e3,
+               '--', color=col, lw=1.1, label='3 $\\sigma$ beam envelope')
+        a.plot(X * 1e3, Y * 1e3, '-', color=col, lw=1.6,
+               label=f'physical aperture ({n_sigma_beam} $\\sigma$)')
+        if chamber_margin > 0:
+            a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3,
+                   label=f'aperture + {chamber_margin*1e3:.0f} mm (chamber)')
+        title = (f"{r['Magnet type']}  ({w['name']})\n"
+                 f"aperture x/y = {n_sigma_beam*w.sigma_x_max*1e3:.1f} / {n_sigma_beam*w.sigma_y_max*1e3:.1f} mm"
+                 + (f", +{chamber_margin*1e3:.0f} mm = {w.chamber_x*1e3:.1f} / {w.chamber_y*1e3:.1f} mm"
+                    if chamber_margin > 0 else ''))
+        if r['_t'] != 'Bend':   # pole drawn for quads and sextupoles only
+            Rm = r['_R'] * 1e3
+            a.add_patch(mpatches.Circle((0, 0), Rm, fill=False, color='grey', lw=1.2,
+                                        label=f'pole (R = {Rm:.1f} mm)'))
+            title += f", pole R = {Rm:.1f} mm, B$_{{pole}}$ = {r['_B']:.3f} T"
+        a.set_title(title,
+                    fontsize=fs, color='crimson' if r['Flag'] else 'black')
         a.set_xlim(-lim, lim)
-        a.set_ylim(-lim, lim)
+        a.set_ylim(-(lim_y or lim), lim_y or lim)
         a.set_aspect('equal')
         a.grid(alpha=0.3)
-        a.tick_params(labelsize=8)
+        a.tick_params(labelsize=fs - 1)
+
+    n_var, ncols = len(df_pole), 4
+    nrows = int(np.ceil(n_var / ncols))
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.4 * nrows), squeeze=False)
+    lim = 1.1 * max(df_mag.chamber_x.max(), df_mag.chamber_y.max(),
+                    df_pole.loc[df_pole['_t'] != 'Bend', '_R'].max()) * 1e3
+    for a, (_, r) in zip(axs.flat, df_pole.iterrows()):
+        _draw_cross_section(a, r, lim)
     for a in list(axs.flat)[n_var:]:
         a.axis('off')
     for a in axs[-1]:
         a.set_xlabel('x [mm]', fontsize=9)
     for a in axs[:, 0]:
         a.set_ylabel('y [mm]', fontsize=9)
-    fig.suptitle(f'Injected beam: 1 $\\sigma$ (faint) and {n_sigma_beam} $\\sigma$ (solid), '
-                 f'chamber = {n_sigma_beam} $\\sigma$ + {chamber_margin*1e3:.0f} mm (dotted), '
-                 f'pole (grey), at the largest-beam magnet of each type', fontsize=11)
+    fig.suptitle(f'Injected beam: 1 $\\sigma$ (faint), 3 $\\sigma$ (dashed), physical aperture = '
+                 f'{n_sigma_beam} $\\sigma$ (solid), pole for quads/sextupoles (grey)'
+                 + (f', chamber = +{chamber_margin*1e3:.0f} mm (dotted)' if chamber_margin > 0 else '')
+                 + ', at the largest-beam magnet of each type', fontsize=11)
     fig.tight_layout()
     fig.savefig(f'{folder_ap}/beam_cross_section_per_magnet_type_{mode_tag}.png', dpi=200,
                 bbox_inches='tight')
     plt.show()
- 
+
+    # --- one figure per kind (Bend, Quadrupole, Sextupole): the magnet type
+    #     with the largest physical aperture (pole radius / half gap) ---
+    for mtype in magnet_types:
+        sub = df_pole[df_pole['_t'] == mtype]
+        if sub.empty:
+            continue
+        r = sub.loc[sub['_R'].idxmax()]
+        w = worst[r['Magnet type']]
+        if mtype == 'Bend':
+            lim_x = 1.15 * max(w.chamber_x, w.chamber_y) * 1e3
+            lim_y = max(1.3 * w.chamber_y * 1e3, 0.3 * lim_x)  # true scale, no empty band
+        else:                                                # whole pole circle in view
+            lim_x = lim_y = 1.1 * max(r['_R'], w.chamber_x, w.chamber_y) * 1e3
+        fig, a = plt.subplots(figsize=(9, 7 * lim_y / lim_x + 1.2))
+        _draw_cross_section(a, r, lim_x, fs=11, lim_y=lim_y)
+        a.set_xlabel('x [mm]', fontsize=11)
+        a.set_ylabel('y [mm]', fontsize=11)
+        a.legend(fontsize=9, loc='center left', bbox_to_anchor=(1.02, 0.5), frameon=False)
+        fig.tight_layout()
+        out = f'{folder_ap}/pole_tip_aperture_{mtype}_{mode_tag}.png'
+        fig.savefig(out, dpi=200, bbox_inches='tight')
+        print(f'Largest {mtype} aperture: {r["Magnet type"]} (R = {r["_R"]*1e3:.1f} mm) -> {out}')
+        plt.show()
+
     # --- table ---
     print(f'\nBrho = {brho:.4f} T m, envelope = {n_sigma_beam} sigma, '
           f'chamber margin = {chamber_margin*1e3:.0f} mm, wall = {wall_thickness*1e3:.1f} mm')
@@ -1147,11 +1198,19 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
 
 
 
-# rms beam parameters computed above: emittances in mm mrad (= um), spread in %
-sigma_delta_for_aperture = relative_spread / 100   # whole beam incl. tails; set a core value if preferred
+# Physical aperture = 5 sigma of the injected beam,
+#     A_x = 5 * sqrt(beta_x * eps_x + (D_x * sigma_delta)^2)       (~20 mm expected)
+# and the vacuum chamber = aperture + 5 mm. Pole radii / B_pole use the chamber.
+# eps_x, eps_y: rms emittances of the beam core computed above (mm mrad = um).
+# sigma_delta: rms momentum spread of the MAIN BUNCH. The whole-distribution
+# spread (relative_spread, ~5 % with the tails) would give ~60 mm instead.
+_main = select_main_bunch(df)
+sigma_delta_for_aperture = float(np.std(_main['p[MeV/c]']) / np.mean(_main['p[MeV/c]']))
+print(f'Aperture uses sigma_delta = {sigma_delta_for_aperture*1e3:.2f} per mil (main bunch), '
+      f'eps_x = {emittance_x:.3f} um, eps_y = {emittance_y:.3f} um')
 aperture_mag, aperture_pole = physical_aperture_study(
     ring, emittance_x * 1e-6, emittance_y * 1e-6, sigma_delta_for_aperture, mode,
-    n_sigma_beam=3, chamber_margin=5e-3)
+    n_sigma_beam=5, chamber_margin=5e-3)
 
 # %%
 rand_num = 74
@@ -1686,35 +1745,16 @@ if mode == 'perfect':
     from TuneDiagram.lib.TuneDiagram.tune_diagram import resonance_lines
 
     seeds = [100, 200, 300, 400, 500]
-    misalignment_val = 0.25e-3
+    misalignment_val = cfg.MISALIGN_SIGMA
     seed_energy_mev = best_energy_mev
 
     context_tracking = xo.ContextCpu(omp_num_threads=0)
 
-    if design == 1 and config == 1:
-        mc.insert_BPMs_all_as_markers(pdr)
-        mc.insert_correctors_var2(pdr)
-    else:
-        mc.insert_BPMs_all_as_markers(pdr)
-        mc.insert_correctors(pdr)
+    mc.insert_bpms_and_correctors(pdr, design, config)
 
     def prep_seed_line(base_line, seed, apply_correction):
-        seed_line = base_line.copy()
-        seed_line.configure_radiation(model='mean')
-        seed_line.build_tracker(_context=context_tracking)
-        seed_line = mc.misalignments(seed_line, misalignment_val, seed=seed)
-
-        if apply_correction:
-            tw = seed_line.twiss(method='6d', radiation_integrals=True,
-                                  eneloss_and_damping=True)
-            mc.misalignments_correctors(seed_line, misalignment_val, seed + 1)
-            try:
-                mc.orbit_correction(seed_line, tw, threading=False, seed=seed)
-            except Exception as e:
-                print(f"  [seed {seed}] orbit_correction(threading=False) raised: {e}")
-                mc.orbit_correction(seed_line, tw, threading=True, seed=seed)
-
-        return seed_line
+        return mc.prepare_seed_line(base_line, seed, correct=apply_correction,
+                                    sigma=misalignment_val, context=context_tracking)
 
     def track_seed_line(seed_line, e_mev):
         p0c_ref = e_mev * 1e6

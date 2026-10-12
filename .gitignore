@@ -2,3 +2,26 @@ Essentials/__pycache__
 __pycache__
 .DS_Store
 323e9247738b4ed9b01189ed0e261662.c
+
+# xobjects compiled kernels and OS clutter
+*.c
+*.so
+.DS_Store
+**/.DS_Store
+
+# LaTeX build outputs
+*.aux
+*.bbl
+*.bcf
+*.bcf-SAVE-ERROR
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+Assignments/**/*.log
+Slides and Notes/**/*.log
