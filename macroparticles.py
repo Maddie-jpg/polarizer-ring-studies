@@ -1091,7 +1091,7 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
     # --- cross-sections per magnet type ---
     th = np.linspace(0, 2 * np.pi, 200)
 
-    def _draw_cross_section(a, r, lim, fs=9):
+    def _draw_cross_section(a, r, lim, fs=9, lim_y=None):
         """Beam (1 and n sigma), chamber and pole for one magnet type, at the
         magnet of that type with the largest beam (`worst`)."""
         w = worst[r['Magnet type']]
@@ -1102,24 +1102,17 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
         Xc, Yc = X * (rr + chamber_margin) / rr, Y * (rr + chamber_margin) / rr
         a.plot(w.sigma_x_max * np.cos(th) * 1e3, w.sigma_y_max * np.sin(th) * 1e3,
                color=col, lw=0.8, alpha=0.6, label='1 $\\sigma$ beam')
-        a.plot(X * 1e3, Y * 1e3, '-', color=col, lw=1.4,
-               label=f'{n_sigma_beam} $\\sigma$ beam envelope')
+        a.plot(X * 1e3, Y * 1e3, '-', color=col, lw=1.6,
+               label=(f'physical aperture ({n_sigma_beam} $\\sigma$)' if chamber_margin == 0
+                      else f'{n_sigma_beam} $\\sigma$ beam envelope'))
         if chamber_margin > 0:
             a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3,
                    label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
-        Rm = r['_R'] * 1e3
-        if r['_t'] == 'Bend':
-            a.axhline(Rm, color='grey', lw=1, label=f'pole (half gap {Rm:.1f} mm)')
-            a.axhline(-Rm, color='grey', lw=1)
-        else:
-            a.add_patch(mpatches.Circle((0, 0), Rm, fill=False, color='grey', lw=1,
-                                        label=f'pole (R = {Rm:.1f} mm)'))
         a.set_title(f"{r['Magnet type']}  ({w['name']})\n"
-                    f"R = {Rm:.1f} mm, B$_{{pole}}$ = {r['_B']:.3f} T, "
-                    f"fits {w.N_sigma_x:.1f}/{w.N_sigma_y:.1f} $\\sigma$",
+                    f"aperture x/y = {w.chamber_x*1e3:.1f} / {w.chamber_y*1e3:.1f} mm",
                     fontsize=fs, color='crimson' if r['Flag'] else 'black')
         a.set_xlim(-lim, lim)
-        a.set_ylim(-lim, lim)
+        a.set_ylim(-(lim_y or lim), lim_y or lim)
         a.set_aspect('equal')
         a.grid(alpha=0.3)
         a.tick_params(labelsize=fs - 1)
@@ -1127,7 +1120,7 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
     n_var, ncols = len(df_pole), 4
     nrows = int(np.ceil(n_var / ncols))
     fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.4 * nrows), squeeze=False)
-    lim = 1.1 * max(df_pole['_R'].max(), df_mag.chamber_x.max()) * 1e3
+    lim = 1.1 * max(df_mag.chamber_x.max(), df_mag.chamber_y.max()) * 1e3
     for a, (_, r) in zip(axs.flat, df_pole.iterrows()):
         _draw_cross_section(a, r, lim)
     for a in list(axs.flat)[n_var:]:
@@ -1136,9 +1129,10 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
         a.set_xlabel('x [mm]', fontsize=9)
     for a in axs[:, 0]:
         a.set_ylabel('y [mm]', fontsize=9)
-    fig.suptitle(f'Injected beam: 1 $\\sigma$ (faint) and {n_sigma_beam} $\\sigma$ (solid), '
-                 f'chamber = {n_sigma_beam} $\\sigma$ + {chamber_margin*1e3:.0f} mm (dotted), '
-                 f'pole (grey), at the largest-beam magnet of each type', fontsize=11)
+    fig.suptitle(f'Injected beam: 1 $\\sigma$ (faint) and physical aperture = '
+                 f'{n_sigma_beam} $\\sigma$ (solid)'
+                 + (f', chamber = +{chamber_margin*1e3:.0f} mm (dotted)' if chamber_margin > 0 else '')
+                 + ', at the largest-beam magnet of each type', fontsize=11)
     fig.tight_layout()
     fig.savefig(f'{folder_ap}/beam_cross_section_per_magnet_type_{mode_tag}.png', dpi=200,
                 bbox_inches='tight')
@@ -1152,13 +1146,13 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
             continue
         r = sub.loc[sub['_R'].idxmax()]
         w = worst[r['Magnet type']]
-        lim_one = 1.15 * max(r['_R'], w.chamber_x, w.chamber_y) * 1e3
-        fig, a = plt.subplots(figsize=(6, 6))
-        _draw_cross_section(a, r, lim_one, fs=11)
+        lim_x = 1.15 * max(w.chamber_x, w.chamber_y) * 1e3
+        lim_y = max(1.3 * w.chamber_y * 1e3, 0.3 * lim_x)      # true scale, no empty band
+        fig, a = plt.subplots(figsize=(9, 7 * lim_y / lim_x + 1.2))
+        _draw_cross_section(a, r, lim_x, fs=11, lim_y=lim_y)
         a.set_xlabel('x [mm]', fontsize=11)
         a.set_ylabel('y [mm]', fontsize=11)
-        a.legend(fontsize=9, loc='upper center', bbox_to_anchor=(0.5, -0.12),
-                 ncol=2, frameon=False)
+        a.legend(fontsize=9, loc='center left', bbox_to_anchor=(1.02, 0.5), frameon=False)
         fig.tight_layout()
         out = f'{folder_ap}/pole_tip_aperture_{mtype}_{mode_tag}.png'
         fig.savefig(out, dpi=200, bbox_inches='tight')
