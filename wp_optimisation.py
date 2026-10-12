@@ -47,6 +47,22 @@ def two_integer_range(q):
     return base - 1, base + 1
 
 
+def one_integer_range(q, offset=0):
+    """(lo, hi) of the integer square containing q, e.g. q=15.7 -> (15, 16).
+    offset shifts it by whole integers: offset=-1 gives (14, 15)."""
+    base = np.floor(q) + offset
+    return base, base + 1
+
+
+def grid_points(lo, hi, n):
+    """n points at the centres of n equal cells between lo and hi, so the
+    edges (integer resonances) are never sampled. With n even no point falls
+    on the half-integer either, e.g. lo=15, hi=16, n=10 -> 15.05 ... 15.95."""
+    if n % 2:
+        print(f'grid_points: n={n} is odd, so the middle point is on the half-integer')
+    return lo + (np.arange(n) + 0.5) * (hi - lo) / n
+
+
 #%%
 #---------------------
 # phase advance scan
@@ -960,22 +976,25 @@ def best_from_map(QX, QY, DA_map):
 
 
 current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
-qx_range = two_integer_range(current_qx)
-qy_range = two_integer_range(current_qy)
+# DA scan window: the integer square containing the current tunes
+# (e.g. 15.7, 13.7 -> Qx 15-16, Qy 13-14). Use offset=-1/+1 for the
+# neighbouring square, or two_integer_range for the old 2x2 window.
+qx_range = one_integer_range(current_qx)
+qy_range = one_integer_range(current_qy)
 
 # Parallel version of tune_scan_realistic (wp_da_scan.py): one worker process
 # per CPU core, each with its own copy of the lattice, so `ring`/`arc1R` here
 # are never touched. ~n_cores times faster than the serial loop above.
-#   Coarse first (n_points=13, 512 turns), then refine around the best region
+#   Coarse first (n_points=20, 530 turns), then refine around the best region
 #   with a smaller window and more turns.
 #   sext_knobs=['k2XFarc', 'k2XDarc'] re-zeros chromaticity at every point
 #   (slower, but compares working points like with like).
 import wp_da_scan
-n_points = 20
+n_points = 20          # per axis; keep it even -> no point on the half-integer
 QX, QY, DA_map, scan_records = wp_da_scan.run_parallel(
     paths.lattice_json_path(study['design'], study['config'], 'perfect',
                             study['phase'], study['changes']),
-    np.linspace(*qx_range, n_points), np.linspace(*qy_range, n_points),
+    grid_points(*qx_range, n_points), grid_points(*qy_range, n_points),
     nemitt_x=n_emittancex, nemitt_y=n_emittancey,
     n_turns=530, n_particles=200, radiation='mean',
     sext_knobs=None, n_workers=None,          # None = all cores but one
