@@ -1105,13 +1105,14 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
         a.plot(3 * w.sigma_x_max * np.cos(th) * 1e3, 3 * w.sigma_y_max * np.sin(th) * 1e3,
                '--', color=col, lw=1.1, label='3 $\\sigma$ beam envelope')
         a.plot(X * 1e3, Y * 1e3, '-', color=col, lw=1.6,
-               label=(f'physical aperture ({n_sigma_beam} $\\sigma$)' if chamber_margin == 0
-                      else f'{n_sigma_beam} $\\sigma$ beam envelope'))
+               label=f'physical aperture ({n_sigma_beam} $\\sigma$)')
         if chamber_margin > 0:
             a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3,
-                   label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
+                   label=f'aperture + {chamber_margin*1e3:.0f} mm (chamber)')
         title = (f"{r['Magnet type']}  ({w['name']})\n"
-                 f"aperture x/y = {w.chamber_x*1e3:.1f} / {w.chamber_y*1e3:.1f} mm")
+                 f"aperture x/y = {n_sigma_beam*w.sigma_x_max*1e3:.1f} / {n_sigma_beam*w.sigma_y_max*1e3:.1f} mm"
+                 + (f", +{chamber_margin*1e3:.0f} mm = {w.chamber_x*1e3:.1f} / {w.chamber_y*1e3:.1f} mm"
+                    if chamber_margin > 0 else ''))
         if r['_t'] != 'Bend':   # pole drawn for quads and sextupoles only
             Rm = r['_R'] * 1e3
             a.add_patch(mpatches.Circle((0, 0), Rm, fill=False, color='grey', lw=1.2,
@@ -1197,8 +1198,9 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
 
 
 
-# Physical aperture = 5 sigma of the injected beam, no extra margin:
+# Physical aperture = 5 sigma of the injected beam,
 #     A_x = 5 * sqrt(beta_x * eps_x + (D_x * sigma_delta)^2)       (~20 mm expected)
+# and the vacuum chamber = aperture + 5 mm. Pole radii / B_pole use the chamber.
 # eps_x, eps_y: rms emittances of the beam core computed above (mm mrad = um).
 # sigma_delta: rms momentum spread of the MAIN BUNCH. The whole-distribution
 # spread (relative_spread, ~5 % with the tails) would give ~60 mm instead.
@@ -1208,7 +1210,7 @@ print(f'Aperture uses sigma_delta = {sigma_delta_for_aperture*1e3:.2f} per mil (
       f'eps_x = {emittance_x:.3f} um, eps_y = {emittance_y:.3f} um')
 aperture_mag, aperture_pole = physical_aperture_study(
     ring, emittance_x * 1e-6, emittance_y * 1e-6, sigma_delta_for_aperture, mode,
-    n_sigma_beam=5, chamber_margin=0.0)
+    n_sigma_beam=5, chamber_margin=5e-3)
 
 # %%
 rand_num = 74
