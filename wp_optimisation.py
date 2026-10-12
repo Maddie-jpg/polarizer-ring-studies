@@ -971,13 +971,13 @@ qy_range = two_integer_range(current_qy)
 #   sext_knobs=['k2XFarc', 'k2XDarc'] re-zeros chromaticity at every point
 #   (slower, but compares working points like with like).
 import wp_da_scan
-n_points = 13
+n_points = 20
 QX, QY, DA_map, scan_records = wp_da_scan.run_parallel(
     paths.lattice_json_path(study['design'], study['config'], 'perfect',
                             study['phase'], study['changes']),
     np.linspace(*qx_range, n_points), np.linspace(*qy_range, n_points),
     nemitt_x=n_emittancex, nemitt_y=n_emittancey,
-    n_turns=512, n_particles=200, radiation='mean',
+    n_turns=530, n_particles=200, radiation='mean',
     sext_knobs=None, n_workers=None,          # None = all cores but one
 )
 plot_tune_scan(QX, QY, DA_map, current_qx=current_qx, current_qy=current_qy)

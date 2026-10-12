@@ -56,7 +56,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -65,7 +65,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -74,7 +74,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -83,7 +83,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -92,7 +92,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -101,7 +101,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -110,7 +110,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -119,7 +119,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.15,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -128,7 +128,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -137,7 +137,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.15,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -228,7 +228,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.15,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtrH"
@@ -238,7 +238,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -251,7 +251,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -261,7 +261,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.15,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtrH"
@@ -591,7 +591,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -613,7 +613,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -635,7 +635,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -645,7 +645,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -667,7 +667,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -677,7 +677,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -687,7 +687,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -707,7 +707,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.15,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtrH"
@@ -6638,7 +6638,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -6660,7 +6660,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -6682,7 +6682,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -6692,7 +6692,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -6714,7 +6714,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -6724,7 +6724,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -6734,7 +6734,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -6754,7 +6754,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.15,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtrH"
@@ -7072,7 +7072,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -7094,7 +7094,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -7116,7 +7116,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -7126,7 +7126,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -7148,7 +7148,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -7158,7 +7158,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -7168,7 +7168,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -7188,7 +7188,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.15,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtrH"
@@ -18702,7 +18702,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -18724,7 +18724,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -18746,7 +18746,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -18756,7 +18756,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -18778,7 +18778,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -18788,7 +18788,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -18798,7 +18798,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -19126,7 +19126,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -19148,7 +19148,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -19170,7 +19170,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -19180,7 +19180,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -19202,7 +19202,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -19212,7 +19212,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -19222,7 +19222,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -19232,7 +19232,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtr"
@@ -19550,7 +19550,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -19572,7 +19572,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -19594,7 +19594,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -19604,7 +19604,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -19626,7 +19626,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -19636,7 +19636,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -19646,7 +19646,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -19974,7 +19974,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -19996,7 +19996,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -20018,7 +20018,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -20028,7 +20028,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -20050,7 +20050,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -20060,7 +20060,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -20070,7 +20070,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -20080,7 +20080,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtr"
@@ -20398,7 +20398,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -20420,7 +20420,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -20442,7 +20442,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -20452,7 +20452,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -20474,7 +20474,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -20484,7 +20484,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -20494,7 +20494,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -20822,7 +20822,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.03361520370367,
+   "k1": 2.9624624210451156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFarcM"
@@ -20844,7 +20844,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.4911843401556495,
+   "k1": -2.467557370023857,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDarcM"
@@ -20866,7 +20866,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.518346880776807,
+   "k1": 2.522099145421156,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDS"
@@ -20876,7 +20876,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 3.253122867990222,
+   "k1": 1.9455089970108743,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDS"
@@ -20898,7 +20898,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -2.848342601609036,
+   "k1": -2.850740533126589,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDDoub"
@@ -20908,7 +20908,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 2.5676453495787728,
+   "k1": 3.2409699579258904,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFDoub"
@@ -20918,7 +20918,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": 5.033275605512546,
+   "k1": 2.152235758573169,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QFtr"
@@ -20928,7 +20928,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.3,
-   "k1": -5.894752398241816,
+   "k1": -3.8235955450453725,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "QDtr"
@@ -20937,7 +20937,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..141": {
@@ -20964,7 +20964,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..144": {
@@ -20991,7 +20991,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..147": {
@@ -21018,7 +21018,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..150": {
@@ -21045,7 +21045,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..153": {
@@ -21072,7 +21072,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..156": {
@@ -21099,7 +21099,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..159": {
@@ -21126,7 +21126,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..162": {
@@ -21153,7 +21153,7 @@
    "__class__": "Quadrupole",
    "radiation_flag": 1,
    "length": 0.3,
-   "k1": -3.2594565494720222,
+   "k1": -2.4832352543219227,
    "order": 5
   },
   "DrDSL..165": {
@@ -21216,7 +21216,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -21225,7 +21225,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -21234,7 +21234,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -21243,7 +21243,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1
   },
@@ -21252,7 +21252,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21282,7 +21282,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21312,7 +21312,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21342,7 +21342,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21372,7 +21372,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21402,7 +21402,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21432,7 +21432,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21462,7 +21462,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -21492,7 +21492,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21522,7 +21522,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21552,7 +21552,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21582,7 +21582,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21612,7 +21612,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21642,7 +21642,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21672,7 +21672,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21702,7 +21702,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -21732,7 +21732,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -21762,7 +21762,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -21792,7 +21792,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -21822,7 +21822,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -21852,7 +21852,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -21882,7 +21882,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -21912,7 +21912,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -21942,7 +21942,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -21972,7 +21972,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22002,7 +22002,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22032,7 +22032,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22062,7 +22062,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22092,7 +22092,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22122,7 +22122,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22152,7 +22152,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22182,7 +22182,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22212,7 +22212,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22242,7 +22242,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22272,7 +22272,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22302,7 +22302,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22332,7 +22332,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22362,7 +22362,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22392,7 +22392,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22422,7 +22422,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -22452,7 +22452,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22482,7 +22482,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22512,7 +22512,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22542,7 +22542,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22572,7 +22572,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22602,7 +22602,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22632,7 +22632,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22662,7 +22662,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -22692,7 +22692,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22722,7 +22722,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22752,7 +22752,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22782,7 +22782,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22812,7 +22812,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22842,7 +22842,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -22872,7 +22872,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22902,7 +22902,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22932,7 +22932,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22962,7 +22962,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -22992,7 +22992,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23022,7 +23022,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23052,7 +23052,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23082,7 +23082,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23112,7 +23112,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23142,7 +23142,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23172,7 +23172,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23202,7 +23202,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23232,7 +23232,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23262,7 +23262,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23292,7 +23292,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23322,7 +23322,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23352,7 +23352,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23382,7 +23382,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -23412,7 +23412,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23442,7 +23442,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23472,7 +23472,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23502,7 +23502,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23532,7 +23532,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23562,7 +23562,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23592,7 +23592,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23622,7 +23622,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -23652,7 +23652,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23682,7 +23682,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23712,7 +23712,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23742,7 +23742,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23772,7 +23772,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23802,7 +23802,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -23832,7 +23832,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23862,7 +23862,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23892,7 +23892,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23922,7 +23922,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23952,7 +23952,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -23982,7 +23982,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24012,7 +24012,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24042,7 +24042,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24072,7 +24072,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24102,7 +24102,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24132,7 +24132,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24162,7 +24162,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24192,7 +24192,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24222,7 +24222,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24252,7 +24252,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24282,7 +24282,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24312,7 +24312,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24342,7 +24342,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD1arc"
@@ -24372,7 +24372,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24402,7 +24402,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24432,7 +24432,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24462,7 +24462,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24492,7 +24492,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24522,7 +24522,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24552,7 +24552,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24582,7 +24582,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": -128.80221107048965,
+   "k2": -119.73468090808046,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XD2arc"
@@ -24612,7 +24612,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24642,7 +24642,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24672,7 +24672,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24702,7 +24702,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24732,7 +24732,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24762,7 +24762,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -24792,7 +24792,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24822,7 +24822,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24852,7 +24852,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24882,7 +24882,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24912,7 +24912,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24942,7 +24942,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -24972,7 +24972,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -25002,7 +25002,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF1arc"
@@ -25032,7 +25032,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -25062,7 +25062,7 @@
    "radiation_flag": 1,
    "edge_entry_active": 1,
    "length": 0.1,
-   "k2": 85.21433879406331,
+   "k2": 80.29712504751514,
    "order": 5,
    "edge_exit_active": 1,
    "prototype": "XF2arc"
@@ -25211,17 +25211,17 @@
    "hBarc": 0.15399963987745097,
    "kQFarc": 2.9475157415453004,
    "kQDarc": -2.921746106485083,
-   "kQFarcM": 3.03361520370367,
-   "kQDarcM": -2.4911843401556495,
-   "kQFDS": 2.518346880776807,
-   "kQDDS": 3.253122867990222,
-   "kQFDoub": 2.5676453495787728,
-   "kQDDoub": -2.848342601609036,
-   "kQFtr": 5.033275605512546,
-   "kQDtr": -5.894752398241816,
-   "kQDDoubDS": -3.2594565494720222,
-   "k2XFarc": 85.21433879406331,
-   "k2XDarc": -128.80221107048965,
+   "kQFarcM": 2.9624624210451156,
+   "kQDarcM": -2.467557370023857,
+   "kQFDS": 2.522099145421156,
+   "kQDDS": 1.9455089970108743,
+   "kQFDoub": 3.2409699579258904,
+   "kQDDoub": -2.850740533126589,
+   "kQFtr": 2.152235758573169,
+   "kQDtr": -3.8235955450453725,
+   "kQDDoubDS": -2.4832352543219227,
+   "k2XFarc": 80.29712504751514,
+   "k2XDarc": -119.73468090808046,
    "k2XFarc_delta": 0.0,
    "k2XDarc_delta": 0.0
   },

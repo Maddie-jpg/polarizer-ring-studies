@@ -1,3 +1,4 @@
+#%%
 """
 Parallel "realistic" tune scan of the dynamic aperture.
 
