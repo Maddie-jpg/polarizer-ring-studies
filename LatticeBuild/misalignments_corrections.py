@@ -314,14 +314,22 @@ def report_eigenvector_counts(ring, twiss, rcond_x=1e-4, rcond_y=1e-2):
 
 
 def orbit_correction(ring, twiss, threading=False,
-                      rcond_x=1e-4, rcond_y=1e-2,
+                      rcond_x=cfg.RCOND_X, rcond_y=cfg.RCOND_Y,
                       n_eig_x=None, n_eig_y=None,
-                      bpm_error=True, sigma=0.25e-3, seed=1234):
-    """
-    n_eig_x / n_eig_y: number of singular values (eigenvectors) to keep
-    for the x / y correction, respectively. Can be an int, or a (low, high)
-    tuple to select a specific window of singular values. If None (default),
-    falls back to the existing rcond-based cutoff.
+                      eig_fraction=cfg.EIG_FRACTION,
+                      bpm_error=True, sigma=cfg.BPM_SIGMA, seed=1234):
+    """SVD closed-orbit correction with BPM reading errors.
+
+    How many singular values (eigenvectors) are kept in each plane, in order
+    of precedence:
+      n_eig_x / n_eig_y   explicit count (int) for that plane
+      eig_fraction        that fraction of the available singular values,
+                          rounded down (default config.EIG_FRACTION = 0.5,
+                          i.e. half: 30 of 60 in x, 31 of 63 in y for D1 C9)
+      rcond_x / rcond_y   only if both of the above are None: drop singular
+                          values below rcond * largest
+    When a count is used the rcond cut is switched off, so the count alone
+    decides. The numbers used are printed for each correction.
     """
     tt = ring.get_table()
     bpm_names_x = tt.rows['BPMx.*'].name
@@ -341,12 +349,21 @@ def orbit_correction(ring, twiss, threading=False,
         monitor_align = bpm_reading_errors(BPMs, sigma, rng)
 
     def run_correction(corr_handler):
-        corr_handler.x_correction.rcond = rcond_x
-        corr_handler.y_correction.rcond = rcond_y
-        if n_eig_x is not None or n_eig_y is not None:
-            corr_handler.correct(n_singular_values=(n_eig_x, n_eig_y))
-        else:
-            corr_handler.correct()
+        for plane, n_eig, rcond in (('x', n_eig_x, rcond_x), ('y', n_eig_y, rcond_y)):
+            corr = getattr(corr_handler, f'{plane}_correction')
+            n_avail = len(corr.singular_values)
+            if n_eig is None and eig_fraction is not None:
+                n_eig = max(1, int(np.floor(eig_fraction * n_avail)))
+            if n_eig is not None:
+                corr.n_singular_values = int(n_eig)
+                corr.rcond = None
+                print(f"  orbit correction {plane}: {n_eig} of {n_avail} singular values")
+            else:
+                corr.n_singular_values = None
+                corr.rcond = rcond
+                kept = int(np.sum(corr.singular_values >= rcond * corr.singular_values[0]))
+                print(f"  orbit correction {plane}: rcond={rcond:g} keeps {kept} of {n_avail}")
+        corr_handler.correct()
 
     if threading is False:
         corr_handler = ring.correct_trajectory(twiss_table=twiss, run=False,
