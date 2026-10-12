@@ -835,8 +835,9 @@ def tune_scan_realistic(pdr, ring, arc1R, cell_arc, cell_tr, qx_range, qy_range,
     for the pre-flight check -- the ONLY check that can reliably tell
     "real setup bug" from "this grid point is genuinely unreachable".
     """
-    restore_knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
-                     'kQFDoub', 'kQDDoub', 'l_trans', 'l_doub', 'l_trips']
+    restore_knobs = ['kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
+                     'kQFDoub', 'kQDDoub', 'kQDDoubDS', 'kQFtr', 'kQDtr',
+                     'l_trans', 'l_doub', 'l_trips']
     k0 = {kn: arc1R.vars[kn]._value for kn in restore_knobs
          if kn in arc1R.vars}
 
@@ -962,13 +963,22 @@ current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
 qx_range = two_integer_range(current_qx)
 qy_range = two_integer_range(current_qy)
 
-QX, QY, DA_map = tune_scan_realistic(
-    pdr, ring, arc1R, cell_arc, cell_tr,
-    qx_range=qx_range, qy_range=qy_range,
-    n_emittancex=n_emittancex, n_emittancey=n_emittancey,
-    start_element='QD1_R1', n_periods=6, mu_cell=0.25,
-    n_points=25, scan_turns=1000, scan_particles=200,
-    sanity_qx=current_qx, sanity_qy=current_qy,
+# Parallel version of tune_scan_realistic (wp_da_scan.py): one worker process
+# per CPU core, each with its own copy of the lattice, so `ring`/`arc1R` here
+# are never touched. ~n_cores times faster than the serial loop above.
+#   Coarse first (n_points=13, 512 turns), then refine around the best region
+#   with a smaller window and more turns.
+#   sext_knobs=['k2XFarc', 'k2XDarc'] re-zeros chromaticity at every point
+#   (slower, but compares working points like with like).
+import wp_da_scan
+n_points = 13
+QX, QY, DA_map, scan_records = wp_da_scan.run_parallel(
+    paths.lattice_json_path(study['design'], study['config'], 'perfect',
+                            study['phase'], study['changes']),
+    np.linspace(*qx_range, n_points), np.linspace(*qy_range, n_points),
+    nemitt_x=n_emittancex, nemitt_y=n_emittancey,
+    n_turns=512, n_particles=200, radiation='mean',
+    sext_knobs=None, n_workers=None,          # None = all cores but one
 )
 plot_tune_scan(QX, QY, DA_map, current_qx=current_qx, current_qy=current_qy)
 plt.show()
@@ -976,3 +986,13 @@ plt.show()
 best_qx, best_qy, best_da = best_from_map(QX, QY, DA_map)
 print(f"Best point in scanned window: Qx={best_qx:.4f}, Qy={best_qy:.4f}, "
       f"min_DA={best_da:.2f} sigma")
+
+# Serial version (kept for reference; ~n_cores times slower):
+# QX, QY, DA_map = tune_scan_realistic(
+#     pdr, ring, arc1R, cell_arc, cell_tr,
+#     qx_range=qx_range, qy_range=qy_range,
+#     n_emittancex=n_emittancex, n_emittancey=n_emittancey,
+#     start_element='QD1_R1', n_periods=6, mu_cell=0.25,
+#     n_points=25, scan_turns=1000, scan_particles=200,
+#     sanity_qx=current_qx, sanity_qy=current_qy,
+# )
