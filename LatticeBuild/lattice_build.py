@@ -48,7 +48,8 @@ if mode == 'perfect':
     # Linear optics - choose the builder for this design
     pdr = lo.three_fold_periodicity(fringe_fields=True, matched=True, WP=(15.80, 13.87),
                                     phase_advance=0.25, betay_DS_target=7.0,
-                                    triplet_seed=(1.8, -3.2))
+                                    triplet_seed=(1.8, -3.2),
+                                    betas_first=True)   # match betas, then WP
     sc.config_D1_C9(pdr)
 
     # Example for design 2:

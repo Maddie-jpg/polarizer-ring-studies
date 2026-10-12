@@ -887,7 +887,15 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # Design 1 (more variations as this was created before pipeline optimisation)
 # ---------------------------------------------------------------------------
 
-def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2)):
+def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
+                           betas_first=False):
+    """Three-fold (D1) ring with F-D-F straights.
+
+    betas_first : False (default) matches tune and beta together (beta as
+        upper bounds). True matches the betas through the matching cell, DS
+        and straight first, then the working point, then a small global tune
+        trim -- see _run_standard_matching for measured results of each.
+    """
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
     E0 = config.E0; VRF = config.VRF
@@ -1014,7 +1022,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
                                                     mu_cell=phase_advance)
     _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, WP, betay_DS_target=betay_DS_target)
+                           arc1R, WP, betay_DS_target=betay_DS_target,
+                           bounded=not betas_first)
     _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
                           period, U0, VRF, bend_edge)
     _check_triplet_basin(pdr)
