@@ -1102,14 +1102,22 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
         Xc, Yc = X * (rr + chamber_margin) / rr, Y * (rr + chamber_margin) / rr
         a.plot(w.sigma_x_max * np.cos(th) * 1e3, w.sigma_y_max * np.sin(th) * 1e3,
                color=col, lw=0.8, alpha=0.6, label='1 $\\sigma$ beam')
+        a.plot(3 * w.sigma_x_max * np.cos(th) * 1e3, 3 * w.sigma_y_max * np.sin(th) * 1e3,
+               '--', color=col, lw=1.1, label='3 $\\sigma$ beam envelope')
         a.plot(X * 1e3, Y * 1e3, '-', color=col, lw=1.6,
                label=(f'physical aperture ({n_sigma_beam} $\\sigma$)' if chamber_margin == 0
                       else f'{n_sigma_beam} $\\sigma$ beam envelope'))
         if chamber_margin > 0:
             a.plot(Xc * 1e3, Yc * 1e3, 'k:', lw=1.3,
                    label=f'chamber (+{chamber_margin*1e3:.0f} mm)')
-        a.set_title(f"{r['Magnet type']}  ({w['name']})\n"
-                    f"aperture x/y = {w.chamber_x*1e3:.1f} / {w.chamber_y*1e3:.1f} mm",
+        title = (f"{r['Magnet type']}  ({w['name']})\n"
+                 f"aperture x/y = {w.chamber_x*1e3:.1f} / {w.chamber_y*1e3:.1f} mm")
+        if r['_t'] != 'Bend':   # pole drawn for quads and sextupoles only
+            Rm = r['_R'] * 1e3
+            a.add_patch(mpatches.Circle((0, 0), Rm, fill=False, color='grey', lw=1.2,
+                                        label=f'pole (R = {Rm:.1f} mm)'))
+            title += f", pole R = {Rm:.1f} mm, B$_{{pole}}$ = {r['_B']:.3f} T"
+        a.set_title(title,
                     fontsize=fs, color='crimson' if r['Flag'] else 'black')
         a.set_xlim(-lim, lim)
         a.set_ylim(-(lim_y or lim), lim_y or lim)
@@ -1120,7 +1128,8 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
     n_var, ncols = len(df_pole), 4
     nrows = int(np.ceil(n_var / ncols))
     fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.4 * nrows), squeeze=False)
-    lim = 1.1 * max(df_mag.chamber_x.max(), df_mag.chamber_y.max()) * 1e3
+    lim = 1.1 * max(df_mag.chamber_x.max(), df_mag.chamber_y.max(),
+                    df_pole.loc[df_pole['_t'] != 'Bend', '_R'].max()) * 1e3
     for a, (_, r) in zip(axs.flat, df_pole.iterrows()):
         _draw_cross_section(a, r, lim)
     for a in list(axs.flat)[n_var:]:
@@ -1129,8 +1138,8 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
         a.set_xlabel('x [mm]', fontsize=9)
     for a in axs[:, 0]:
         a.set_ylabel('y [mm]', fontsize=9)
-    fig.suptitle(f'Injected beam: 1 $\\sigma$ (faint) and physical aperture = '
-                 f'{n_sigma_beam} $\\sigma$ (solid)'
+    fig.suptitle(f'Injected beam: 1 $\\sigma$ (faint), 3 $\\sigma$ (dashed), physical aperture = '
+                 f'{n_sigma_beam} $\\sigma$ (solid), pole for quads/sextupoles (grey)'
                  + (f', chamber = +{chamber_margin*1e3:.0f} mm (dotted)' if chamber_margin > 0 else '')
                  + ', at the largest-beam magnet of each type', fontsize=11)
     fig.tight_layout()
@@ -1146,8 +1155,11 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
             continue
         r = sub.loc[sub['_R'].idxmax()]
         w = worst[r['Magnet type']]
-        lim_x = 1.15 * max(w.chamber_x, w.chamber_y) * 1e3
-        lim_y = max(1.3 * w.chamber_y * 1e3, 0.3 * lim_x)      # true scale, no empty band
+        if mtype == 'Bend':
+            lim_x = 1.15 * max(w.chamber_x, w.chamber_y) * 1e3
+            lim_y = max(1.3 * w.chamber_y * 1e3, 0.3 * lim_x)  # true scale, no empty band
+        else:                                                # whole pole circle in view
+            lim_x = lim_y = 1.1 * max(r['_R'], w.chamber_x, w.chamber_y) * 1e3
         fig, a = plt.subplots(figsize=(9, 7 * lim_y / lim_x + 1.2))
         _draw_cross_section(a, r, lim_x, fs=11, lim_y=lim_y)
         a.set_xlabel('x [mm]', fontsize=11)
