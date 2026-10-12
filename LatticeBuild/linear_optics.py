@@ -63,6 +63,23 @@ KNOB_LIMITS_DEFAULT = (-15., 15.)
 KNOB_LIMITS = {}
 FIXED_KNOBS = set()
 
+# Polarity of each matched quad family. Without these the optimiser is free
+# to flip signs, and an F-D-F straight with kQFtr < 0, kQDtr > 0 is a D-F-D
+# straight in disguise (seen on a Mac build: kQFtr=-6.39, kQDtr=+6.21, betx
+# 45 m in the straight). kQDDS is left free: it runs positive in both the
+# D-F-D and F-D-F solutions. Override per knob with KNOB_LIMITS.
+POLARITY_LIMITS = {
+    'kQFarcM': (0., 15.),  'kQDarcM': (-15., 0.),
+    'kQFDS':   (0., 15.),
+    'kQFDoub': (0., 15.),  'kQDDoub': (-15., 0.),  'kQDDoubDS': (-15., 0.),
+    'kQFtr':   (0., 15.),  'kQDtr':   (-15., 0.),
+}
+
+
+def _knob_limits(k):
+    """Limits for a matching knob: KNOB_LIMITS, else its polarity, else default."""
+    return KNOB_LIMITS.get(k, POLARITY_LIMITS.get(k, KNOB_LIMITS_DEFAULT))
+
 
 def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
                betay_DS_target=None, MakePlot=False, FDF=True,
@@ -80,7 +97,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
 
     knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF)
     vary = [xt.Vary(k, step=1e-5,
-                    limits=KNOB_LIMITS.get(k, KNOB_LIMITS_DEFAULT))
+                    limits=_knob_limits(k))
             for k in knob_names if k not in FIXED_KNOBS]
 
     targets = [
@@ -151,6 +168,10 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     straight (same knobs, bound and weight as matchingWP, so the WP match
     can start from this solution).
 
+    Done in two stages for robustness: (1) closure only, (2) the beta bound
+    lowered in steps to BETA_MAX, re-closing each time; the last step that
+    stays closed is kept. Quad polarities are held by POLARITY_LIMITS.
+
     The phase advance is left free, so the ring keeps whatever tunes these
     optics give; match them afterwards with matchingWP if needed.
 
@@ -168,37 +189,78 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
               dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0])
 
     knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF)
-    vary = [xt.Vary(k, step=1e-5, limits=KNOB_LIMITS.get(k, KNOB_LIMITS_DEFAULT))
+    vary = [xt.Vary(k, step=1e-5, limits=_knob_limits(k))
             for k in knob_names if k not in FIXED_KNOBS]
 
-    targets = [
+    closure = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
     ]
+    extra = []
     if match_end_betas:
         cell_tr_opt.targets[0].value = betxS
         cell_tr_opt.targets[1].value = betyS
         cell_tr_opt.run_jacobian(10)
         tw_tr = cell_tr.twiss(method='4d')
-        targets.append(xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0],
-                                    at=xt.END, tol=1e-3, weight=0.1))
+        extra.append(xt.TargetSet(betx=tw_tr.betx[0], bety=tw_tr.bety[0],
+                                  at=xt.END, tol=1e-3, weight=0.1))
     if qx_target is not None and qy_target is not None:
-        targets.append(xt.TargetSet(mux=qx_target / n_periods,
-                                    muy=qy_target / n_periods, at=xt.END, tol=1e-8))
+        extra.append(xt.TargetSet(mux=qx_target / n_periods,
+                                  muy=qy_target / n_periods, at=xt.END, tol=1e-8))
 
-    BETA_MAX = max(betay_DS_target or 0, BETA_BOUND_FLOOR)
-    for mk in mk_list:
-        targets += [
-            xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
-            xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
-        ]
+    def _solve(opt, n=60):
+        try:
+            opt.solve(n_steps=n)
+        except Exception:
+            try:
+                opt.step(n, broyden=True, rcond=1e-4)
+            except Exception:
+                pass
 
+    def _closed():
+        try:
+            t = arc1R.twiss(method='4d', **bc)
+        except Exception:
+            return False, None
+        ok = max(abs(t.dx[-1]), abs(t.dpx[-1]), abs(t.alfx[-1]), abs(t.alfy[-1])) < 1e-6
+        return ok, t
+
+    knob_vals = lambda: {k: pdr_vars[k]._value for k in knob_names if k not in FIXED_KNOBS}
+    pdr_vars = arc1R.env.vars if hasattr(arc1R, 'env') else arc1R.vars
+
+    # Stage 1: close the half-period (dispersion-free, mirror-symmetric
+    # straight). 4 hard targets vs 8-9 knobs, no beta pull -> converges.
     opt = arc1R.match(method='4d', solve=False, verbose=False, **bc,
-                      vary=vary, targets=targets, assert_within_tol=False)
-    try:
-        opt.solve(n_steps=60)
-    except Exception:
-        opt.step(60, broyden=True, rcond=1e-4)
+                      vary=vary, targets=closure + extra, assert_within_tol=False)
+    _solve(opt)
+    ok, tw = _closed()
+    if not ok:
+        print('matchingBeta: WARNING closure not reached in stage 1')
+    last_good = knob_vals()
+
+    # Stage 2: lower the beta bound in steps from where the optics sit now
+    # to BETA_MAX, re-closing at each step; keep the last step that closes.
+    BETA_MAX = max(betay_DS_target or 0, BETA_BOUND_FLOOR)
+    t_now = tw if tw is not None else arc1R.twiss(method='4d', **bc)
+    idx = [i for i, n in enumerate(t_now.name) if n in mk_list] + [len(t_now.name) - 1]  # + END
+    b0 = max(t_now.betx[idx].max(), t_now.bety[idx].max())
+    if b0 > BETA_MAX:
+        for bound in np.geomspace(b0, BETA_MAX, 8)[1:]:
+            bounds = []
+            for mk in mk_list:
+                bounds += [xt.Target('betx', xt.LessThan(bound), at=mk, weight=beta_weight),
+                           xt.Target('bety', xt.LessThan(bound), at=mk, weight=beta_weight)]
+            opt = arc1R.match(method='4d', solve=False, verbose=False, **bc, vary=vary,
+                              targets=closure + extra + bounds, assert_within_tol=False)
+            _solve(opt)
+            ok, _ = _closed()
+            if not ok:
+                for k, v in last_good.items():
+                    pdr_vars[k] = v
+                print(f'matchingBeta: beta bound stopped at the previous step '
+                      f'(closure lost at {bound:.1f} m)')
+                break
+            last_good = knob_vals()
 
     tw = arc1R.twiss(method='4d', **bc)
     print(f'matchingBeta   -> END dx={tw.dx[-1]:+.2e} alfx={tw.alfx[-1]:+.2e} '
@@ -326,6 +388,10 @@ def _beta_bound_setup(arc1R, FDF=True):
     for n in names:
         if n.startswith(pref) and n not in seen:
             seen.add(n); mks.append(n)
+    # The sextant END is the straight centre, inside the centre triplet quad
+    # (QDTripC / QFTripC half-quad). beta peaks there in y for F-D-F (44 m
+    # when left unbounded), so it must be bounded too.
+    mks.append(xt.END)
     return knobs, mks
 
 
