@@ -104,7 +104,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(mux=mux0, muy=muy0, at=xt.END, tol=1e-8, tag='phase'),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-    ]
+    ] + _ds_waist_targets(arc1R)        # horizontal DS waist, if markers exist
     # alfx=alfy=0 at CtrS1 is a design preference (waist at the straight
     # centre), not a periodicity requirement -- alfx=alfy=0 at END already
     # closes the half-period. With it on, the problem is 8 hard targets at
@@ -195,7 +195,7 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     closure = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-    ]
+    ] + _ds_waist_targets(arc1R)        # horizontal DS waist, if markers exist
     extra = []
     if match_end_betas:
         cell_tr_opt.targets[0].value = betxS
@@ -222,7 +222,9 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
             t = arc1R.twiss(method='4d', **bc)
         except Exception:
             return False, None
-        ok = max(abs(t.dx[-1]), abs(t.dpx[-1]), abs(t.alfx[-1]), abs(t.alfy[-1])) < 1e-6
+        res = [abs(t.dx[-1]), abs(t.dpx[-1]), abs(t.alfx[-1]), abs(t.alfy[-1])]
+        res += [abs(t['alfx', n]) for n in arc1R.element_names if n.startswith(DS_WAIST_PREFIX)]
+        ok = max(res) < 1e-6
         return ok, t
 
     knob_vals = lambda: {k: pdr_vars[k]._value for k in knob_names if k not in FIXED_KNOBS}
@@ -270,6 +272,48 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     if MakePlot:
         tw.plot()
     return opt
+
+DS_WAIST_PREFIX = 'DSW_'
+
+
+def insert_DS_waist_markers(pdr, ring, period, *extra_lines):
+    """Insert a marker DSW_<sector> at the centre of the drift between QDDS
+    and BendDS in every dispersion suppressor (straight end of the DS).
+    When present, matchingBeta and matchingWP require a horizontal waist
+    there (alfx = 0) -- see _ds_waist_targets.
+    """
+    def insert_into_line(line, label):
+        names = list(line.element_names)
+        plan = []
+        for qdds in sorted(n for n in names if n.startswith('QDDS_')):
+            sector = qdds[len('QDDS_'):]
+            new = DS_WAIST_PREFIX + sector
+            if new in names:
+                continue
+            i = names.index(qdds)
+            half = line.element_dict[qdds].length / 2.0
+            for step, sign in ((+1, '+'), (-1, '-')):
+                j, k = i + step, i + 2 * step
+                if 0 <= k < len(names) and names[k].startswith('BendDS_'):
+                    dlen = getattr(line.element_dict[names[j]], 'length', 0.0) or 0.0
+                    plan.append((new, qdds, f'{sign}{half + dlen / 2.0}'))
+                    break
+        for new, qdds, at in plan:
+            line.insert(pdr.new(new, xt.Marker), at=at, from_=qdds, from_anchor='center')
+        print(f'insert_DS_waist_markers [{label}]: inserted {len(plan)} markers')
+
+    insert_into_line(ring, 'ring')
+    insert_into_line(period, 'period')
+    for i, ln in enumerate(extra_lines):
+        insert_into_line(ln, f'extra[{i}]')
+    return pdr
+
+
+def _ds_waist_targets(arc1R, tol=1e-9):
+    """alfx = 0 at the DS waist marker(s) of the matched sextant, if any."""
+    return [xt.Target('alfx', 0, at=n, tol=tol)
+            for n in arc1R.element_names if n.startswith(DS_WAIST_PREFIX)]
+
 
 def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
                           l_qy=None, frac=0.9):
@@ -983,7 +1027,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # ---------------------------------------------------------------------------
 
 def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
-                           match_WP=True):
+                           match_WP=True, ds_waist_x=True):
     """Three-fold (D1) ring with F-D-F straights.
 
     Matching order (always): arc and straight cells, then the betas through
@@ -993,6 +1037,9 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     match_WP : True (default) matches the ring to WP after the betas.
         False keeps the tunes the beta-matched optics give (WP is ignored);
         they are printed so you can see where the lattice sits.
+    ds_waist_x : True (default) puts a marker DSW_<sector> in the drift
+        between QDDS and BendDS and requires a horizontal waist there
+        (alfx = 0) in both the beta and the WP match.
     """
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
@@ -1111,6 +1158,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
     # the existing doublet quad automatically.
     insert_DS_betay_quads(pdr, ring, period, arc1R)
+    if ds_waist_x:
+        insert_DS_waist_markers(pdr, ring, period, arc1R)
 
     _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
 
