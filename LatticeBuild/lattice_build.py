@@ -46,7 +46,7 @@ SEED = cfg.DEFAULT_SEED
 #%% Build
 if mode == 'perfect':
     # Linear optics - choose the builder for this design
-    pdr = lo.three_fold_periodicity(fringe_fields=True, matched=True, WP=(15.17, 13.7),
+    pdr = lo.three_fold_periodicity(fringe_fields=True, matched=True, WP=(15.22, 13.72),
                                     phase_advance=0.25, betay_DS_target=7.0,
                                     triplet_seed=(1.8, -3.2),
                                     match_WP=True)   # betas always matched first; False = skip the WP match
