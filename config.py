@@ -36,8 +36,8 @@ BPM_SIGMA = 0.25e-3                 # RMS BPM reading error
 MISALIGN_CUT = 2.5                  # Gaussian truncation [sigma]
 RCOND_X = 1e-4                      # SVD cut-off for horizontal orbit correction
 RCOND_Y = 1e-2                      # SVD cut-off for vertical orbit correction
-EIG_FRACTION = 0.5                  # Orbit correction keeps this fraction of the singular
-                                    # values (eigenvectors) in each plane, e.g. 30 of 60.
+N_EIG_X = 15                        # Singular values (eigenvectors) kept by the horizontal
+N_EIG_Y = 15                        # and vertical orbit correction (of ~60 available).
                                     # Set to None to fall back to the RCOND cut-offs.
 
 DEFAULT_SEED = 123456789            # Seed used to build pdr_misaligned / pdr_corrected JSONs

@@ -315,17 +315,17 @@ def report_eigenvector_counts(ring, twiss, rcond_x=1e-4, rcond_y=1e-2):
 
 def orbit_correction(ring, twiss, threading=False,
                       rcond_x=cfg.RCOND_X, rcond_y=cfg.RCOND_Y,
-                      n_eig_x=None, n_eig_y=None,
-                      eig_fraction=cfg.EIG_FRACTION,
+                      n_eig_x=cfg.N_EIG_X, n_eig_y=cfg.N_EIG_Y,
+                      eig_fraction=None,
                       bpm_error=True, sigma=cfg.BPM_SIGMA, seed=1234):
     """SVD closed-orbit correction with BPM reading errors.
 
     How many singular values (eigenvectors) are kept in each plane, in order
     of precedence:
-      n_eig_x / n_eig_y   explicit count (int) for that plane
-      eig_fraction        that fraction of the available singular values,
-                          rounded down (default config.EIG_FRACTION = 0.5,
-                          i.e. half: 30 of 60 in x, 31 of 63 in y for D1 C9)
+      n_eig_x / n_eig_y   count for that plane (default config.N_EIG_X /
+                          N_EIG_Y = 15); capped at the number available
+      eig_fraction        if the count is None: that fraction of the
+                          available singular values, rounded down
       rcond_x / rcond_y   only if both of the above are None: drop singular
                           values below rcond * largest
     When a count is used the rcond cut is switched off, so the count alone
@@ -355,7 +355,8 @@ def orbit_correction(ring, twiss, threading=False,
             if n_eig is None and eig_fraction is not None:
                 n_eig = max(1, int(np.floor(eig_fraction * n_avail)))
             if n_eig is not None:
-                corr.n_singular_values = int(n_eig)
+                n_eig = min(int(n_eig), n_avail)
+                corr.n_singular_values = n_eig
                 corr.rcond = None
                 print(f"  orbit correction {plane}: {n_eig} of {n_avail} singular values")
             else:
