@@ -711,6 +711,12 @@ def find_best_working_point(QX, QY, maps, weight=None):
     return QX[idx], QY[idx], combined
 
 
+# NB: this map keeps the optics fixed and only moves the tune (like a phase
+# trombone at s=0). With the observation point at s=0 the numerator of every
+# RDT is the same at every (Qx, Qy), so the colours only show the distance
+# to each RDT's resonance line -- use it as a resonance-line diagram. The DA
+# scan below records the real RDTs (max around the ring), amplitude detuning
+# and Q'' of each re-matched point; see plot_metric_maps there.
 tt = ring.get_table()
 
 rdts_of_interest = ['f3000', 'f2100', 'f1020', 'f1011', 'f1002']  # 3rd-order, sextupole-driven
@@ -963,6 +969,57 @@ def tune_scan_realistic(pdr, ring, arc1R, cell_arc, cell_tr, qx_range, qy_range,
              f"pre-scan values: {list(k0.keys())}")
 
 
+def plot_metric_maps(QX, QY, maps, DA_map=None, current_qx=None, current_qy=None,
+                     keys=None):
+    """One panel per metric from wp_da_scan.metric_maps (plus the DA first).
+    RDTs (|f|) are shown as log10; detuning and Q'' on a linear scale."""
+    if keys is None:
+        order = lambda k: (0 if k.startswith('f') else 1 if k.startswith('det') else 2, k)
+        keys = sorted((k for k in maps if not k.endswith('_rms')), key=order)
+    panels = ([('DA', DA_map)] if DA_map is not None else []) + [(k, maps[k]) for k in keys]
+    nc = 4
+    nr = int(np.ceil(len(panels) / nc))
+    fig, axs = plt.subplots(nr, nc, figsize=(4.2 * nc, 3.6 * nr), squeeze=False)
+    for ax, (k, z) in zip(axs.flat, panels):
+        is_rdt = k.startswith('f') and k[1:5].isdigit()
+        zz = np.log10(z) if is_rdt else z
+        lab = {'DA': r'min DA [$\sigma$]', 'det_xx': r'$dQ_x/dJ_x$ [1/m]',
+               'det_yy': r'$dQ_y/dJ_y$ [1/m]', 'det_xy': r'$dQ_x/dJ_y$ [1/m]',
+               'det_yx': r'$dQ_y/dJ_x$ [1/m]', 'ddqx': r"$Q_x''$", 'ddqy': r"$Q_y''$"}.get(
+               k, rf'$\log_{{10}}|f_{{{k[1:5]}}}|$ max' if is_rdt else k)
+        cmap = 'viridis' if k == 'DA' else ('magma' if is_rdt else 'coolwarm')
+        if cmap == 'coolwarm' and np.isfinite(zz).any():
+            v = np.nanmax(np.abs(zz)); kw = dict(vmin=-v, vmax=v)
+        else:
+            kw = {}
+        im = ax.pcolormesh(QX, QY, zz, shading='auto', cmap=cmap, **kw)
+        fig.colorbar(im, ax=ax)
+        if current_qx is not None:
+            ax.plot(current_qx, current_qy, 'o', color='cyan', mec='k', ms=7)
+        ax.set_title(lab, fontsize=10)
+        ax.set_xlabel('$Q_x$'); ax.set_ylabel('$Q_y$')
+    for ax in list(axs.flat)[len(panels):]:
+        ax.axis('off')
+    fig.tight_layout()
+    return fig
+
+
+def print_metric_correlations(maps, DA_map):
+    """Spearman rank correlation of each metric with the DA over the points
+    where both exist. Uses |value| for detuning and Q'' (size matters, not
+    sign)."""
+    def rank(a):
+        r = np.empty(len(a)); r[np.argsort(a)] = np.arange(len(a)); return r
+    print(f"{'metric':12s} {'rank corr. with DA':>20s} {'n':>5s}")
+    for k, z in maps.items():
+        v = np.abs(z) if not k.startswith('f') else z
+        ok = np.isfinite(v) & np.isfinite(DA_map)
+        if ok.sum() < 5 or np.ptp(v[ok]) == 0:
+            continue
+        c = np.corrcoef(rank(v[ok]), rank(DA_map[ok]))[0, 1]
+        print(f'{k:12s} {c:20.2f} {int(ok.sum()):5d}')
+
+
 def plot_tune_scan(QX, QY, DA_map, current_qx=None, current_qy=None):
     plot_data = np.nan_to_num(DA_map, nan=0.0)
 
@@ -1026,6 +1083,14 @@ plot_tune_scan(QX, QY, DA_map, current_qx=current_qx, current_qy=current_qy)
 plt.show()
 
 best_qx, best_qy, best_da = best_from_map(QX, QY, DA_map)
+
+# RDTs (max around the ring), amplitude detuning and Q'' from each point's
+# re-matched optics, on the same grid as the DA -- and how well each one
+# tracks the DA (rank correlation; strongly negative = "bigger is worse").
+metric = wp_da_scan.metric_maps(scan_records, QX[0], QY[:, 0])
+plot_metric_maps(QX, QY, metric, DA_map, current_qx=current_qx, current_qy=current_qy)
+plt.show()
+print_metric_correlations(metric, DA_map)
 print(f"Best point in scanned window: Qx={best_qx:.4f}, Qy={best_qy:.4f}, "
       f"min_DA={best_da:.2f} sigma")
 

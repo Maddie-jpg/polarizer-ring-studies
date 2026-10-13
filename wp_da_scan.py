@@ -17,6 +17,16 @@ Why it is faster than the serial version in wp_optimisation.py:
   * turns / particles / radiation are arguments, so a coarse scan can
     be run first and refined around the best region
 
+At every point it can also record, from that point's re-matched optics
+(cheap compared with the tracking):
+  * first-order RDTs (xt.rdt_first_order_perturbation), max and rms of |f|
+    around the ring -> keys '<rdt>_max', '<rdt>_rms'
+  * amplitude-detuning coefficients dQx/dJx, dQy/dJy, dQx/dJy, dQy/dJx
+    [1/m] (amplitude_detuning) -> 'det_xx', 'det_yy', 'det_xy', 'det_yx'
+  * second-order chromaticity Q'' (ring.get_non_linear_chromaticity)
+    -> 'ddqx', 'ddqy'
+metric_maps() turns those records into maps on the same grid as the DA.
+
 Use from wp_optimisation.py (or anywhere):
     import wp_da_scan
     QX, QY, DA = wp_da_scan.run_parallel(lattice_json, qx_vals, qy_vals,
@@ -47,14 +57,20 @@ if str(REPO_ROOT) not in sys.path:
 # DA helpers (same definition as analysis.py / wp_optimisation.py)
 # =============================================================================
 def get_DA_boundary(particles, num_r_steps, num_theta_steps, x_norm, y_norm):
-    """First lost radius per angle; returns (x_DA, y_DA, min_DA) in sigma."""
+    """First lost radius per angle; returns (x_DA, y_DA, min_DA) in sigma.
+
+    An angle where nothing is lost gets the largest radius tracked at that
+    angle (a lower bound), so a point whose DA is beyond the whole grid
+    returns the grid edge instead of NaN -- before, those points were
+    counted as failed. analysis.py's definition is otherwise unchanged.
+    """
     max_turns = np.max(particles.filter(particles.at_element == 0).at_turn)
     part_at_turn = particles.at_turn
     x_2d = x_norm.reshape(num_r_steps, num_theta_steps)
     y_2d = y_norm.reshape(num_r_steps, num_theta_steps)
     p_2d = part_at_turn.reshape(num_r_steps, num_theta_steps)
-    x_DA = np.full(num_theta_steps, np.nan)
-    y_DA = np.full(num_theta_steps, np.nan)
+    x_DA = x_2d[-1].astype(float).copy()          # default: grid edge
+    y_DA = y_2d[-1].astype(float).copy()
     for jj in range(num_theta_steps):
         for ii in range(num_r_steps):
             if p_2d[ii, jj] != max_turns:
@@ -62,6 +78,116 @@ def get_DA_boundary(particles, num_r_steps, num_theta_steps, x_norm, y_norm):
                 break
     min_DA = np.nanmin(np.round(np.sqrt(x_DA ** 2 + y_DA ** 2), 1))
     return x_DA, y_DA, min_DA
+
+
+# Sextupole-driven (3rd-order) RDTs: resonances 3Qx, Qx, Qx+2Qy, Qx, Qx-2Qy
+DEFAULT_RDTS = ('f3000', 'f2100', 'f1020', 'f1011', 'f1002')
+
+
+def amplitude_detuning(ring, gemitt_x, gemitt_y, amps=(1, 2, 3, 4),
+                       other=0.5, turns=1024):
+    """dQ/dJ [1/m] from tracking: particles at amps x sigma in one plane
+    (other x sigma in the other), tunes by NAFF on the complex normalised
+    signal, linear fit of Q against J = a^2 eps / 2.
+
+    The RF is switched off while tracking (and restored), so delta stays at
+    0. With it on, particles launched on the 4D orbit do a ~0.7 mm
+    synchrotron oscillation through the dispersion and NAFF returns Qs
+    instead of the betatron tune -- this is also why
+    ring.get_amplitude_detuning_coefficients gives nonsense on this ring.
+    Returns det_xx, det_yy, det_xy (dQx/dJy) and det_yx (dQy/dJx); the last
+    two should agree, which is a useful check.
+    """
+    import nafflib as nl
+    amps = np.asarray(amps, float)
+    k = len(amps)
+    p0 = ring.particle_ref
+    bg = float(p0.beta0[0] * p0.gamma0[0])
+    tw = ring.twiss(method='4d')
+    part = ring.build_particles(
+        method='4d', zeta=0, delta=0,
+        x_norm=np.r_[amps, np.full(k, other)], y_norm=np.r_[np.full(k, other), amps],
+        nemitt_x=gemitt_x * bg, nemitt_y=gemitt_y * bg)
+    cav = [n for n, e in zip(ring.element_names, ring.elements)
+           if e.__class__.__name__ == 'Cavity']
+    volts = [ring[n].voltage for n in cav]
+    for n in cav:
+        ring[n].voltage = 0
+    try:
+        ring.track(part, num_turns=turns, turn_by_turn_monitor=True)
+    finally:
+        for n, v in zip(cav, volts):
+            ring[n].voltage = v
+    if np.any(part.state <= 0):
+        raise RuntimeError('detuning particles lost')
+    m = ring.record_last_track
+
+    def tune(u, pu, b, a):
+        u, pu = u - u.mean(), pu - pu.mean()
+        return nl.get_tune(u / np.sqrt(b) - 1j * (a * u + b * pu) / np.sqrt(b)) % 1.0
+
+    qx = np.array([tune(m.x[i], m.px[i], tw.betx[0], tw.alfx[0]) for i in range(2 * k)])
+    qy = np.array([tune(m.y[i], m.py[i], tw.bety[0], tw.alfy[0]) for i in range(2 * k)])
+    if abs(qx[0] - tw.qx % 1) > 0.01 or abs(qy[k] - tw.qy % 1) > 0.01:
+        raise RuntimeError(f'NAFF tunes ({qx[0]:.4f}, {qy[k]:.4f}) do not match '
+                           f'twiss ({tw.qx % 1:.4f}, {tw.qy % 1:.4f})')
+    Jx, Jy = amps ** 2 * gemitt_x / 2, amps ** 2 * gemitt_y / 2
+    slope = lambda J, q: float(np.polyfit(J, q, 1)[0])
+    return dict(det_xx=slope(Jx, qx[:k]), det_yx=slope(Jx, qy[:k]),
+                det_xy=slope(Jy, qx[k:]), det_yy=slope(Jy, qy[k:]))
+
+
+def optics_metrics(ring, rdts=DEFAULT_RDTS, detuning=True, nl_chroma=True,
+                   nemitt_x=1e-6, nemitt_y=1e-6, detuning_turns=1024):
+    """RDTs, amplitude detuning and Q'' of `ring` as it is now.
+
+    Radiation must be off. Returns a flat dict of floats; anything that fails
+    is reported under 'metrics_error' instead of raising, so a failed
+    metric never costs the DA of that point.
+    """
+    import xtrack as xt
+    out = {}
+    try:
+        if rdts:
+            tw = ring.twiss(method='4d')
+            st = ring.get_table(attr=True)
+            res = xt.rdt_first_order_perturbation(list(rdts), twiss=tw,
+                                                  strengths=st, feed_down=False)
+            for r in rdts:
+                a = np.abs(np.asarray(res[r]))
+                out[f'{r}_max'] = float(a.max())
+                out[f'{r}_rms'] = float(np.sqrt(np.mean(a ** 2)))
+        if detuning:
+            p0 = ring.particle_ref
+            bg = float(p0.beta0[0] * p0.gamma0[0])
+            out.update(amplitude_detuning(ring, nemitt_x / bg, nemitt_y / bg,
+                                          turns=detuning_turns))
+        if nl_chroma:
+            nlc = ring.get_non_linear_chromaticity()
+            out['ddqx'] = float(nlc.dnqx[2])
+            out['ddqy'] = float(nlc.dnqy[2])
+    except Exception as e:
+        out['metrics_error'] = f'{type(e).__name__}: {str(e)[:150]}'
+    return out
+
+
+def metric_maps(records, qx_vals, qy_vals, keys=None):
+    """Turn per-point records into {key: 2-D map} on the scan grid (same
+    shape and orientation as the DA map). keys=None takes every metric found."""
+    qx_vals, qy_vals = np.asarray(qx_vals, float), np.asarray(qy_vals, float)
+    ix = {round(v, 10): j for j, v in enumerate(qx_vals)}
+    iy = {round(v, 10): i for i, v in enumerate(qy_vals)}
+    skip = {'qx_t', 'qy_t', 'qx', 'qy', 'DA', 'DA_at_grid_edge', 'time', 'error', 'metrics_error',
+            'betx_max', 'bety_max'}
+    if keys is None:
+        keys = sorted({k for r in records for k in r if k not in skip})
+    maps = {k: np.full((len(qy_vals), len(qx_vals)), np.nan) for k in keys}
+    for r in records:
+        i, j = iy[round(r['qy_t'], 10)], ix[round(r['qx_t'], 10)]
+        for k in keys:
+            if r.get(k) is not None:
+                maps[k][i, j] = r[k]
+    return maps
 
 
 def _study_params(s):
@@ -122,6 +248,14 @@ def _worker(cfg_file, out_file):
             if s.get('sext_knobs'):                       # re-zero chromaticity here
                 with quiet():
                     sc.ChromCorrect(ring, pdr, s['sext_knobs'])
+            if s.get('metrics'):
+                ring.configure_radiation(model=None)
+                with quiet():
+                    row.update(optics_metrics(
+                        ring, rdts=s['metrics'].get('rdts', DEFAULT_RDTS),
+                        detuning=s['metrics'].get('detuning', True),
+                        nl_chroma=s['metrics'].get('nl_chroma', True),
+                        nemitt_x=s['nemitt_x'], nemitt_y=s['nemitt_y']))
             ring.configure_radiation(model=s['radiation'])
             with quiet():
                 particles, grid = xutil.generate_particle_grid(ring, study)
@@ -132,6 +266,8 @@ def _worker(cfg_file, out_file):
                                        grid['num_theta_x_points'],
                                        grid['x_normalized'], grid['y_normalized'])
             row['DA'] = float(da)
+            r_edge = np.round(np.hypot(grid['x_normalized'], grid['y_normalized']).max(), 1)
+            row['DA_at_grid_edge'] = bool(da >= r_edge - 1e-9)   # True: DA is a lower bound
         except Exception as e:
             row['error'] = f'{type(e).__name__}: {str(e)[:150]}'
         row['time'] = time.time() - t0
@@ -154,7 +290,7 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                  n_workers=None, n_turns=1000, n_particles=200, radiation='mean',
                  sext_knobs=None, n_periods=6, mu_cell=0.25, betay_DS_target=None,
                  triplet_seed=(1.8, -3.2), tune_tol=2e-3, start_element=None,
-                 progress_every=10):
+                 progress_every=10, metrics=True):
     """Scan min DA over qx_vals x qy_vals using n_workers processes.
 
     lattice_json   saved Environment to scan (e.g. paths.lattice_json_path(...))
@@ -164,6 +300,11 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
     sext_knobs     e.g. ['k2XFarc', 'k2XDarc'] to re-correct chromaticity to
                    zero at every point (slower, but compares like with like);
                    None keeps the lattice's sextupole strengths
+    metrics        True (default): also record RDTs, amplitude detuning and
+                   Q'' at every point (see optics_metrics; adds a few s per
+                   point). A dict like {'rdts': ['f3000'], 'detuning': False,
+                   'nl_chroma': True} picks which; False/None skips them.
+                   Get the maps with metric_maps(records, qx_vals, qy_vals).
     Returns QX, QY, DA_map (np.nan where the match or tracking failed) and a
     list of per-point records (tunes reached, beta max, errors, time).
     """
@@ -178,7 +319,9 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                 nemitt_x=float(nemitt_x), nemitt_y=float(nemitt_y),
                 sext_knobs=sext_knobs, n_periods=n_periods, mu_cell=mu_cell,
                 betay_DS_target=betay_DS_target, triplet_seed=triplet_seed,
-                tune_tol=tune_tol, start_element=start_element)
+                tune_tol=tune_tol, start_element=start_element,
+                metrics=(dict(rdts=list(DEFAULT_RDTS), detuning=True, nl_chroma=True)
+                         if metrics is True else (metrics or None)))
     procs, outs = [], []
     total = 0
     for w, rows in enumerate(row_blocks):
@@ -221,8 +364,12 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
         if r.get('DA') is not None:
             DA[iy[round(r['qy_t'], 10)], ix[round(r['qx_t'], 10)]] = r['DA']
     n_ok = int(np.isfinite(DA).sum())
+    n_edge = sum(bool(r.get('DA_at_grid_edge')) for r in records)
     print(f'[wp_da_scan] finished in {(time.time()-t0)/60:.1f} min: '
           f'{n_ok}/{total} points with a DA, {total - n_ok} failed/unreachable')
+    if n_edge:
+        print(f'[wp_da_scan] {n_edge} points lost nothing on the whole grid: their DA '
+              f'is the grid edge (a lower bound). Enlarge the grid to resolve them.')
     return QX, QY, DA, records
 
 
