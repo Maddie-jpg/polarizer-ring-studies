@@ -260,7 +260,7 @@ def _annotate_best_point(ax, best, label='Best', value_fmt='{:.4e}',
 
 
 def plot_mux_muy_4panel(scan_result, cmap='viridis', log_emittance=False,
-                        show_best=True, objectives=None):
+                        show_best=False, objectives=None):
     """
     Four-panel (mu_x, mu_y) scan plot:
 
@@ -320,7 +320,7 @@ def plot_mux_muy_4panel(scan_result, cmap='viridis', log_emittance=False,
 
 
 def plot_mux_muy_combined_chroma(scan_result, ax=None, cmap='viridis',
-                                 show_best=True, objective='min'):
+                                 show_best=False, objective='min'):
     """
     Plot mu_x vs mu_y with the heatmap being sqrt(dqx + dqy), computed
     from an existing scan_mux_muy_emittance() result (no re-scan needed).
