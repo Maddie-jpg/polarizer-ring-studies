@@ -54,6 +54,26 @@ def one_integer_range(q, offset=0):
     return base, base + 1
 
 
+def centred_range(q, half_width=1.0):
+    """(lo, hi) = (q - half_width, q + half_width), e.g. q=15.22 -> (14.22, 16.22)."""
+    return q - half_width, q + half_width
+
+
+def grid_points_aligned(lo, hi, per_unit):
+    """Grid points spaced 1/per_unit, at the centres of cells aligned to the
+    integers (k + (i + 0.5)/per_unit), keeping only those inside [lo, hi].
+    The window can start anywhere (e.g. centred on the WP) and the points
+    still never sit on an integer, and with per_unit even never on a
+    half-integer. per_unit=10 -> 0.1 spacing, 20 points over a +-1 window."""
+    if per_unit % 2:
+        print(f'grid_points_aligned: per_unit={per_unit} is odd, so some points '
+              f'are on the half-integer')
+    k0, k1 = int(np.floor(lo)), int(np.ceil(hi))
+    pts = np.concatenate([k + (np.arange(per_unit) + 0.5) / per_unit
+                          for k in range(k0, k1)])
+    return pts[(pts >= lo) & (pts <= hi)]
+
+
 def grid_points(lo, hi, n):
     """n points at the centres of n equal cells between lo and hi, so the
     edges (integer resonances) are never sampled. With n even no point falls
@@ -976,25 +996,28 @@ def best_from_map(QX, QY, DA_map):
 
 
 current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
-# DA scan window: the integer square containing the current tunes
-# (e.g. 15.7, 13.7 -> Qx 15-16, Qy 13-14). Use offset=-1/+1 for the
-# neighbouring square, or two_integer_range for the old 2x2 window.
-qx_range = one_integer_range(current_qx)
-qy_range = one_integer_range(current_qy)
+# DA scan window: +-1 around the current tunes
+# (e.g. 15.22, 13.72 -> Qx 14.22-16.22, Qy 12.72-14.72).
+# one_integer_range(q) gives the integer square instead, two_integer_range
+# the old 2x2 integer-aligned window.
+qx_range = centred_range(current_qx, 1.0)
+qy_range = centred_range(current_qy, 1.0)
 
 # Parallel version of tune_scan_realistic (wp_da_scan.py): one worker process
 # per CPU core, each with its own copy of the lattice, so `ring`/`arc1R` here
 # are never touched. ~n_cores times faster than the serial loop above.
-#   Coarse first (n_points=20, 530 turns), then refine around the best region
+#   Coarse first (per_unit=10, 530 turns), then refine around the best region
 #   with a smaller window and more turns.
 #   sext_knobs=['k2XFarc', 'k2XDarc'] re-zeros chromaticity at every point
 #   (slower, but compares working points like with like).
 import wp_da_scan
-n_points = 20          # per axis; keep it even -> no point on the half-integer
+per_unit = 10          # grid points per unit of tune (0.1 spacing -> 20 per axis);
+                       # keep it even -> no point on an integer or half-integer.
+                       # 20 gives 0.05 spacing but 4x the points (1600).
 QX, QY, DA_map, scan_records = wp_da_scan.run_parallel(
     paths.lattice_json_path(study['design'], study['config'], 'perfect',
                             study['phase'], study['changes']),
-    grid_points(*qx_range, n_points), grid_points(*qy_range, n_points),
+    grid_points_aligned(*qx_range, per_unit), grid_points_aligned(*qy_range, per_unit),
     nemitt_x=n_emittancex, nemitt_y=n_emittancey,
     n_turns=530, n_particles=200, radiation='mean',
     sext_knobs=None, n_workers=None,          # None = all cores but one
