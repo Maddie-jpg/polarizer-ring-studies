@@ -276,36 +276,47 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
 DS_WAIST_PREFIX = 'DSW_'
 
 
-def insert_DS_waist_markers(pdr, ring, period, *extra_lines):
-    """Insert a marker DSW_<sector> at the centre of the drift between QDDS
-    and BendDS in every dispersion suppressor (straight end of the DS).
-    When present, matchingBeta and matchingWP require a horizontal waist
-    there (alfx = 0) -- see _ds_waist_targets.
+def insert_DS_waist_markers(pdr, *lines):
+    """Insert a marker DSW_<sector> at the centre of the long straight drift
+    (DrTripl, between the doublet and the outer triplet quad -- where the RF
+    cavity sits) in every sector of the given lines. When present,
+    matchingBeta and matchingWP require a horizontal waist there (alfx = 0)
+    -- see _ds_waist_targets.
+
+    This is where the D-F-D lattice has its natural horizontal waist
+    (betx ~1.4 m). In the F-D-F straight the x-waist otherwise moves to the
+    straight centre, so it has to be asked for.
+
+    Pass the matching line (arc1R) and period, NOT the ring: the RF cavity is
+    inserted into this drift of the ring afterwards and needs it unsplit.
+    Positions are taken from the line itself, so it works for both F-D-F
+    (QFDoub next to the drift) and D-F-D (QDDoub next to it).
     """
     def insert_into_line(line, label):
-        names = list(line.element_names)
+        tt = line.get_table()
+        names = list(tt.name)
+        L = lambda n: line.element_dict[n].length
         plan = []
-        for qdds in sorted(n for n in names if n.startswith('QDDS_')):
-            sector = qdds[len('QDDS_'):]
+        for trip in (n for n in names if n.startswith(('QFTrip_', 'QDTrip_'))):
+            sector = trip.split('_', 1)[1][:-1]           # QFTrip_1R1 -> 1R
             new = DS_WAIST_PREFIX + sector
             if new in names:
                 continue
-            i = names.index(qdds)
-            half = line.element_dict[qdds].length / 2.0
-            for step, sign in ((+1, '+'), (-1, '-')):
-                j, k = i + step, i + 2 * step
-                if 0 <= k < len(names) and names[k].startswith('BendDS_'):
-                    dlen = getattr(line.element_dict[names[j]], 'length', 0.0) or 0.0
-                    plan.append((new, qdds, f'{sign}{half + dlen / 2.0}'))
-                    break
-        for new, qdds, at in plan:
-            line.insert(pdr.new(new, xt.Marker), at=at, from_=qdds, from_anchor='center')
+            doub = [n for n in (f'QFDoub_{sector}', f'QDDoub_{sector}') if n in names]
+            if not doub:
+                continue
+            s_t0, s_t1 = tt['s', trip], tt['s', trip] + L(trip)
+            # doublet quad nearest the triplet quad, then the gap between them
+            d = min(doub, key=lambda n: abs(tt['s', n] - s_t0))
+            s_d0, s_d1 = tt['s', d], tt['s', d] + L(d)
+            mid = (s_d1 + s_t0) / 2 if s_d0 < s_t0 else (s_t1 + s_d0) / 2
+            plan.append((new, mid))
+        for new, mid in sorted(plan, key=lambda x: -x[1]):
+            line.insert(pdr.new(new, xt.Marker), at=mid)
         print(f'insert_DS_waist_markers [{label}]: inserted {len(plan)} markers')
 
-    insert_into_line(ring, 'ring')
-    insert_into_line(period, 'period')
-    for i, ln in enumerate(extra_lines):
-        insert_into_line(ln, f'extra[{i}]')
+    for i, ln in enumerate(lines):
+        insert_into_line(ln, f'line[{i}]')
     return pdr
 
 
@@ -1037,9 +1048,10 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     match_WP : True (default) matches the ring to WP after the betas.
         False keeps the tunes the beta-matched optics give (WP is ignored);
         they are printed so you can see where the lattice sits.
-    ds_waist_x : True (default) puts a marker DSW_<sector> in the drift
-        between QDDS and BendDS and requires a horizontal waist there
-        (alfx = 0) in both the beta and the WP match.
+    ds_waist_x : True (default) puts a marker DSW_<sector> at the centre of
+        the long straight drift (doublet to triplet, where the RF cavity
+        sits) and requires a horizontal waist there (alfx = 0) in both the
+        beta and the WP match, like the natural waist of the D-F-D lattice.
     """
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
@@ -1159,7 +1171,7 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     # the existing doublet quad automatically.
     insert_DS_betay_quads(pdr, ring, period, arc1R)
     if ds_waist_x:
-        insert_DS_waist_markers(pdr, ring, period, arc1R)
+        insert_DS_waist_markers(pdr, arc1R, period)   # not ring: RF goes there
 
     _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
 
