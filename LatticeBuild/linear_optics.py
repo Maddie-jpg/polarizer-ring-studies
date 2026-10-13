@@ -33,7 +33,7 @@ import numpy as np
 import xtrack as xt
 
 import config
-
+import matplotlib as plt
 
 # ----------------------
 # Module-level helpers
@@ -712,6 +712,105 @@ def delta_range(ring, dmax=0.09, step=0.0025, method='4d'):
             break
     return lo, hi
 
+# ---------------------------------------------------
+# Fringe Field Expansion - taken from silke's github
+# ---------------------------------------------------
+
+
+def _bshape4(L, bb0, bp0, bbL, bpL, bint):
+    """
+    Coefficients (lowest order first, in powers of s) of the 4th-order
+    polynomial on [0, L] with value bb0 / slope bp0 at 0, value bbL / slope
+    bpL at L, and integral bint over [0, L].
+    """
+    t1 = np.array([1, 0, -18,  32, -15])   # p(0)  = 1
+    t2 = np.array([0, 1, -9/2,  6, -5/2])  # p'(0) = 1
+    t3 = np.array([0, 0, -12,  28, -15])   # p(1)  = 1
+    t4 = np.array([0, 0, 3/2,  -4,  5/2])  # p'(1) = 1
+    t5 = np.array([0, 0, 30,  -60,  30])   # int_0^1 p = 1
+    return ((bb0*t1 + L*bp0*t2 + bbL*t3 + L*bpL*t4 + bint/L*t5)
+            * L**np.arange(0, -5, -1, dtype=float))
+
+
+def _field_expansion_bend(env, name, length, angle, gap=0.05, edge_angle=None,
+                          fringe_inside=True, num_integration_steps=5):
+    """
+    Rectangular dipole with soft fringe fields, as a line of 5
+    xt.BFieldExpansion pieces (+ 2 thin edges) called `name`.
+
+        [in-fringe 1st half | in-fringe 2nd half | body | out-fringe 1st half | out-fringe 2nd half]
+          straight            curved               curved  curved                straight
+
+    Each fringe is a 4th-order ramp over 3*gap, with zero slope at both ends
+    and half the full field integrated over it, so the equivalent hard edge
+    is at the centre of the ramp -- where the curved reference starts and
+    ends. Total bending angle = `angle` exactly.
+
+    fringe_inside=True  (default) the whole field fits inside `length`, so the
+        element is a drop-in replacement with the same footprint (layout and
+        circumference unchanged). The equivalent hard-edge length is
+        length - 3*gap and the peak field is higher by length/(length - 3*gap).
+    fringe_inside=False hard-edge length = `length` (same peak field as
+        xt.Bend); the element is 3*gap longer, so shorten the drift on each
+        side by 1.5*gap or the ring gets longer.
+
+    edge_angle: pole-face rotation at each end (rectangular magnet:
+        angle/2, which is what the hard-edge 'Bend' used). Added as linear
+        xt.DipoleEdge kicks at the hard-edge positions; without them the
+        magnet focuses like a sector bend (horizontal instead of vertical).
+
+    NB: BFieldExpansion does not radiate yet (xtrack 0.115), so these bends
+    give no synchrotron radiation / damping.
+    """
+    fringe = 3 * gap
+    l_mag = length - fringe if fringe_inside else length   # hard-edge-equivalent length
+    body = l_mag - fringe
+    if body < 0:
+        raise ValueError(f'{name}: fringe 3*gap = {fringe} m too long for a '
+                         f'{length} m magnet; use a smaller gap')
+    h = angle / l_mag                     # curvature = k0 of the body
+    b_in = _bshape4(fringe, 0, 0, h, 0, fringe * h / 2)
+    b_out = _bshape4(fringe, h, 0, 0, 0, fringe * h / 2)
+
+    kw = dict(num_integration_steps=num_integration_steps)
+    pieces = [
+        (f'{name}_fe0', xt.BFieldExpansion(length=fringe/2, knc=[b_in], **kw)),
+        (f'{name}_fe1', xt.BFieldExpansion(length=fringe/2, knc=[b_in], h=h,
+                                           s_start=fringe/2, **kw)),
+        (f'{name}_fe2', xt.BFieldExpansion(length=body, knc=[[h]], h=h, **kw)),
+        (f'{name}_fe3', xt.BFieldExpansion(length=fringe/2, knc=[b_out], h=h, **kw)),
+        (f'{name}_fe4', xt.BFieldExpansion(length=fringe/2, knc=[b_out],
+                                           s_start=fringe/2, **kw)),
+    ]
+    for n, el in pieces:
+        env.elements[n] = el
+    names = [n for n, _ in pieces]
+
+    if edge_angle:
+        env.elements[f'{name}_edge_in'] = xt.DipoleEdge(
+            k=h, e1=edge_angle, side='entry', model='linear')
+        env.elements[f'{name}_edge_out'] = xt.DipoleEdge(
+            k=h, e1=edge_angle, side='exit', model='linear')
+        names = (names[:1] + [f'{name}_edge_in'] + names[1:4]
+                 + [f'{name}_edge_out'] + names[4:])
+
+    return env.new_line(name=name, components=names)
+
+
+def plot_bend_profile(line):
+    """Field profile k0(s) of a bend built by _field_expansion_bend."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    s0 = 0.0
+    for el in line.elements:
+        if isinstance(el, xt.BFieldExpansion):
+            c = np.asarray(el.knc)[0]
+            s = np.linspace(0, el.length, 50)
+            ax.plot(s0 + s, np.polyval(c[::-1], s + el.s_start))
+            s0 += el.length
+    ax.set_xlabel('s [m]'); ax.set_ylabel('k0 [1/m]')
+    return fig
+
 
 # ----------------
 # Shared Builders
@@ -719,17 +818,31 @@ def delta_range(ring, dmax=0.09, step=0.0025, method='4d'):
 
 def _make_env(fringe_fields):
     pdr = xt.Environment()
-    pdr.particle_ref = xt.Particles(kinetic_energy0=2.86e9,
-                                     mass0=xt.ELECTRON_MASS_EV)
+    pdr.particle_ref = xt.Particles(kinetic_energy0=2.86e9, mass0=xt.ELECTRON_MASS_EV)
     return pdr, fringe_fields, 'full' if fringe_fields else 'linear'
 
 
-def _make_base_elements(pdr, quad_edge, bend_edge):
-    pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend',
-            k0_from_h=True,
-            edge_entry_angle='hBarc*l_bend/2',
-            edge_exit_angle='hBarc*l_bend/2',
-            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+def _make_base_elements(pdr, quad_edge, bend_edge, field_expansion_bends=True):
+    # Arc dipoles. pdr.new(f'Bend1_...', 'Bend') in makesextant clones this
+    # line for every magnet (elements become e.g. 'Bend_fe2.Bend1_1R8').
+    # Field values are numbers taken from l_bend / hBarc NOW, so set those
+    # vars before calling this.
+    if field_expansion_bends:
+        l_b = pdr['l_bend']
+        ang = pdr['hBarc'] * l_b
+        l_bDS = pdr['l_bendDS']
+        angDS = pdr['hBarc'] * l_bDS
+        _field_expansion_bend(pdr, 'Bend', length=l_b, angle=ang,
+                              edge_angle=ang / 2, fringe_inside=True)
+        _field_expansion_bend(pdr, 'BendDS', length=l_bDS, angle=angDS,
+                                      edge_angle=angDS / 2, fringe_inside=True)
+    else:
+        pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend',
+                k0_from_h=True,
+                edge_entry_angle='hBarc*l_bend/2',
+                edge_exit_angle='hBarc*l_bend/2',
+                edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+
     pdr.new('BendDS', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS',
             k0_from_h=True,
             edge_entry_angle='hBarc*l_bendDS/2',
