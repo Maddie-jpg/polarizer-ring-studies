@@ -11,21 +11,21 @@
    "dl_noben": 0.95,
    "dl_trans": 0.2,
    "hBarc": 0.15399963987745097,
-   "k2XDarc": -150.85168750832966,
+   "k2XDarc": -115.01607188081431,
    "k2XDarc_delta": 0.0,
-   "k2XFarc": 101.5883208461945,
+   "k2XFarc": 75.36845927346417,
    "k2XFarc_delta": 0.0,
-   "kQDDS": 1.4025779721160527,
-   "kQDDoub": -2.3446281599679653,
-   "kQDDoubDS": -2.2879199582527323,
+   "kQDDS": 3.7408083649536574,
+   "kQDDoub": -2.8353026062437143,
+   "kQDDoubDS": -3.5380665998034626,
    "kQDarc": -2.921746105639236,
-   "kQDarcM": -1.9068173859709283,
-   "kQDtr": -6.090466850435789,
-   "kQFDS": 2.4222940232643455,
-   "kQFDoub": 2.57418599404239,
+   "kQDarcM": -2.7838364178988,
+   "kQDtr": -3.0791681465347613,
+   "kQFDS": 2.5663961594945155,
+   "kQFDoub": 2.745101758411464,
    "kQFarc": 2.947515735535274,
-   "kQFarcM": 2.821340064187196,
-   "kQFtr": 4.589219610976912,
+   "kQFarcM": 3.103374494175839,
+   "kQFtr": 1.7650239373952301,
    "l_DSL": 2.3499999999999996,
    "l_bend": 0.4,
    "l_bendDS": 0.4,
@@ -11994,6 +11994,15 @@
   "CtrS1_xR1": {
    "__class__": "Marker"
   },
+  "DSW_PL": {
+   "__class__": "Marker"
+  },
+  "DSW_PR": {
+   "__class__": "Marker"
+  },
+  "DSW_xR": {
+   "__class__": "Marker"
+  },
   "DrDSL": {
    "__class__": "Drift",
    "length": 2.3499999999999996
@@ -13953,16 +13962,42 @@
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.2
+   "weight": 0.5
   },
   "DrTripl..103": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.25,
+   "weight": 0.5
+  },
+  "DrTripl..104": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "weight": 0.5
+  },
+  "DrTripl..105": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.25,
+   "weight": 0.5
+  },
+  "DrTripl..106": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "weight": 0.2
+  },
+  "DrTripl..107": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.5,
    "weight": 0.6
   },
-  "DrTripl..104": {
+  "DrTripl..108": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
@@ -24893,7 +24928,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -24909,7 +24944,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -24925,7 +24960,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -24941,7 +24976,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -24957,7 +24992,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -24973,7 +25008,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -24989,7 +25024,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -25063,7 +25098,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -25137,7 +25172,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -26765,7 +26800,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26780,7 +26815,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26796,7 +26831,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26812,7 +26847,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26828,7 +26863,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26844,7 +26879,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26860,7 +26895,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26876,7 +26911,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -26950,7 +26985,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -27024,7 +27059,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 1.4025779721160527,
+   "k1": 3.7408083649536574,
    "knl_rel": [
     0.0
    ],
@@ -27098,7 +27133,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27111,7 +27146,7 @@
   },
   "QDDoubDS_1L": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27124,7 +27159,7 @@
   },
   "QDDoubDS_1R": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27137,7 +27172,7 @@
   },
   "QDDoubDS_2L": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27150,7 +27185,7 @@
   },
   "QDDoubDS_2R": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27163,7 +27198,7 @@
   },
   "QDDoubDS_3L": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27176,7 +27211,7 @@
   },
   "QDDoubDS_3R": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27189,7 +27224,7 @@
   },
   "QDDoubDS_PL": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27202,7 +27237,7 @@
   },
   "QDDoubDS_PR": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27215,7 +27250,7 @@
   },
   "QDDoubDS_xR": {
    "__class__": "Quadrupole",
-   "k1": -2.2879199582527323,
+   "k1": -3.5380665998034626,
    "knl_rel": [
     0.0
    ],
@@ -27230,7 +27265,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27246,7 +27281,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27262,7 +27297,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27278,7 +27313,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27294,7 +27329,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27310,7 +27345,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27326,7 +27361,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27400,7 +27435,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27474,7 +27509,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.3446281599679653,
+   "k1": -2.8353026062437143,
    "knl_rel": [
     0.0
    ],
@@ -27548,7 +27583,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27564,7 +27599,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27580,7 +27615,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27596,7 +27631,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27649,7 +27684,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27702,7 +27737,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27771,7 +27806,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27787,7 +27822,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27818,7 +27853,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -1.9068173859709283,
+   "k1": -2.7838364178988,
    "knl_rel": [
     0.0
    ],
@@ -27833,7 +27868,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -27848,7 +27883,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -6.090466850435789,
+   "k1": -3.0791681465347613,
    "knl_rel": [
     0.0
    ],
@@ -28583,7 +28618,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28599,7 +28634,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28615,7 +28650,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28631,7 +28666,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28647,7 +28682,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28663,7 +28698,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28679,7 +28714,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28753,7 +28788,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -28827,7 +28862,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -30440,7 +30475,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30455,7 +30490,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30471,7 +30506,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30487,7 +30522,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30503,7 +30538,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30519,7 +30554,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30535,7 +30570,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30551,7 +30586,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30625,7 +30660,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30699,7 +30734,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.4222940232643455,
+   "k1": 2.5663961594945155,
    "knl_rel": [
     0.0
    ],
@@ -30773,7 +30808,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30788,7 +30823,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30804,7 +30839,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30820,7 +30855,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30836,7 +30871,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30852,7 +30887,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30868,7 +30903,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30884,7 +30919,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -30958,7 +30993,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -31032,7 +31067,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.57418599404239,
+   "k1": 2.745101758411464,
    "knl_rel": [
     0.0
    ],
@@ -31106,7 +31141,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31122,7 +31157,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31138,7 +31173,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31154,7 +31189,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31170,7 +31205,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31186,7 +31221,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31202,7 +31237,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31276,7 +31311,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31350,7 +31385,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31456,7 +31491,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31472,7 +31507,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31518,7 +31553,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.821340064187196,
+   "k1": 3.103374494175839,
    "knl_rel": [
     0.0
    ],
@@ -31533,7 +31568,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31548,7 +31583,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.589219610976912,
+   "k1": 1.7650239373952301,
    "knl_rel": [
     0.0
    ],
@@ -31578,7 +31613,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31593,7 +31628,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31609,7 +31644,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31625,7 +31660,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31641,7 +31676,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31657,7 +31692,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31673,7 +31708,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31689,7 +31724,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31705,7 +31740,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31721,7 +31756,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31737,7 +31772,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31753,7 +31788,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31769,7 +31804,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31785,7 +31820,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31801,7 +31836,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31817,7 +31852,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31833,7 +31868,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31849,7 +31884,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31865,7 +31900,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31881,7 +31916,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31897,7 +31932,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31913,7 +31948,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31929,7 +31964,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31945,7 +31980,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31961,7 +31996,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31977,7 +32012,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -31993,7 +32028,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32009,7 +32044,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32025,7 +32060,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32041,7 +32076,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32057,7 +32092,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32073,7 +32108,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32089,7 +32124,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32105,7 +32140,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32120,7 +32155,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32136,7 +32171,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32152,7 +32187,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32168,7 +32203,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32184,7 +32219,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32200,7 +32235,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32216,7 +32251,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32232,7 +32267,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32248,7 +32283,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32264,7 +32299,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32280,7 +32315,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32296,7 +32331,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32312,7 +32347,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32328,7 +32363,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32344,7 +32379,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32360,7 +32395,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32376,7 +32411,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32392,7 +32427,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32408,7 +32443,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32424,7 +32459,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32440,7 +32475,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32456,7 +32491,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32472,7 +32507,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32488,7 +32523,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32504,7 +32539,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32520,7 +32555,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32536,7 +32571,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32552,7 +32587,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32568,7 +32603,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32584,7 +32619,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32600,7 +32635,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32616,7 +32651,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -150.85168750832966,
+   "k2": -115.01607188081431,
    "knl_rel": [
     0.0
    ],
@@ -32632,7 +32667,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32647,7 +32682,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32663,7 +32698,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32679,7 +32714,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32695,7 +32730,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32711,7 +32746,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32727,7 +32762,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32743,7 +32778,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32759,7 +32794,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32775,7 +32810,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32791,7 +32826,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32807,7 +32842,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32823,7 +32858,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32839,7 +32874,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32855,7 +32890,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32871,7 +32906,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32887,7 +32922,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32903,7 +32938,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32919,7 +32954,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32935,7 +32970,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32951,7 +32986,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32967,7 +33002,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32983,7 +33018,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -32999,7 +33034,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33015,7 +33050,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33031,7 +33066,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33047,7 +33082,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33063,7 +33098,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33079,7 +33114,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33095,7 +33130,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33111,7 +33146,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33127,7 +33162,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33143,7 +33178,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33159,7 +33194,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33174,7 +33209,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33190,7 +33225,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33206,7 +33241,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33222,7 +33257,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33238,7 +33273,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33254,7 +33289,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33270,7 +33305,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33286,7 +33321,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33302,7 +33337,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33318,7 +33353,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33334,7 +33369,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33350,7 +33385,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33366,7 +33401,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33382,7 +33417,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33398,7 +33433,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33414,7 +33449,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33430,7 +33465,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33446,7 +33481,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33462,7 +33497,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33478,7 +33513,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33494,7 +33529,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33510,7 +33545,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33526,7 +33561,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33542,7 +33577,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33558,7 +33593,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33574,7 +33609,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33590,7 +33625,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33606,7 +33641,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33622,7 +33657,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33638,7 +33673,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33654,7 +33689,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33670,7 +33705,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 101.5883208461945,
+   "k2": 75.36845927346417,
    "knl_rel": [
     0.0
    ],
@@ -33963,6 +33998,7 @@
     "DrDoub",
     "QFDoub_xR",
     "DrTripl..0",
+    "DSW_xR",
     "CtrS1_xR1",
     "DrTripl..1",
     "QFTrip_xR1",
@@ -34994,14 +35030,18 @@
     "QDDoub_PR",
     "DrDoub",
     "QFDoub_PR",
-    "DrTripl",
+    "DrTripl..104",
+    "DSW_PR",
+    "DrTripl..105",
     "QFTrip_PR1",
     "DrTrips",
     "QDTripC_PR2H",
     "QDTripC_PL2H",
     "DrTrips",
     "QFTrip_PL1",
-    "DrTripl",
+    "DrTripl..102",
+    "DSW_PL",
+    "DrTripl..103",
     "QFDoub_PL",
     "DrDoub",
     "QDDoub_PL",
@@ -36093,9 +36133,9 @@
     "QDDoub_1R",
     "DrDoub",
     "QFDoub_1R",
-    "DrTripl..102",
+    "DrTripl..106",
     "RFCav_1",
-    "DrTripl..104",
+    "DrTripl..108",
     "QFTrip_1R1",
     "DrTrips",
     "QDTripC_2L2",
