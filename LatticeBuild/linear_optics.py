@@ -118,7 +118,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
     # weight: at the old weight=0.02 they were effectively ignored and bety
     # ran to 16 m in the dispersion suppressor. BETA_MAX below ~9 m collapses
     # the horizontal plane instead (betx -> 30 m), so 10 m is the knee.
-    BETA_MAX = betay_DS_target if betay_DS_target else BETA_BOUND_FLOOR
+    '''BETA_MAX = betay_DS_target if betay_DS_target else BETA_BOUND_FLOOR
     if BETA_MAX < BETA_BOUND_FLOOR:
         print(f'matchingWP: betay_DS_target={BETA_MAX:g} m is below the '
               f'{BETA_BOUND_FLOOR:g} m knee found for this geometry/working '
@@ -130,7 +130,7 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         targets += [
             xt.Target('betx', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
             xt.Target('bety', xt.LessThan(BETA_MAX), at=mk, weight=beta_weight),
-        ]
+        ]'''
 
     opt = arc1R.match(
         method='4d', solve=False, verbose=False, **bc,
