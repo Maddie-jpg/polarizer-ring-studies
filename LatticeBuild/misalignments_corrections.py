@@ -641,27 +641,42 @@ def misalignments(line, sigma, seed=None, cut=2.5):
             var = truncnorm(cut, rgen)
         return var
 
+    import bend_tools as bt
     tab = line.get_table()
+    etype = dict(zip(tab.name, tab.element_type))
     quads = list(tab.rows[tab.element_type == 'Quadrupole'].name)
     sexts = list(tab.rows[tab.element_type == 'Sextupole'].name)
-    bends = list(tab.rows[tab.element_type == 'Bend'].name)
+    # {magnet: [elements]}: a hard-edge bend is [itself], a field-expansion
+    # bend all its pieces, so the whole magnet gets ONE set of errors.
+    bends = bt.bend_groups(line, tab)
 
-    for name in quads + sexts + bends:
-        ref = line.element_refs[name]
-
-        ref.shift_x   = sigma * truncnorm(cut, rng)
-        ref.shift_y   = sigma * truncnorm(cut, rng)
-        ref.shift_s   = sigma * truncnorm(cut, rng)
-        ref.rot_s_rad = sigma * truncnorm(cut, rng)
-        ref.rot_x_rad = sigma * truncnorm(cut, rng)
-        ref.rot_y_rad = sigma * truncnorm(cut, rng)
-
+    # Same draw order as before (quads, sexts, bends; 7 numbers per magnet),
+    # so hard-edge lattices get exactly the same errors for a given seed.
+    for magnet, elems in [(q, [q]) for q in quads + sexts] + list(bends.items()):
+        err = dict(shift_x=sigma * truncnorm(cut, rng),
+                   shift_y=sigma * truncnorm(cut, rng),
+                   shift_s=sigma * truncnorm(cut, rng),
+                   rot_s_rad=sigma * truncnorm(cut, rng),
+                   rot_x_rad=sigma * truncnorm(cut, rng),
+                   rot_y_rad=sigma * truncnorm(cut, rng))
         eps = truncnorm(cut, rng) * 1e-3
-        if name in quads:   ref.k1 = ref.k1 * (1 + eps)
-        elif name in sexts: ref.k2 = ref.k2 * (1 + eps)
-        elif name in bends:
-            line[name].k0_from_h = False      # keep geometry (h), perturb the field
-            ref.k0 = ref.h * (1 + eps)
+
+        for name in elems:
+            ref = line.element_refs[name]
+            for k, v in err.items():
+                setattr(ref, k, v)
+            t = etype[name]
+            if t == 'Quadrupole':
+                ref.k1 = ref.k1 * (1 + eps)
+            elif t == 'Sextupole':
+                ref.k2 = ref.k2 * (1 + eps)
+            elif t in ('Bend', 'RBend'):
+                line[name].k0_from_h = False      # keep geometry (h), perturb the field
+                ref.k0 = ref.h * (1 + eps)
+            elif t == 'BFieldExpansion':
+                ref.kscale = ref.kscale * (1 + eps)   # whole field profile
+            elif t == 'DipoleEdge':
+                ref.k = ref.k * (1 + eps)             # edge focusing follows the field
 
     return line
 

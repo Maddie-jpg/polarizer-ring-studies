@@ -99,7 +99,8 @@ def addSketchBL(acc_tw, acc, lims, limy1, limy2, scK1):
     for ind in range( len(tab_pan.T.columns) -1 ):
         if tab_pan['element_type'][ind].find('Drift') >= 0:
            axl.plot( [tab_pan['s'][ind], tab_pan['s'][ind+1]], [0, 0], color='black' )
-        if tab_pan['element_type'][ind].find('Bend') >= 0:
+        if (tab_pan['element_type'][ind].find('Bend') >= 0
+                or tab_pan['element_type'][ind] in ('BFieldExpansion', 'ThickSliceBFieldExpansion')):
            axl.add_patch( patches.Rectangle( (tab_pan['s'][ind], -0.08), 
                tab_pan['s'][ind+1] - tab_pan['s'][ind], 0.16, fill=True, color='tab:blue' ) ) 
         if tab_pan['element_type'][ind].find('Quad') >= 0:

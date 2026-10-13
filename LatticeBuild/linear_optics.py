@@ -822,32 +822,28 @@ def _make_env(fringe_fields):
     return pdr, fringe_fields, 'full' if fringe_fields else 'linear'
 
 
-def _make_base_elements(pdr, quad_edge, bend_edge, field_expansion_bends=True):
+def _make_base_elements(pdr, quad_edge, bend_edge, field_expansion_bends=True,
+                        gap=0.05, fringe_inside=True):
     # Arc dipoles. pdr.new(f'Bend1_...', 'Bend') in makesextant clones this
     # line for every magnet (elements become e.g. 'Bend_fe2.Bend1_1R8').
     # Field values are numbers taken from l_bend / hBarc NOW, so set those
     # vars before calling this.
-    if field_expansion_bends:
-        l_b = pdr['l_bend']
-        ang = pdr['hBarc'] * l_b
-        l_bDS = pdr['l_bendDS']
-        angDS = pdr['hBarc'] * l_bDS
-        _field_expansion_bend(pdr, 'Bend', length=l_b, angle=ang,
-                              edge_angle=ang / 2, fringe_inside=True)
-        _field_expansion_bend(pdr, 'BendDS', length=l_bDS, angle=angDS,
-                                      edge_angle=angDS / 2, fringe_inside=True)
-    else:
-        pdr.new('Bend', xt.Bend, length='l_bend', angle='hBarc*l_bend',
-                k0_from_h=True,
-                edge_entry_angle='hBarc*l_bend/2',
-                edge_exit_angle='hBarc*l_bend/2',
-                edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+    dipoles = {'Bend': 'l_bend', 'BendDS': 'l_bendDS'}
 
-    pdr.new('BendDS', xt.Bend, length='l_bendDS', angle='hBarc*l_bendDS',
-            k0_from_h=True,
-            edge_entry_angle='hBarc*l_bendDS/2',
-            edge_exit_angle='hBarc*l_bendDS/2',
-            edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+    for name, l_var in dipoles.items():
+        if field_expansion_bends:
+            l_b = pdr[l_var]
+            ang = pdr['hBarc'] * l_b
+            _field_expansion_bend(pdr, name, length=l_b, angle=ang,
+                                  gap=gap, edge_angle=ang / 2,
+                                  fringe_inside=fringe_inside)
+        else:
+            pdr.new(name, xt.Bend, length=l_var, angle=f'hBarc*{l_var}',
+                    k0_from_h=True,
+                    edge_entry_angle=f'hBarc*{l_var}/2',
+                    edge_exit_angle=f'hBarc*{l_var}/2',
+                    edge_entry_model=bend_edge, edge_exit_model=bend_edge)
+
     pdr.new('QFarc',  xt.Quadrupole, length='l_quad',    k1='kQFarc',
             edge_entry_active=quad_edge, edge_exit_active=quad_edge)
     pdr.new('QFarcH', xt.Quadrupole, length='l_quad/2.', k1='kQFarc',
@@ -1151,7 +1147,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # ---------------------------------------------------------------------------
 
 def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
-                           match_WP=True, ds_waist_x=True):
+                           match_WP=True, ds_waist_x=True, field_expansion_bends=True):
     """Three-fold (D1) ring with F-D-F straights.
 
     Matching order (always): arc and straight cells, then the betas through
@@ -1165,6 +1161,10 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
         the long straight drift (doublet to triplet, where the RF cavity
         sits) and requires a horizontal waist there (alfx = 0) in both the
         beta and the WP match, like the natural waist of the D-F-D lattice.
+    field_expansion_bends : True (default) builds every dipole (Bend and
+        BendDS) as a soft-fringe BFieldExpansion magnet; False uses hard-edge
+        xt.Bend. Use False for spin tracking or anything needing radiation:
+        BFieldExpansion does not radiate and cannot be spin-tracked.
     """
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
@@ -1201,7 +1201,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     U0 = (0.88463e-31)*E0**4*(2.*np.pi) / (
         6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']))
 
-    _make_base_elements(pdr, quad_edge, bend_edge)
+    _make_base_elements(pdr, quad_edge, bend_edge,
+                        field_expansion_bends=field_expansion_bends)
     cell_arc, cell_tr = _make_reference_cells(pdr)
 
     _seed_arc_knobs(pdr, mu_cell=phase_advance)

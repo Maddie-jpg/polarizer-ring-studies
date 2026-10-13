@@ -152,6 +152,10 @@ def log(msg):
 
 def magnet_names(line):
     tt = line.get_table()
+    if any(t in ('BFieldExpansion', 'ThickSliceBFieldExpansion') for t in tt.element_type):
+        raise NotImplementedError(
+            'tolerance_scan applies its errors and multipole kicks per hard-edge '
+            'magnet; build the lattice with field_expansion_bends=False for it.')
     out = {}
     for t in MAGNET_TYPES:
         out[t] = [n for n in tt.rows[tt.element_type == t].name]

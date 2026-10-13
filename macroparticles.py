@@ -933,27 +933,24 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
     C_x, C_y = env_x + chamber_margin, env_y + chamber_margin
  
     # --- per magnet ---
-    tt_ap = ring.get_table()
+    import bend_tools as bt          # groups field-expansion dipoles into one 'Bend'
     rows = []
-    for name, etype, s0 in zip(tt_ap.name, tt_ap.element_type, tt_ap.s):
-        if etype not in magnet_types:
-            continue
-        el = ring[name]
-        s1 = s0 + el.length
+    for mag in bt.magnets(ring, magnet_types):
+        name, etype, s0, s1 = mag['name'], mag['type'], mag['s_start'], mag['s_end']
         i0, i1 = np.searchsorted(s_ap, s0 - 1e-9), np.searchsorted(s_ap, s1 + 1e-9)
         sl = slice(i0, max(i1, i0 + 1))
         ch_x, ch_y = float(C_x[sl].max()), float(C_y[sl].max())
         sx_max, sy_max = float(sig_x[sl].max()), float(sig_y[sl].max())
         rows.append({'name': name, 'family': name.split('::')[0].split('_')[0],
-                     'type': etype, 's_start': s0, 's_end': s1, 'length': el.length,
+                     'type': etype, 's_start': s0, 's_end': s1, 'length': mag['length'],
                      'betx_max': float(np.max(tw_ap.betx[sl])),
                      'bety_max': float(np.max(tw_ap.bety[sl])),
                      'dx_max': float(np.max(np.abs(tw_ap.dx[sl]))),
                      'sigma_x_max': sx_max, 'sigma_y_max': sy_max,
                      'chamber_x': ch_x, 'chamber_y': ch_y, 'chamber_r': max(ch_x, ch_y),
                      'N_sigma_x': ch_x / sx_max, 'N_sigma_y': ch_y / sy_max,
-                     'h': el.angle / el.length if etype == 'Bend' else 0.0,
-                     'k1': getattr(el, 'k1', 0.0), 'k2': getattr(el, 'k2', 0.0)})
+                     'h': mag['h'] if etype == 'Bend' else 0.0,
+                     'k1': mag['k1'], 'k2': mag['k2']})
     df_mag = pd.DataFrame(rows)
     df_mag['N_eps_x'] = df_mag.N_sigma_x**2
     df_mag['N_eps_y'] = df_mag.N_sigma_y**2

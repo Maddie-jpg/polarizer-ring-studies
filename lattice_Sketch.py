@@ -205,10 +205,16 @@ _SLICE_RE = re.compile(
     r'(?:\.\.(?:\d+|entry_map|exit_map)|_entry|_exit)$')
 
 
+_FE_PIECE_RE = re.compile(r'^.+?_(?:fe\d+|edge_in|edge_out)\.(?P<magnet>.+)$')
+
+
 def _base_name(name):
-    """Map a slice name back to the element it was cut from."""
+    """Map a slice name back to the element it was cut from, and a piece of
+    a field-expansion dipole ('Bend_fe2.Bend1_1R8') to its magnet ('Bend1_1R8')."""
     m = _SLICE_RE.match(name)
-    return m.group('base') if m else name
+    name = m.group('base') if m else name
+    m = _FE_PIECE_RE.match(name)
+    return m.group('magnet') if m else name
 
 
 def _merge_slices(rows):

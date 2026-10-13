@@ -57,3 +57,19 @@ from pathlib import Path as _Path
 INJECTED_BEAM_FILE = _os.environ.get(
     'BEAM_FILE',
     str(_Path(__file__).resolve().parent / 'PositronBeam_2p86GeV_PolarizedEbeam' / 'beam_ECS_04092026.dat'))
+
+# -----------------------------------------------------------------------------
+# Xsuite kernels: newer xsuite only uses prebuilt tracking kernels unless
+# compilation is allowed. Anything not prebuilt (freeze_longitudinal in
+# get_footprint, BFieldExpansion bends, ...) then fails with
+# PrebuiltKernelNotFoundError. Every script imports this file, so allow
+# just-in-time compilation here (first use of a new kernel takes a while).
+# -----------------------------------------------------------------------------
+_os.environ.setdefault('XSUITE_ALLOW_KERNEL_COMPILATION', '1')
+try:
+    import xobjects as _xo
+    if hasattr(_xo, 'settings'):
+        _xo.settings.allow_kernel_compilation = True
+    _xo.context_cpu.allow_no_prebuilt_kernel = True
+except ImportError:
+    pass
