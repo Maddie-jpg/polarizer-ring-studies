@@ -521,6 +521,8 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
 
     sc = ax.scatter(x, y, c=z, s=s, cmap=cmap, **kwargs)
     return sc
+
+
 # %%
 
 df_clean = filter_by_action_xy(df, n_sigma=3)
@@ -1406,7 +1408,7 @@ def compute_energy_scan(track_line, track_tw, df_subset, p0c_avg_mev, energy_ran
             delta=delta_test, zeta=zeta_m
         )
 
-        track_line.track(p_test, num_turns=100)
+        track_line.track(p_test, num_turns=1000)
         survived = np.sum(p_test.state > 0)
         efficiency = (survived / len(p_test.x)) * 100
         efficiency_results.append(efficiency)
@@ -1518,7 +1520,7 @@ def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
 
         n_track = len(particles.x)
         track_line.configure_radiation(model='quantum')
-        track_line.track(particles, num_turns=6100, turn_by_turn_monitor=True, with_progress=True)
+        track_line.track(particles, num_turns=7000, turn_by_turn_monitor=True, with_progress=True)
         data = track_line.record_last_track
 
         folder2 = mf.results_dir(design, config, phase, changes=changes,
@@ -1774,7 +1776,7 @@ if mode == 'perfect':
         )
 
         seed_line.configure_radiation(model='quantum')
-        seed_line.track(particles, num_turns=6100,
+        seed_line.track(particles, num_turns=7000,
                          turn_by_turn_monitor=True, with_progress=False)
         data_seed = seed_line.record_last_track
         survival_counts_seed = np.sum(data_seed.state > 0, axis=0)

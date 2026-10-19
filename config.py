@@ -56,7 +56,7 @@ import os as _os
 from pathlib import Path as _Path
 INJECTED_BEAM_FILE = _os.environ.get(
     'BEAM_FILE',
-    str(_Path(__file__).resolve().parent / 'PositronBeam_2p86GeV_PolarizedEbeam' / 'beam_ECS_04092026.dat'))
+    str(_Path(__file__).resolve().parent / 'PositronBeam_2p86GeV' / 'beam_ECS_09102026.dat'))
 
 # -----------------------------------------------------------------------------
 # Xsuite kernels: newer xsuite only uses prebuilt tracking kernels unless
