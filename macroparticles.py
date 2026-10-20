@@ -44,7 +44,17 @@ print(list(df.columns))
 
 # %%
 
-def filter_beam_core(df_raw, n_sigma=3):
+def filter_beam_core(df_raw, mahalanobis_r=3):
+    """
+    6-D Mahalanobis-radius cut. NOT the same convention as filter_by_action's
+    n_sigma, which is a 2-D action cut -- the fraction kept here follows the
+    chi-squared CDF with 6 dof, so mahalanobis_r=3 keeps ~88%, not ~99%:
+
+        r = 2 -> ~45%      r = 3 -> ~88%      r = 5 -> ~97%
+
+    Renamed from n_sigma to stop it being read as an n-sigma beam cut.
+    """
+    n_sigma = mahalanobis_r
     cols = ['x[mm]', 'xp[mrad]', 'y[mm]', 'yp[mrad]', 't[mm/c]', 'p[MeV/c]']
     df_centered = df_raw[cols] - df_raw[cols].mean()
     
@@ -55,7 +65,8 @@ def filter_beam_core(df_raw, n_sigma=3):
     
     is_core = distances_sq <= (n_sigma ** 2)
     
-    print(f"--> Filtering Beam Core ({n_sigma} sigma): Retained {np.sum(is_core)} / {len(df_raw)} particles.")
+    print(f"--> Filtering Beam Core (Mahalanobis r={n_sigma}, 6-D): "
+          f"Retained {np.sum(is_core)} / {len(df_raw)} particles.")
     return df_raw[is_core].copy()
 
 def select_main_bunch(df_in, t_col='t[mm/c]', mad_k=10):
@@ -155,7 +166,7 @@ def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
     df_res = df_res.sort_values(by=['Efficiency_%', 'RMS_Spread_%'], ascending=[False, True])
     return df_res
 
-df_raw=filter_beam_core(df, n_sigma=3)
+#df_raw=filter_beam_core(df, mahalanobis_r=3)   # 6-D cut, keeps ~88%
 
 # %%
 '''
@@ -288,7 +299,7 @@ def filter_by_action(df, position, angle, n_sigma=3, max_iter=8):
         df_iter = df_iter[mask].copy()
     return df_iter
 
-def filter_by_action_xy(df, n_sigma=3, max_iter=5):
+def filter_by_action_xy(df, n_sigma=5, max_iter=5):
     df_x = filter_by_action(df, 'x[mm]', 'xp[mrad]', n_sigma, max_iter)
     df_xy = filter_by_action(df_x, 'y[mm]', 'yp[mrad]', n_sigma, max_iter)
     return df_xy
@@ -523,10 +534,51 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
     return sc
 
 
+def draw_action_ellipse(ax_plot, df_plot, pos_col, ang_col,
+                        alpha, beta, emittance, n_sigma,
+                        color='hotpink', lw=2, ls='-'):
+    """
+    Draw the n_sigma action ellipse -- the boundary of the particles kept by
+    filter_by_action at the same n_sigma -- and label it with the emittance
+    and how many of the PLOTTED particles lie inside it.
+
+    Uses the same action as filter_by_action,
+        J = gamma*x^2 + 2*alpha*x*xp + beta*xp^2 <= n_sigma^2 * eps,
+    so an n_sigma here means exactly what it means there. The count is taken
+    from the points actually on the axes, so the label always describes the
+    curve that is drawn rather than the sample the Twiss was fitted to.
+    """
+    theta = np.linspace(0, 2 * np.pi, 400)
+    amp = n_sigma * np.sqrt(emittance)
+    e_pos = amp * np.sqrt(beta) * np.cos(theta)
+    e_ang = -amp / np.sqrt(beta) * (alpha * np.cos(theta) - np.sin(theta))
+
+    gamma = (1.0 + alpha ** 2) / beta
+    x = df_plot[pos_col].values - df_plot[pos_col].values.mean()
+    xp = df_plot[ang_col].values - df_plot[ang_col].values.mean()
+    J = gamma * x ** 2 + 2 * alpha * x * xp + beta * xp ** 2
+    n_in, n_tot = int(np.sum(J <= n_sigma ** 2 * emittance)), len(df_plot)
+
+    ax_plot.plot(e_pos, e_ang, color=color, lw=lw, ls=ls,
+        label=f'{n_sigma:g}$\\sigma$ beam core ($\\epsilon$={emittance:.3g} $\\mu$m)\n'
+              f'{n_in}/{n_tot} particles inside ({100*n_in/n_tot:.1f}%)')
+    return n_in, n_tot
+
+
 # %%
 
-df_clean = filter_by_action_xy(df, n_sigma=3)
-print(f"Action filter: kept {len(df_clean)}/{len(df)} particles")
+# Beam-core definition. This ONE number sets the action cut, the emittance
+# that comes out of it, and the ellipse drawn on every phase-space plot.
+# The emittance depends strongly on it -- on a beam with 5% halo:
+#     3 sigma -> eps 2.41 (95.6% kept)      5 sigma -> eps 2.93 (98.8% kept)
+#     4 sigma -> eps 2.69 (97.9% kept)      6 sigma -> eps 3.21 (99.5% kept)
+# so everything downstream (normalised emittance, mismatch factors, the
+# physical-aperture study) inherits whatever is set here.
+N_SIGMA = 3
+
+df_clean = filter_by_action_xy(df, n_sigma=N_SIGMA)
+print(f"Action filter ({N_SIGMA} sigma): kept {len(df_clean)}/{len(df)} particles "
+      f"({100*len(df_clean)/len(df):.1f}%)")
 
 emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
 m_emittance_x=CalcEmittanceManual(df_clean, 'x[mm]', 'xp[mrad]')
@@ -564,16 +616,13 @@ axes[0, 1].set_ylabel('yp [mrad]')
 axes[0, 1].set_title('Vertical Phase Space')
 fig.colorbar(sc1, ax=axes[0, 1], label='Relative Density')
 
-theta = np.linspace(0, 2 * np.pi, 200)
-ellipse_x = np.sqrt(emittance_x * bx) * np.cos(theta)
-ellipse_xp = -np.sqrt(emittance_x / bx) * (ax * np.cos(theta) - np.sin(theta))
-axes[0, 0].plot(ellipse_x, ellipse_xp, color='hotpink', lw=2, label='RMS Ellipse')
-axes[0, 0].legend(fontsize='small')
+draw_action_ellipse(axes[0, 0], df, 'x[mm]', 'xp[mrad]',
+                    ax, bx, emittance_x, N_SIGMA)
+axes[0, 0].legend(fontsize='small', loc='upper left', framealpha=0.9)
 
-ellipse_y = np.sqrt(emittance_y * by) * np.cos(theta)
-ellipse_yp = -np.sqrt(emittance_y / by) * (ay * np.cos(theta) - np.sin(theta))
-axes[0, 1].plot(ellipse_y, ellipse_yp, color='hotpink', lw=2, label='RMS Ellipse')
-axes[0, 1].legend(fontsize='small')
+draw_action_ellipse(axes[0, 1], df, 'y[mm]', 'yp[mrad]',
+                    ay, by, emittance_y, N_SIGMA)
+axes[0, 1].legend(fontsize='small', loc='upper left', framealpha=0.9)
 
 main_bunch = select_main_bunch(df)
 sc2 = density_scatter(axes[1, 0], main_bunch['t[mm/c]'], main_bunch['p[MeV/c]'])
@@ -619,7 +668,7 @@ for ax_i, history, beta_action, alfa_action, eps_action, plane_label in [
     x_action = np.sqrt(eps_action * beta_action) * np.cos(theta_cmp)
     xp_action = -np.sqrt(eps_action / beta_action) * (alfa_action * np.cos(theta_cmp) - np.sin(theta_cmp))
     ax_i.plot(x_action, xp_action, color='red', lw=2.5, linestyle='--',
-              label=f'Action-based, n_sigma=8 (\u03b5={eps_action:.3f})')
+              label=f'Action-based, n_sigma={N_SIGMA} (\u03b5={eps_action:.3f})')
 
     ax_i.set_title(f'{plane_label}: Moment-based vs Action-based Emittance')
     ax_i.axhline(0, color='black', lw=0.5, ls='--')
@@ -1408,7 +1457,7 @@ def compute_energy_scan(track_line, track_tw, df_subset, p0c_avg_mev, energy_ran
             delta=delta_test, zeta=zeta_m
         )
 
-        track_line.track(p_test, num_turns=1000)
+        track_line.track(p_test, num_turns=1000, with_progress=True)
         survived = np.sum(p_test.state > 0)
         efficiency = (survived / len(p_test.x)) * 100
         efficiency_results.append(efficiency)
