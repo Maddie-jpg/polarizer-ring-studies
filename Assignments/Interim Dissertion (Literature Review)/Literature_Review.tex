@@ -42,14 +42,17 @@ superscriptaddress
 \title[]{Beam Polarization for Energy Calibration at FCC-ee: A Review and the Case for a Dedicated Polarizer Ring}
 
 % Force line breaks with \\
-\author{URN 6803029}
+\author{Madeleine Watson}
  
 \affiliation{ 
-Physics Department, University of Surrey UK
+Physics Department, University of Surrey, Guildford, GU2 7XH, United Kingdom
+}%
+\affiliation{ 
+Beams Department, CERN, Geneva, Switzerland
 }%
 
 
-\date{\today}% It is always \today, today,
+\date{22nd July 2026}% It is always \today, today,
              %  but any date may be explicitly specified
 
 %--------------------------------------------------
@@ -57,7 +60,7 @@ Physics Department, University of Surrey UK
 %--------------------------------------------------
 
 \begin{abstract}
-Precision electroweak measurements at the proposed FCC-ee collider require beam-energy calibration through resonant depolarization, which depends on producing and understanding transverse beam polarization in the $91\text{km}$ storage ring. This review discusses the physics that makes such polarization both possible and challenging. The spontaneous radiative self-polarization of the Sokolov—Ternov effect, bounded at 92.4\% in an idealised lattice, and its machine-specific degradation  captured by the Baier–Katkov–Strakhovenko and Derbenev–Kondratenko formalisms, through spin-orbit resonances whose reliability at FCC-ee energies remains an open theoretical question. At FCC-ee, the growth of energy spread and resonance density with beam energy confines resonant-depolarization calibration to the lower operating points, while the machine's large bending radius stretches natural polarization build-up to impractical timescales, motivating polarizing wigglers and, to avoid their luminosity cost, a dedicated low-energy polarizer ring within the injector complex. First designs of such a ring, recently proposed, demonstrate feasibility but leave open problems in acceptance, robustness to imperfections, and emittance compatible with direct acceleration. This report reviews that physics and defines a research project to refine and optimise the polarizer-ring design through beam-dynamics and spin-tracking simulation in Xsuite, aiming to deliver a technically documented lattice whose performance can inform the FCC-ee reference design.
+Precision electroweak measurements at the proposed FCC-ee collider require beam-energy calibration through resonant depolarization, which depends on producing and understanding transverse beam polarization in the $91\,\text{km}$ storage ring. This review discusses the physics that makes such polarization both possible and challenging. Spontaneous radiative self-polarization through the Sokolov–Ternov effect is bounded at 92.4\% in an idealised lattice; in a real machine it is degraded by spin-orbit resonances, as captured by the Baier–Katkov–Strakhovenko and Derbenev–Kondratenko formalisms, whose reliability at FCC-ee energies remains an open theoretical question. At FCC-ee, the growth of energy spread and resonance density with beam energy confines resonant-depolarization calibration to the lower operating points, while the machine's large bending radius stretches natural polarization build-up to impractical timescales, motivating polarizing wigglers and, to avoid their luminosity cost, a dedicated low-energy polarizer ring within the injector complex. First designs of such a ring, recently proposed, demonstrate feasibility but leave open problems in acceptance, robustness to imperfections, and emittance compatible with direct acceleration. This report reviews that physics and defines a research project to refine and optimise the polarizer-ring design through beam-dynamics and spin-tracking simulation in Xsuite, aiming to deliver a technically documented lattice whose performance can inform the FCC-ee reference design.
 \end{abstract}
 
 \maketitle
@@ -68,7 +71,7 @@ Precision electroweak measurements at the proposed FCC-ee collider require beam-
 
 \section{Introduction}
 
-Despite many claims that the search for new particles concluded with the discovery of the Higgs boson \cite{}, numerous fundamental questions remain unanswered, including the identity of dark matter and the origin of neutrino mass.
+Although the discovery of the Higgs boson completed the particle content of the Standard Model, numerous fundamental questions remain unanswered, including the identity of dark matter and the origin of neutrino mass.
 Access to such new physics most likely lies beyond the reach of any current collider, and a successor machine has accordingly been proposed.
 
 
@@ -81,7 +84,7 @@ An established technique employed at LEP, known as resonant depolarization, infe
 It is consequently imperative that the calibration process is capable of producing and maintaining polarization within a high-energy ring.
 
 
-Transverse polarization arises spontaneously through synchrotron radiation; however, its preservation at FCC-ee is challenging, as the operational requirements of the collider are in direct tension with those necessary for polarization \cite{}.
+Transverse polarization arises spontaneously through synchrotron radiation; however, its preservation at FCC-ee is challenging, as the operational requirements of the collider are in direct tension with those necessary for polarization \cite{blondel_polarization_2019,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
 The production of a usable polarized beam therefore demands careful consideration of both the mechanism and location of its generation.
 It is in this context that a dedicated low-energy polarization ring has been proposed, and the underlying physics governing its design and optimisation is reviewed in this report.
 
@@ -95,7 +98,7 @@ Current polarizer ring designs are subsequently discussed, and the scope and met
 
 The Large Electron-Positron Collider (LEP), which operated at CERN between 1989 and 2000, ushered in the era of modern precision electroweak physics and established the benchmark against which the performance goals of the FCC-ee are evaluated \cite{dam_precision_2016}. LEP initially operated around the $Z$-resonance before expanding its energy reach past the $W$-pair production threshold \cite{the_fcc_collaboration_fcc-ee_2019}. Through dedicated line-shape scans, compiled in the final combined legacy reports of the LEP collaborations, LEP determined the $Z$-boson mass and width to $m_Z = 91187.5 \pm 2.1\text{ MeV}$ and $\Gamma_Z = 2495.2 \pm 2.3\text{ MeV}$, respectively \cite{the_fcc_collaboration_fcc-ee_2019, LEP_precision_2006}. The collider also provided a precise determination of the number of active light neutrino species \cite{dam_precision_2016}, while measurements of fermion pair-production cross-sections around the $Z$-pole offered indirect sensitivity to the top-quark mass prior to its discovery \cite{the_fcc_collaboration_fcc-ee_2019}. Ultimately, after raising the centre-of-mass energy to above the $W$-pair threshold, the $W$-boson mass was predicted to be $m_W = 80.362^{+0.032}_{-0.031}\text{ GeV}$ and direct measurement confirmed this \cite{the_fcc_collaboration_fcc-ee_2019}.
 
-These precision measurements were made possible by exploiting the natural transverse polarization of the electron and positron beams via a technique known as resonant depolarization (RDP) \cite{benedikt_future_2025}. RDP allows the spin tune of the beam to be determined by exciting the particles with a transverse oscillating magnetic field until the polarization is destroyed; the frequency of the depolarizing field then directly maps to the spin precession frequency \cite{benedikt_future_2025,blondel_polarization_2019}. At LEP, a polarization level of only 5–10\% was sufficient for precise energy calibration \cite{blondel_polarization_2019}. However, this technique was fundamentally limited to beam energies below $61\text{ GeV}$ due to the rapid growth of energy spread and spin-orbit resonances observed during high-energy LEP runs \cite{blondel_polarization_2019,koratzinos_fcc-ee_2016,assmann_spin_2001}. This limitation is mitigated in the FCC-ee layout; its significantly larger bending radius keeps the relative energy spread small enough to preserve beam polarization up to the $W$-pair threshold, aiming for a $W$-boson mass measurement precision of $300\text{ keV}$ \cite{dam_precision_2016}.
+These precision measurements were made possible by exploiting the natural transverse polarization of the electron and positron beams via a technique known as resonant depolarization (RDP) \cite{benedikt_future_2025}. RDP allows the spin tune of the beam to be determined by exciting the particles with a transverse oscillating magnetic field until the polarization is destroyed; the frequency of the depolarizing field then directly maps to the spin precession frequency \cite{benedikt_future_2025,blondel_polarization_2019}. At LEP, a polarization level of only 5–10\% was sufficient for precise energy calibration \cite{blondel_polarization_2019}. However, this technique was fundamentally limited to beam energies below $61\text{ GeV}$ due to the rapid growth of energy spread and spin-orbit resonances observed during high-energy LEP runs \cite{blondel_polarization_2019,koratzinos_fcc-ee_2016,assmann_spin_2001}. This limitation is mitigated in the FCC-ee layout; its significantly larger bending radius keeps the relative energy spread small enough to preserve beam polarization up to the $W$-pair threshold, with current studies projecting a centre-of-mass-energy-related uncertainty on the $W$-boson mass of approximately $150\text{ keV}$ \cite{keintzel:ipac2026-mop1037}.
 
 The FCC-ee physics programme targets luminosities up to five orders of magnitude greater than those achieved at LEP \cite{Dam2025DetectorRequirements}. Specifically, the $Z$-pole operational mode is projected to deliver approximately $10^5$ times the LEP statistics \cite{koratzinos_fcc-ee_2016}, enabling profound improvements in the measurement of key electroweak observables, including the weak mixing angle, $W$ and $Z$ masses, and widths \cite{Dam2025DetectorRequirements, denterria_physics_2016}. Current FCC-ee layout studies project uncertainties of approximately $100\text{ keV}$ and $12\text{ keV}$ on the $Z$ mass and width, respectively—representing an order of magnitude improvement over the final LEP results \cite{benedikt_future_2025, maestre_z_2021}. Fully exploiting this immense statistical data sample requires an equivalent, unprecedented improvement in beam-energy calibration, as well as drastic reductions in theoretical calculation uncertainties to ensure theory errors do not limit the experimental precision \cite{blondel_theory_2019}.
 
@@ -132,7 +135,7 @@ The emittance is subsequently given by the ensemble average of the action, $\eps
 The number of betatron oscillations completed per revolution defines the betatron tune,
 
 \begin{equation}
-\nu=\frac{1}{2\pi} \oint \frac{1}{\beta(s)} \, ds
+Q=\frac{1}{2\pi} \oint \frac{1}{\beta(s)} \, ds
 \end{equation}
 
 Tunes at integer or half-integer values must be avoided, as periodic perturbations at these resonances accumulate coherently over successive turns and may lead to beam loss.\cite{sylee}
@@ -144,26 +147,26 @@ Energy deviations are converted into transverse displacements through the disper
 x_\delta (s)=D(s)\delta
 \end{equation}
 
-This constitutes the mechanism by which the beam becomes coupled to its spatial distribution and, subsequently, to its spin distribution.
+This is the mechanism by which a particle's energy becomes coupled to its transverse position and, subsequently, to its spin motion.
 The transverse emittance and relative energy spread are determined by the equilibrium between synchrotron radiation damping and quantum excitation\cite{sands}, yielding a beam size of
 
 \begin{equation}
 \sigma (s)=\sqrt{\epsilon \beta (s) + (D(s)\sigma_\delta)^2}
 \end{equation}
 
-Since the beam size is proportional to the energy spread, the FCC-ee, operating at exceptionally high beam energies, is expected to exhibit a large energy spread, with significant consequences for depolarisation.
+Wherever the dispersion is non-zero, the energy spread therefore contributes directly to the beam size. Since $\sigma_\delta$ grows with beam energy, this contribution becomes increasingly important at the higher FCC-ee operating points, with significant consequences for depolarization (Section~V).
 
 \subsection{Spin Motion and Tune in Storage Rings}
 
 As an electron or positron travels around an accelerator, its spin does not remain aligned with the guiding magnetic field, owing to the fact that spin precession occurs at a rate distinct from that of the orbital revolution.
-This motion is described by the Thomas–BMT equation\cite{bargmann_michel_telegdi_1959}, which arises from the combination of Larmor precession and Thomas precession into a single precession vector\cite{hamwi_hoffstaetter_2025}, expressed as:
+This motion is described by the Thomas–BMT equation\cite{bargmann_michel_telegdi_1959}, which arises from the combination of Larmor precession and Thomas precession into a single precession vector\cite{hamwi_hoffstaetter_2025}, expressed as \cite{meot_huang_ptitsyn_lin_2023}:
 \begin{equation}
-\boldsymbol{\Omega} = (1+G\gamma)\,\mathbf{B}_{\perp} + (1+G)\,\mathbf{B}_{\parallel} + \left(\frac{1}{\gamma+1}+G\right)\gamma\,\frac{\mathbf{E}\times\boldsymbol{\beta}}{c}
-\end{equation}\cite{meot_huang_ptitsyn_lin_2023}
+\boldsymbol{\Omega} = -\frac{e}{m\gamma}\left[(1+G\gamma)\,\mathbf{B}_{\perp} + (1+G)\,\mathbf{B}_{\parallel} - \left(G\gamma+\frac{\gamma}{\gamma+1}\right)\frac{\mathbf{E}\times\boldsymbol{\beta}}{c}\right]
+\end{equation}
 where $\mathbf{B}_\parallel$ and $\mathbf{B}_\perp$ are the magnetic field components parallel and perpendicular to the velocity $\boldsymbol{\beta}$, $G$ is the gyromagnetic anomaly, and $\gamma$ is the Lorentz factor.
 In circular accelerators, the $\mathbf{E}\times\boldsymbol{\beta}$ term is generally negligible, since radiofrequency cavity fields are oriented parallel to the particle velocity, yielding the considerably simpler expression:
 \begin{equation}
-\boldsymbol{\Omega} \approx (1+G\gamma)\mathbf{B}_\perp + (1+G)\mathbf{B}_\parallel
+\boldsymbol{\Omega} \approx -\frac{e}{m\gamma}\left[(1+G\gamma)\mathbf{B}_\perp + (1+G)\mathbf{B}_\parallel\right]
 \end{equation}
 for most practical purposes.\cite{meot_huang_ptitsyn_lin_2023, zara_berglund_2001}
 This precession arises because a particle's magnetic moment, which is proportional to its spin, experiences a torque when subjected to a magnetic field, causing it to precess about the field direction rather than align with it\cite{meot_huang_ptitsyn_lin_2023}.
@@ -176,7 +179,7 @@ Specialising to the simplest case of a particle traversing a single bending magn
 \end{equation}
 For every degree through which the momentum vector is rotated by the bend, the spin rotates by $G\gamma$ degrees in excess of the orbital deflection, a consequence of the $(1+G\gamma)$ factor, which grows with beam energy.
 Since $G\gamma$ is tuned so as to avoid integer resonances, the spin does not return to its original orientation upon completion of each revolution but instead advances to a new phase with each successive turn\cite{zara_berglund_2001}.
-This excess precession defines the spin tune $\nu = G\gamma$, corresponding to the number of spin precessions per orbital revolution as evaluated in the frame co-moving with the particle\cite{meot_huang_ptitsyn_lin_2023, huang_2019}.
+This excess precession defines the closed-orbit spin tune $\nu_0 = G\gamma$, corresponding to the number of spin precessions per orbital revolution as evaluated in the frame co-moving with the particle\cite{meot_huang_ptitsyn_lin_2023, huang_2019}.
 The relationship between spin tune and electron energy is linear, rendering it particularly valuable in the resonant depolarization process as the beam energy can be determined directly \cite{meot_huang_ptitsyn_lin_2023,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
 \section{Radiative Polarization}
 
@@ -189,12 +192,11 @@ P=\frac{N_{\uparrow} - N_{\downarrow}}{N_{\uparrow} + N_{\downarrow}}
 \end{equation}
 
 
-where $N_{\uparrow}$ and $N_{\downarrow}$ are populations parallel and antiparallel to the quantisation axis\cite{meot_huang_ptitsyn_lin_2023}
-
-The definition is built for $1/2$-spin systems so it is implicitly scoped to electrons/positrons \cite{Buon269521,meot_huang_ptitsyn_lin_2023}.
+where $N_{\uparrow}$ and $N_{\downarrow}$ are populations parallel and antiparallel to the quantisation axis\cite{meot_huang_ptitsyn_lin_2023}.
+This definition applies to spin-$1/2$ particles such as electrons and positrons, which have only two spin states along the quantisation axis \cite{Buon269521,meot_huang_ptitsyn_lin_2023}.
 
 Radiative spin polarization was first predicted theoretically by Sokolov and Ternov, who derived an asymptotic polarization limit of 
-$P_0=8/(5\sqrt{3})\approx92.4\%$ for an idealised uniform field \cite{sokolov_ternov_1963}. This prediction was confirmed experimentally within a decade: the first observations of radiative polarization were made at the VEPP-2 storage ring at Novosibirsk and at the ACO ring in Orsay, with later runs at the improved VEPP-2M and ACO approaching the theoretical limit \cite{baier_2006,Buon269521}. Real machines, however, rarely reach this asymptotic value — SPEAR II, for instance, achieved an equilibrium polarization of only about 76\% at $3.7\text{GeV}$ \cite{mane2025radiativespinpolarizationhigh}, and, as mentioned in Section I, LEP itself operated with a transverse polarization around 10\%.
+$P_0=8/(5\sqrt{3})\approx92.4\%$ for an idealised uniform field \cite{sokolov_ternov_1963}. This prediction was confirmed experimentally within a decade: the first observations of radiative polarization were made at the VEPP-2 storage ring at Novosibirsk and at the ACO ring in Orsay, with later runs at the improved VEPP-2M and ACO approaching the theoretical limit \cite{baier_2006,Buon269521}. Real machines, however, rarely reach this asymptotic value — SPEAR II, for instance, achieved an equilibrium polarization of only about 76\% at $3.7\,\text{GeV}$ \cite{mane2025radiativespinpolarizationhigh}, and, as mentioned in Section~II, LEP itself operated with a transverse polarization around 10\%.
 
 \begin{figure}[htbp]
   \centering
@@ -222,7 +224,7 @@ W_{\uparrow\downarrow} &= \frac{5\sqrt{3}}{16}\frac{e^2\gamma^5\hbar}{m_e^2c^2|\
 W_{\downarrow\uparrow} &= \frac{5\sqrt{3}}{16}\frac{e^2\gamma^5\hbar}{m_e^2c^2|\rho|^3}\left(1-\frac{8}{5\sqrt{3}}\right)
 \end{align}
 
-Intuitively, $W_{\uparrow\downarrow} > W_{\downarrow\uparrow}$ always due to the change in sign. For electrons, this asymmetry favours the down-state, causing polarization build-up anti-parallel to the field, and vice versa for positrons \cite{Buon269521}.
+Since the two rates differ only in the sign of the bracketed term, $W_{\uparrow\downarrow} > W_{\downarrow\uparrow}$ always. For electrons, this asymmetry favours the down-state, causing polarization build-up anti-parallel to the field, and vice versa for positrons \cite{Buon269521}.
 
 Sokolov and Ternov derived this asymmetry from the Dirac equation and demonstrated that the radiated intensity depends on the initial spin orientation relative to the field \cite{Buon269521, sokolov_ternov_1963}. Their method involved tracking spin populations against the field ($n_1$) and along the field ($n_2$) under the equation 
 
@@ -232,7 +234,7 @@ Sokolov and Ternov derived this asymmetry from the Dirac equation and demonstrat
 \end{equation}
 
 
-which demonstrated that the population ratio relaxes to a fixed value, calculated to be $\approx 95\%$ polarization in Sokolov and Ternov's original paper. \cite{sokolov_ternov_1963}
+which demonstrated that the population ratio relaxes to a fixed equilibrium value \cite{sokolov_ternov_1963}.
 
 Starting with an unpolarized beam, the unequal flip rates steadily skew the spin population towards the favoured state until the rate of flips reaches an equilibrium.\cite{sokolov_ternov_1963, assmann_1999}
 
@@ -264,7 +266,7 @@ The build-up time $\tau_{\text{ST}}$ is the characteristic timescale over which 
 
 The $\gamma^5/\rho^3$ scaling means that build-up is dramatically faster at higher energies and stronger bending. Additionally, the resulting timescale for polarization build-up is large compared to every other process in the ring, such as radiation damping or synchro-betatron oscillations \cite{zara_berglund_2001}.
 
-The FCC-ee, with its large circumference, naturally needs a comparatively moderate bending against a smaller ring reaching the same energy \cite{suleiman_2023}. Therefore, this gentler bending increases the natural polarization build-up time to much larger timescales ($\approx 250$ hours) compared to previous lepton colliders \cite{blondel_polarization_2019}. This motivates alternative methods for polarization through a separate, dedicated storage ring.
+The FCC-ee, with its large circumference, requires much gentler bending than a smaller ring reaching the same energy \cite{suleiman_2023}. This gentler bending increases the natural polarization build-up time to much larger timescales than at previous lepton colliders: approximately $200$–$250$ hours at the Z-pole, with recent estimates of $190$ and $237$ hours for the two candidate collider optics \cite{blondel_polarization_2019,keintzel:ipac2026-mop1037}. This motivates alternative methods for polarization through a separate, dedicated storage ring.
 
 \subsection{ Realistic Polarization Models}
 
@@ -272,7 +274,7 @@ The Sokolov-Ternov effect assumes a perfectly homogeneous field without any depo
 
 In a realistic scenario, energy lost to synchrotron radiation is compensated, in the longitudinal plane, by RF cavities, with each photon emission being a stochastic, discrete event partnered with a sudden change in the electron’s energy and orbit distortion \cite{zara_berglund_2001}. These stochastic precessions arise from photon emissions changing $\delta$, hence $\Omega$ and the orbit \cite{zara_berglund_2001}.
 
-Quantum fluctuations limiting achievable polarization was first theoretically predicted by Baier and Orlov \cite{Baier1965tr} and was experimentally confirmed by the observation of radiative depolarization at the ACO storage ring in Orsay, where polarization was measured by the spin dependent cross-section of Coulomb scattering \cite{inproceedings}.
+Quantum fluctuations limiting the achievable polarization were first predicted theoretically by Baier and Orlov \cite{Baier1965tr} and were experimentally confirmed by the observation of radiative depolarization at the ACO storage ring in Orsay, where polarization was measured by the spin dependent cross-section of Coulomb scattering \cite{inproceedings}.
 
 With these amendments in mind, polarization becomes a competition between radiation damping and quantum fluctuations where the balance between them represents the net polarization.
 
@@ -294,7 +296,7 @@ $\hat{n}_0 (s)$ is the invariant spin field on the closed orbit. Instead of pola
 
 In a perfectly planar ring, $\hat{n}_0$ remains vertical, but if a ring contains vertical bends, for example spin rotators used to produce longitudinal polarization, there are regions where $\hat{n}_0$ tilts away from the vertical and prevents polarization from reaching the asymptotic limit \cite{zara_berglund_2001}.
 
-The Derbenev-Kondratenko formalism extends the picture further, involving realistic betatron and synchrotron oscillations around the closed orbit \cite{derbenev_kondratenko_1973}. Centrally, it uses the invariant spin field $(\vec{u};s)$ which is a generalisation of $\hat{n}_0 (s)$ for the full phase space. It is a periodic unit vector satisfying $\hat{n} (\vec{u};s)=\hat{n} (\vec{u};s+C)$ which obeys the Thomas-BMT equation through an entire field transformation instead of a single particle \cite{zara_berglund_2001}.
+The Derbenev-Kondratenko formalism extends the picture further, involving realistic betatron and synchrotron oscillations around the closed orbit \cite{derbenev_kondratenko_1973}. Centrally, it uses the invariant spin field $\hat{n}(\vec{u};s)$, which is a generalisation of $\hat{n}_0 (s)$ for the full phase space. It is a periodic unit vector satisfying $\hat{n} (\vec{u};s)=\hat{n} (\vec{u};s+C)$ which obeys the Thomas-BMT equation through an entire field transformation instead of a single particle \cite{zara_berglund_2001}.
 
 Because Thomas-BMT precession is so much faster than either radiation damping or the radiative spin processes, a particle's spin effectively locks onto the local $\hat{n}$ direction long before radiation has time to meaningfully disturb it which allows the slow radiative competition between build-up and diffusion to be analysed as a perturbation on top of this fast, deterministic precession, rather than needing to be solved simultaneously with it. \cite{hamwi_hoffstaetter_2025}
 
@@ -307,11 +309,11 @@ The resulting equilibrium polarization formula is:
   \end{gathered}
 \end{equation}
 
-The Derbenev-Kondratenko formula differs from the Baier-Katkov-Strakhovenko result in two ways:$ \hat{n}_0$ is replaced by the full phase-space invariant spin field $\hat{n}$, and new terms involving $\partial\hat{n}/\partial\delta$ appear throughout, this partial derivative measures how sharply the invariant spin direction changes in response to the fractional energy jumps $\delta$ that accompany each photon emission. \cite{zara_berglund_2001}
+The Derbenev-Kondratenko formula differs from the Baier-Katkov-Strakhovenko result in two ways: $\hat{n}_0$ is replaced by the full phase-space invariant spin field $\hat{n}$, and new terms involving $\partial\hat{n}/\partial\delta$ appear throughout. This partial derivative measures how sharply the invariant spin direction changes in response to the fractional energy jumps $\delta$ that accompany each photon emission \cite{zara_berglund_2001}.
 
-This term demonstrates that, even if a particle has a small orbital amplitude, it can suffer significant depolarization in an area where $\hat{n}$ is highly sensitive to small energy changes, for example near a spin resonance. \cite{}
+This term demonstrates that, even if a particle has a small orbital amplitude, it can suffer significant depolarization in an area where $\hat{n}$ is highly sensitive to small energy changes, for example near a spin resonance \cite{zara_berglund_2001}.
 
-Together, Baier-Katkov-Strakhovenko and Derbenev-Kondratenko theory move the prediction of achievable polarization from Sokolov-Ternov's single, idealised number to a machine-specific calculation that accounts for the real, inhomogeneous lattice. Both formalisms reduce to the same Sokolov-Ternov limit in the appropriate idealisation, but diverge from it wherever the lattice or the particle's orbital amplitude pushes $\hat{n}$ away from vertical becomes increasingly common at higher beam energies as the density of depolarizing resonances grows.
+Together, Baier-Katkov-Strakhovenko and Derbenev-Kondratenko theory move the prediction of achievable polarization from Sokolov-Ternov's single, idealised number to a machine-specific calculation that accounts for the real, inhomogeneous lattice. Both formalisms reduce to the same Sokolov-Ternov limit in the appropriate idealisation, but diverge from it wherever the lattice or the particle's orbital amplitude pushes $\hat{n}$ away from the vertical, a situation that becomes increasingly common at higher beam energies as the density of depolarizing resonances grows.
 
 This formalism remains an active area of research directly relevant to FCC-ee. A recent reformulation of the Derbenev-Kondratenko approach has been explicitly validated for storage rings with a wide range of energies, extending the original 1973 theory with corrections and providing estimates of its reliability at FCC-ee-relevant energies \cite{heinemann2026elaborationkineticapproachderbenev}.
 
@@ -335,12 +337,12 @@ Synchrotron radiation plays a significant role in this context, as it directly a
 \end{equation}
 An isolated depolarizing resonance can only be established whilst $\zeta \lesssim 1.2-1.4$ \cite{keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}, a threshold that is crossed in the vicinity of the W-pair energy.
 This condition is understood to be the reason why resonant depolarization is not feasible above $80\,\text{GeV}$, precluding its direct application at the ZH and top pair operating points \cite{blondel_polarization_2019,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
-The same mechanism is also considered responsible for the failure to achieve polarization at LEP at higher energies.
+The same mechanism is also considered responsible for the failure to achieve polarization at LEP at higher energies \cite{assmann_spin_2001}.
 
 \subsection{Build-up Time and Asymmetric Wigglers}
 
 A further difficulty concerns timescale, which arises from the $\gamma^5/\rho^3$ dependence in the Sokolov–Ternov equation.
-The kilometre-scale bending radius of the FCC-ee means that the natural polarization time at the Z-pole extends to approximately 250 hours \cite{blondel_polarization_2019}.
+The kilometre-scale bending radius of the FCC-ee means that the natural polarization time at the Z-pole extends to approximately 200–250 hours \cite{blondel_polarization_2019,keintzel:ipac2026-mop1037}.
 The solution to this large timescale, as employed at LEP, is the use of asymmetric wigglers.
 \\
 These consist of short, strong alternating vertical fields, in which the short high-field poles dominate the $\oint |\rho|^{-3} \, ds$ integral, thereby reducing the polarization build-up time to approximately one hour \cite{blondel_polarization_2019,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025,keskar_bartosik_carli_2026}.
@@ -348,7 +350,7 @@ However, the poles of opposite sign disrupt the homogeneity of the field in whic
 As is discussed in Section VI, the polarization values achieved by the current polarizer ring designs are consequently capped at approximately $78$–$85\%$ \cite{keskar_bartosik_carli_2026}.
 The radiation produced in these high-field poles increases both the energy spread and the emittance, thereby contributing to $\sigma_\delta$.
 Nevertheless, for calibration purposes this limitation is considered sufficient, since resonant depolarization can be performed on a beam with as little as $10\%$ polarization, as was demonstrated at LEP \cite{blondel_polarization_2019,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
-However, wiggler operation cannot be sustained with full-intensity beams in the collider \cite{keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025,keskar_bartosik_carli_2026}, a constraint that provides motivation for relocating the polarization process outside the collider, since it otherwise confines the polarized beam to low-intensity bunches \cite{}.
+However, wiggler operation cannot be sustained with full-intensity beams in the collider \cite{keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025,keskar_bartosik_carli_2026}, a constraint that provides motivation for relocating the polarization process outside the collider, since it otherwise confines the polarized beam to low-intensity bunches \cite{keskar_bartosik_carli_2026}.
 
 \subsection{Resonant Depolarization in the FCC-ee}
 
@@ -356,9 +358,9 @@ The operational scheme built on these constraints has been developed by the FCC-
 Operating at $10\%$ of the nominal bunch intensity, low-intensity pilot bunches are polarized and their spin tune is measured.
 This is achieved by sweeping a transverse radio-frequency exciter through a resonance $\nu_0$ and observing the subsequent polarization collapse via inverse-Compton polarimeters.
 This process pins the exciter frequency to the spin tune and, consequently, to the average beam energy \cite{blondel_polarization_2019,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
-The measurement feeds calibration targets of $\approx 100\text{ keV}$ on the Z-mass, $12\text{ keV}$ on the Z-width, and $300\text{ keV}$ on the W-mass, at a frequency of several times per hour \cite{dam_precision_2016,keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025}.
+The measurement feeds centre-of-mass-energy-related uncertainty targets of $\approx 100\text{ keV}$ on the Z-mass, $12\text{ keV}$ on the Z-width, and $\approx 150\text{ keV}$ on the W-mass, at a frequency of several times per hour \cite{keintzel_wu_kiel_sagan_wilkinson_oide_bauche_hofle_blondel_jiang_2025,keintzel:ipac2026-mop1037}.
 \\
-As noted in Section 3, the relation $\nu_0 = G\gamma$ holds only for an ideal machine.
+As noted in Section~III, the relation $\nu_0 = G\gamma$ holds only for an ideal machine.
 Misalignments and solenoids tilt the invariant spin axis and shift the spin tune, potentially introducing systematic errors into the calibration quantities.
 Studies conducted by the energy-calibration and polarization working group establish that this effect is non-negligible, demonstrating that rigorous orbital correction and spin matching constitute an essential component of the calibration procedure.
 Free spin precession, in which the precession of a kicked bunch is observed directly, is currently being investigated as an independent cross-check \cite{keintzel:ipac2026-mop1037}.
@@ -424,7 +426,7 @@ For this approach to be viable, polarization must be preserved throughout the en
   \centering
   \includegraphics[width=\columnwidth]{Injector_complex_2025.png}
   \caption{Layout of the FCC-ee injector complex, comprising the electron
-  and positron sources and linacs, the $2.86\text{GeV}$
+  and positron sources and linacs, the $2.86\,\text{GeV}$
   damping ring, the high-energy linac, and the transfer lines to the
   booster. A dedicated polarizer ring is proposed as a sibling of the
   damping ring within this complex (Sec.~VI).
@@ -441,7 +443,7 @@ Three candidate lattices were developed as initial designs, evaluated by means o
 The wigglers serve a dual purpose: simultaneously accelerating the polarization build-up and reducing the equilibrium emittance \cite{keskar_bartosik_carli_2026}.
 \\
 Notably, as shown in Table I, none of the designs approach the $92.4\%$ Sokolov-Ternov ceiling.
-This is because, although the wigglers decrease the polarization build-up time, they disrupt the field homogeneity upon which the ceiling depends (Section V.B).
+This is because, although the wigglers decrease the polarization build-up time, they disrupt the field homogeneity upon which the ceiling depends (Section V.A).
 \\
 One of the principal constraints of the design is acceptance.
 The beam arrives at the ring with large emittance and energy spread; consequently, the ring must possess large dynamic aperture and momentum acceptance.
@@ -460,7 +462,7 @@ A low-energy polarizer ring provides a means by which polarization build-up time
 However, the initial designs require optimisation, as equilibrium polarization is found to degrade when misalignments are introduced.
 It is anticipated that alternative designs could reduce polarization build-up time whilst increasing equilibrium polarization, alongside a reduced circumference and enlarged dynamic aperture and momentum acceptance.
 The aim of the project is to refine and optimise the design of the polarizer ring for precision energy calibration of FCC-ee through beam dynamics simulations.
-Primarily, work is carried out in Xsuite\cite{}, within which spin tracking capabilities have been implemented on the basis of LEP transverse polarization and resonant depolarization data\cite{}.
+Primarily, work is carried out in Xsuite \cite{iadarola_hb23}, within which spin tracking capabilities have been implemented on the basis of LEP transverse polarization and resonant depolarization data \cite{wenninger_iadarola_2026,iadarola:ipac2026-mop1028}.
 The work of Keskar et al.\cite{keskar_bartosik_carli_2026} informs the simulations and beam optics required for analysis, including, but not limited to, Twiss parameters, beta-functions, dynamic aperture, momentum acceptance, equilibrium polarization, and polarization build-up time.
 Beyond the initial design of a perfect lattice, analysis is also performed on lattices incorporating closed orbit misalignments and their subsequently corrected counterparts, so as to reflect a physically realistic machine.
 Spin tracking is conducted on lattices once closed orbit perturbations have been introduced, in order to yield physically meaningful results.
@@ -495,7 +497,7 @@ The reliability of the underlying Derbenev–Kondratenko formalism at these ener
 A related area of interest is the generation of polarized beams outside the collider itself, within a dedicated low-energy polarizer ring; this approach is motivated by the luminosity penalty associated with maintaining polarization inside the collider.
 Initial lattice designs for such a ring have been developed, demonstrating its feasibility whilst also identifying scope for further optimisation with respect to equilibrium emittance, polarization build-up time, dynamic aperture, and momentum acceptance.
 \\
-The present research project aims to refine and optimise the design of a polarizer ring for FCC-ee through beam dynamics and spin-tracking simulations in Xsuite, building upon the work completed by Keskar\cite{keskar_bartosik_carli_2026}.
+The present research project aims to refine and optimise the design of a polarizer ring for FCC-ee through beam dynamics and spin-tracking simulations in Xsuite, building upon the work completed by Keskar \textit{et al.}\cite{keskar_bartosik_carli_2026}.
 
 Further research is required to establish whether polarization can be preserved throughout the injector chain and the associated energy ramp-up upon which the scheme depends, to reduce uncertainty in the equilibrium polarization formalism at FCC-ee energies, and to integrate the polarizer ring into the wider injector complex before the concept can be adopted for beam-energy calibration.
 \begin{acknowledgments}
