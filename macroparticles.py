@@ -941,7 +941,8 @@ import matplotlib.patches as mpatches
 
 def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
                             n_sigma_beam=3, chamber_margin=5e-3, wall_thickness=0.0,
-                            B_limits=None, ds=0.02):
+                            B_limits=None, ds=0.02, chamber_3d='cylinder',
+                            interactive_3d=False):
     """Size the vacuum chamber and magnet bores from the injected beam, and
     count how many rms emittances fit.
  
@@ -1074,7 +1075,14 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
     fig.savefig(f'{folder_ap}/beam_envelope_chamber_{mode_tag}.png', dpi=200, bbox_inches='tight')
     plt.show()
  
-    # --- 3D beam envelope along the ring (injected beam, n_sigma_beam) ---
+    # --- 3D beam envelope along the ring, inside the vacuum chamber ---
+    # chamber_3d:
+    #   'cylinder' one constant bore at the worst case over the whole ring --
+    #              what actually gets built, and the number the aperture
+    #              sketch quotes
+    #   'follow'   the s-dependent envelope + margin, a corrugated tube: shows
+    #              where the margin is tight, but is not a buildable chamber
+    #   None       beam only
     from matplotlib import cm as mcm, colors as mcolors
     stride = max(1, len(s_ap) // 3000)          # keep the surface light
     s3, sx3, sy3 = s_ap[::stride], env_x[::stride] * 1e3, env_y[::stride] * 1e3   # [mm]
@@ -1086,19 +1094,64 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
     norm3 = mcolors.Normalize(R3.min(), R3.max())
     fig = plt.figure(figsize=(12, 7))
     a3 = fig.add_subplot(111, projection='3d')
+
+    Cx0, Cy0 = float(C_x.max()) * 1e3, float(C_y.max()) * 1e3
+    if chamber_3d == 'cylinder':
+        # drawn FIRST and left transparent so the beam stays visible through it
+        s_ends = np.array([s3[0], s3[-1]])
+        S_C, TH_C = np.meshgrid(s_ends, th3, indexing='ij')
+        a3.plot_surface(S_C, Cx0 * np.cos(TH_C), Cy0 * np.sin(TH_C),
+                        color='#6b7a8f', alpha=0.13, rstride=1, cstride=1,
+                        linewidth=0, antialiased=True, shade=False)
+        for i in np.linspace(0, len(s3) - 1, 9).astype(int):
+            a3.plot(np.full_like(th3, s3[i]), Cx0 * np.cos(th3), Cy0 * np.sin(th3),
+                    color='#3f4b5b', lw=0.8, alpha=0.45)
+        for th_ in np.linspace(0, 2 * np.pi, 12, endpoint=False):
+            a3.plot(s_ends, [Cx0 * np.cos(th_)] * 2, [Cy0 * np.sin(th_)] * 2,
+                    color='#3f4b5b', lw=0.6, alpha=0.3)
+        ch_lab = f'chamber {Cx0:.1f} $\\times$ {Cy0:.1f} mm'
+    elif chamber_3d == 'follow':
+        cx3, cy3 = C_x[::stride] * 1e3, C_y[::stride] * 1e3
+        a3.plot_surface(S3, cx3[:, None] * np.cos(TH3), cy3[:, None] * np.sin(TH3),
+                        color='#6b7a8f', alpha=0.15, rstride=2, cstride=1,
+                        linewidth=0, antialiased=True, shade=False)
+        ch_lab = f'chamber = envelope + {chamber_margin*1e3:.0f} mm'
+    else:
+        ch_lab = None
+
     a3.plot_surface(S3, X3, Y3, facecolors=mcm.viridis(norm3(R3)), rstride=2, cstride=1,
                     linewidth=0, antialiased=False, shade=False)
     a3.set_box_aspect((3, 1, 1))
     a3.view_init(elev=25, azim=-60)
+    if chamber_3d:
+        lim = max(Cx0, Cy0) * 1.08
+        a3.set_ylim(-lim, lim)
+        a3.set_zlim(-lim, lim)
     a3.set_xlabel('s [m]', labelpad=10)
     a3.set_ylabel('x [mm]', labelpad=10)
     a3.set_zlabel('y [mm]', labelpad=10)
     fig.colorbar(mcm.ScalarMappable(norm=norm3, cmap=mcm.viridis), ax=a3, shrink=0.6, pad=0.1,
                  label='Beam radius R(s,$\\theta$) [mm]')
-    a3.set_title(f'{n_sigma_beam}$\\sigma$ beam envelope (injected beam rms emittances, {mode_tag})')
+    a3.set_title(f'{n_sigma_beam}$\\sigma$ beam envelope (injected beam rms emittances, '
+                 f'{mode_tag})' + (f' inside {ch_lab}' if ch_lab else ''))
     fig.tight_layout()
     fig.savefig(f'{folder_ap}/beam_envelope_3D_{mode_tag}.png', dpi=200, bbox_inches='tight')
     plt.show()
+
+    # beam's-eye cross-section with the aperture requirement on it
+    aperture_cross_section(s_ap, env_x, env_y, sig_x, sig_y, n_sigma_beam,
+                           chamber_margin=chamber_margin, mode_tag=mode_tag,
+                           folder=folder_ap)
+    plt.show()
+
+    # rotatable version of the same figure (needs plotly)
+    if interactive_3d:
+        try:
+            beam_chamber_3d_interactive(s_ap, env_x, env_y, C_x, C_y,
+                                        n_sigma_beam, mode_tag=mode_tag,
+                                        folder=folder_ap)
+        except ImportError:
+            print('    interactive 3D skipped: pip install plotly')
  
     # --- pole-tip fields per magnet type ---
     pole_rows, worst = [], {}
@@ -1246,9 +1299,328 @@ def physical_aperture_study(ring, eps_x, eps_y, sigma_delta, mode_tag,
 
 
 
-# Physical aperture = 5 sigma of the injected beam,
-#     A_x = 5 * sqrt(beta_x * eps_x + (D_x * sigma_delta)^2)       (~20 mm expected)
+def aperture_cross_section(s_ap, env_x, env_y, sig_x, sig_y, n_sigma_beam,
+                           chamber_margin=5e-3, mode_tag='', n_theta=721,
+                           folder=None, ax=None):
+    """
+    Beam's-eye view: every n-sigma cross-section along the ring, superimposed,
+    with the chamber that contains them all.
+
+    Looking down s, the beam sweeps out the UNION of its cross-sections. For
+    an axis-aligned ellipse of half-axes (a, b) the polar radius is
+        r(theta) = a b / sqrt(b^2 cos^2 theta + a^2 sin^2 theta)
+    so the union boundary is  R(theta) = max over s of r_s(theta).
+    That is the lobed outline, and it is what the chamber must clear.
+
+    A concentric axis-aligned ellipse contains another iff it is at least as
+    big in BOTH half-axes, so the smallest elliptical chamber has half-axes
+    max(env_x) and max(env_y) -- the dashed curve. The gap between it and the
+    lobed union is aperture the beam never uses.
+    """
+    a = np.asarray(env_x); b = np.asarray(env_y)
+    th = np.linspace(0, 2*np.pi, n_theta)
+    ct, st = np.cos(th), np.sin(th)
+    # r_s(theta) for every s, then the max over s
+    r = (a[:, None]*b[:, None]) / np.sqrt((b[:, None]*ct)**2 + (a[:, None]*st)**2)
+    R = r.max(axis=0)
+
+    Ax, Ay = float(a.max()), float(b.max())
+    isx, isy = int(a.argmax()), int(b.argmax())
+    Cx, Cy = Ax + chamber_margin, Ay + chamber_margin
+    bore = float(np.hypot(Cx, Cy))
+
+    mm = 1e3
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8.6, 8.4))
+    else:
+        fig = ax.figure
+
+    # every cross-section, faintly
+    step = max(1, len(a)//400)
+    for i in range(0, len(a), step):
+        ax.plot(a[i]*mm*ct, b[i]*mm*st, color='#5b9bd5', lw=0.4, alpha=0.12,
+                zorder=1)
+
+    ax.fill(R*mm*ct, R*mm*st, color='#5b9bd5', alpha=0.18, zorder=2)
+    ax.plot(R*mm*ct, R*mm*st, color='#1f4e79', lw=2.0, zorder=5,
+            label=f'union of all {n_sigma_beam:g}$\\sigma$ cross-sections')
+    ax.plot(Ax*mm*ct, Ay*mm*st, color='#8c1c2b', lw=1.6, ls='--', zorder=4,
+            label=f'required beam aperture  {Ax*mm:.2f} $\\times$ {Ay*mm:.2f} mm')
+    ax.plot(Cx*mm*ct, Cy*mm*st, color='0.15', lw=2.4, zorder=6,
+            label=f'chamber  {Cx*mm:.2f} $\\times$ {Cy*mm:.2f} mm '
+                  f'(+{chamber_margin*mm:.0f} mm)')
+    ax.plot(bore*mm*ct, bore*mm*st, color='0.55', lw=1.3, ls=':', zorder=3,
+            label=f'circular bore  r = {bore*mm:.2f} mm')
+
+    ax.annotate('', xy=(Cx*mm, 0), xytext=(0, 0),
+                arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.1))
+    ax.text(Cx*mm/2, -bore*mm*0.045, f'{Cx*mm:.1f} mm', ha='center', va='top',
+            fontsize=9.5, color='0.15')
+    ax.annotate('', xy=(0, Cy*mm), xytext=(0, 0),
+                arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.1))
+    ax.text(bore*mm*0.015, Cy*mm/2, f'{Cy*mm:.1f} mm', rotation=90,
+            ha='left', va='center', fontsize=9.5, color='0.15')
+
+    # The union touches the bounding ellipse only on the axes -- there the
+    # clearance is the margin by construction, so a "minimum clearance" is not
+    # a useful number. What is useful: how much of the elliptical aperture the
+    # beam never occupies.
+    _trapz = getattr(np, 'trapezoid', None) or np.trapz   # numpy <2 fallback
+    area_union = 0.5*_trapz(R**2, th)
+    area_req = np.pi*Ax*Ay
+    unused = 1.0 - area_union/area_req
+
+    for (xx, yy, lab, s_at) in ((Ax, 0.0, 'widest in x', s_ap[isx]),
+                                (0.0, Ay, 'widest in y', s_ap[isy])):
+        ax.plot([xx*mm], [yy*mm], marker='o', ms=7, mfc='none',
+                mec='#8c1c2b', mew=1.8, zorder=8)
+        ax.annotate(f'{lab}\ns = {s_at:.1f} m',
+                    xy=(xx*mm, yy*mm),
+                    xytext=(14 if xx else 10, 10 if xx else 14),
+                    textcoords='offset points', fontsize=8.2, color='#8c1c2b',
+                    ha='left', va='bottom',
+                    bbox=dict(boxstyle='round,pad=0.2', fc='white',
+                              ec='#8c1c2b', lw=0.7, alpha=0.9))
+
+    lim = bore*mm*1.1
+    ax.axhline(0, color='0.85', lw=0.6, zorder=0)
+    ax.axvline(0, color='0.85', lw=0.6, zorder=0)
+    ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_aspect('equal')
+    ax.set_xlabel('x [mm]'); ax.set_ylabel('y [mm]')
+    ax.set_title(f'Aperture requirement, beam\'s-eye view ({mode_tag})\n'
+                 f'all {n_sigma_beam:g}$\\sigma$ cross-sections of the ring '
+                 f'superimposed', fontsize=11)
+    ax.legend(loc='upper right', fontsize=8.2, framealpha=0.95)
+
+    Nsx = Cx/float(sig_x.max()); Nsy = Cy/float(sig_y.max())
+    txt = (f'required beam half-aperture   x {Ax*mm:6.2f} mm  (widest at s = {s_ap[isx]:.1f} m)\n'
+           f'                              y {Ay*mm:6.2f} mm  (widest at s = {s_ap[isy]:.1f} m)\n'
+           f'chamber half-aperture         x {Cx*mm:6.2f} mm      y {Cy*mm:6.2f} mm\n'
+           f'circular bore radius            {bore*mm:6.2f} mm\n'
+           f'acceptance   {Nsx:.2f} $\\sigma_x$ / {Nsy:.2f} $\\sigma_y$'
+           f'   =   {Nsx**2:.0f} / {Nsy**2:.0f} rms emittances\n'
+           f'beam fills {100*(1-unused):.0f}% of the elliptical aperture')
+    ax.text(0.5, -0.115, txt, transform=ax.transAxes, ha='center', va='top',
+            fontsize=8.4, family='monospace', linespacing=1.5,
+            bbox=dict(boxstyle='round,pad=0.45', fc='white', ec='0.7'))
+
+    out = dict(A_x=Ax, A_y=Ay, chamber_x=Cx, chamber_y=Cy, bore_r=bore,
+               s_widest_x=float(s_ap[isx]), s_widest_y=float(s_ap[isy]),
+               N_sigma_x=Nsx, N_sigma_y=Nsy,
+               area_union=float(area_union), area_required=float(area_req),
+               unused_fraction=float(unused))
+    if folder:
+        fig.tight_layout()
+        fig.savefig(f'{folder}/aperture_cross_section_{mode_tag}.png',
+                    dpi=200, bbox_inches='tight')
+        print(f'--> saved {folder}/aperture_cross_section_{mode_tag}.png')
+    print(f'--> Aperture requirement ({mode_tag}), {n_sigma_beam:g} sigma:')
+    for k, v in out.items():
+        print(f'    {k:24s} {v:10.4f}')
+    return out
+
+
+def beam_chamber_3d_interactive(s_ap, env_x, env_y, C_x, C_y, n_sigma_beam,
+                                mode_tag='', n_theta=72, max_s=1200,
+                                html=None, show=True, folder=None):
+    """
+    The same 3D beam-in-chamber figure, but rotatable.
+
+    Why not just %matplotlib widget on the mplot3d version: that surface is
+    ~109k quads and matplotlib re-renders the whole thing in Python on every
+    mouse-move (~2.4 s per redraw here), so dragging it is unusable. Plotly
+    hands the mesh to the browser's WebGL once and rotation costs nothing.
+
+    Needs plotly (pip install plotly). html='x.html' writes a standalone file
+    that opens in any browser and keeps working without a kernel.
+    """
+    import plotly.graph_objects as go
+
+    st = max(1, len(s_ap) // max_s)
+    s3 = s_ap[::st]
+    sx3, sy3 = env_x[::st] * 1e3, env_y[::st] * 1e3
+    th = np.linspace(0, 2 * np.pi, n_theta)
+    S, TH = np.meshgrid(s3, th, indexing='ij')
+    X, Y = sx3[:, None] * np.cos(TH), sy3[:, None] * np.sin(TH)
+    R = np.hypot(X, Y)
+
+    Cx0, Cy0 = float(C_x.max()) * 1e3, float(C_y.max()) * 1e3
+    S_C, TH_C = np.meshgrid(np.array([s3[0], s3[-1]]), th, indexing='ij')
+
+    fig = go.Figure()
+    fig.add_surface(x=S_C, y=Cx0 * np.cos(TH_C), z=Cy0 * np.sin(TH_C),
+                    opacity=0.18, showscale=False, hoverinfo='skip',
+                    colorscale=[[0, '#6b7a8f'], [1, '#6b7a8f']],
+                    surfacecolor=np.zeros_like(S_C),
+                    name='chamber', showlegend=True)
+    fig.add_surface(x=S, y=X, z=Y, surfacecolor=R, colorscale='Viridis',
+                    colorbar=dict(title='R(s,theta) [mm]', len=0.6),
+                    name='beam', showlegend=True,
+                    hovertemplate='s=%{x:.1f} m<br>x=%{y:.2f} mm'
+                                  '<br>y=%{z:.2f} mm<extra></extra>')
+    lim = max(Cx0, Cy0) * 1.08
+    fig.update_layout(
+        title=f'{n_sigma_beam} sigma beam envelope inside chamber '
+              f'{Cx0:.1f} x {Cy0:.1f} mm ({mode_tag})',
+        scene=dict(xaxis_title='s [m]', yaxis_title='x [mm]',
+                   zaxis_title='y [mm]',
+                   yaxis=dict(range=[-lim, lim]), zaxis=dict(range=[-lim, lim]),
+                   aspectmode='manual', aspectratio=dict(x=3, y=1, z=1)),
+        width=1150, height=650, margin=dict(l=0, r=0, t=50, b=0))
+
+    # Always write the standalone file: it is the one route that works
+    # everywhere (VS Code notebook, Interactive Window, plain `python x.py`,
+    # over SSH). Inline display is attempted on top of that, and a missing
+    # renderer or missing nbformat must not kill a long run.
+    if html is None and folder is not None:
+        html = f'{folder}/beam_chamber_3d_{mode_tag}.html'
+    if html:
+        fig.write_html(html, include_plotlyjs='cdn')
+        print(f'--> interactive 3D written to {html}  (open it to rotate)')
+    if show:
+        try:
+            fig.show()
+        except Exception as e:
+            print(f'    inline display unavailable ({type(e).__name__}: {e}); '
+                  f'open the html file instead')
+    return fig
+
+
+def beam_amplitude(df_particles, df_core, position, angle, p_col='p[MeV/c]',
+                   p0_mev=2860.0):
+    """
+    Amplitude of every particle in df_particles, in units of the rms beam size
+    that the CORE emittance implies:
+
+        A = sqrt(J / eps_core),      J = gamma x^2 + 2 alpha x x' + beta x'^2
+
+    so A = 3 means "this particle reaches 3 sigma_x somewhere in betatron
+    phase", with sigma_x = sqrt(beta eps_core).
+
+    df_core sets alpha, beta and eps (the core Twiss); df_particles supplies
+    the particles being measured. Passing the same frame for both measures the
+    core against itself; passing the raw frame measures the halo too.
+    """
+    core = remove_dispersion(df_core, position, angle, p_col, p0_mev)
+    alpha, beta, gamma, _, _ = get_twiss(core, position, angle, p_col, p0_mev)
+    eps = CalcEmittanceAuto(core, position, angle)
+
+    raw = remove_dispersion(df_particles, position, angle, p_col, p0_mev)
+    u = raw[position].values - raw[position].values.mean()
+    up = raw[angle].values - raw[angle].values.mean()
+    J = gamma * u ** 2 + 2 * alpha * u * up + beta * up ** 2
+    return np.sqrt(J / eps), eps
+
+
+def aperture_n_sigma_from_beam(df_beam, df_core, n_sigma_core, cover='max',
+                               safety=1.15, df_reference=None, p0_mev=2860.0,
+                               override=None, verbose=True):
+    """
+    Envelope factor for the chamber, sized to df_beam.
+
+    n_sigma_core (the action cut that DEFINES the core, and so eps) and this
+    envelope factor are different quantities and must not be the same number:
+
+      * n_sigma_core answers "where does beam stop and halo start?" Raising it
+        makes eps bigger.
+      * the envelope factor answers "how many rms beam sizes of clearance does
+        the chamber need?"
+
+    WHICH DISTRIBUTION TO PASS AS df_beam
+      df_clean (the filtered core) -- treats the core as the beam to be
+        transported and the discarded tail as not-beam. Because the action
+        filter guarantees J <= n_sigma_core^2 eps, max amplitude comes out at
+        n_sigma_core by construction, so the result is just
+        ceil(safety * n_sigma_core). That is a policy multiplier, not a
+        measurement: the beam contributes nothing to it. Correct when the
+        discarded tail is instrumental junk or particles accepted as lost.
+      df (the raw distribution) -- sizes the chamber to clear every particle
+        actually present, halo included. The result then depends on the real
+        tail and can be much larger.
+
+    Pass df_reference (normally the raw frame) to have the tail reported for
+    comparison without letting it drive the number.
+
+    cover
+        'max'  -- clear every particle in df_beam
+        float  -- a percentile, e.g. 99.9, accepting the rest as loss
+
+    override
+        Set a number to FORCE the envelope (e.g. 5 for a 5 sigma chamber).
+        The value the beam would have asked for is still computed and printed,
+        and the coverage is reported against the forced value, so choosing it
+        is a decision rather than an accident.
+
+    Returns (n_aperture, amp_x, amp_y) with amp measured on df_beam.
+    """
+    amp_x, _ = beam_amplitude(df_beam, df_core, 'x[mm]', 'xp[mrad]',
+                              p0_mev=p0_mev)
+    amp_y, _ = beam_amplitude(df_beam, df_core, 'y[mm]', 'yp[mrad]',
+                              p0_mev=p0_mev)
+    if cover == 'max':
+        a_cov = max(amp_x.max(), amp_y.max())
+        how = 'max amplitude'
+    else:
+        a_cov = max(np.percentile(amp_x, cover), np.percentile(amp_y, cover))
+        how = f'{cover:g}th percentile'
+    n_derived = max(float(n_sigma_core), float(np.ceil(safety * a_cov)))
+    n_ap = float(override) if override is not None else n_derived
+
+    if verbose:
+        print('--> Aperture envelope factor')
+        print(f'    core cut defining eps : {n_sigma_core} sigma '
+              f'(sets eps -- NOT an aperture)')
+        print(f'    sized to              : {len(df_beam)} particles')
+        print(f'    max amplitude  x / y  : '
+              f'{amp_x.max():.3f} / {amp_y.max():.3f} sigma')
+        print(f'    cover = {cover}  ({how} = {a_cov:.3f} sigma), '
+              f'safety = {safety}')
+        if override is None:
+            print(f'    --> envelope          : {n_ap:g} sigma')
+        else:
+            print(f'    derived from the beam : {n_derived:g} sigma')
+            print(f'    --> envelope (FORCED) : {n_ap:g} sigma'
+                  + ('   <-- smaller than derived: the tail beyond it is '
+                     'accepted as loss' if n_ap < n_derived else ''))
+        if abs(a_cov - n_sigma_core) < 0.15 * n_sigma_core:
+            print(f'    note: max amplitude sits at the core cut, as the '
+                  f'action filter guarantees. This envelope is '
+                  f'ceil({safety} x {n_sigma_core}) and carries no '
+                  f'information from the beam itself.')
+        if df_reference is not None:
+            rx, _ = beam_amplitude(df_reference, df_core, 'x[mm]', 'xp[mrad]',
+                                   p0_mev=p0_mev)
+            ry, _ = beam_amplitude(df_reference, df_core, 'y[mm]', 'yp[mrad]',
+                                   p0_mev=p0_mev)
+            out = int(np.sum(rx > n_ap) + np.sum(ry > n_ap))
+            print(f'    cross-check against {len(df_reference)} unfiltered '
+                  f'particles (reported only, does not change the envelope):')
+            print(f'      max amplitude x / y : {rx.max():.2f} / {ry.max():.2f} sigma')
+            print(f'      {"n":>5s} {"beyond (x)":>12s} {"beyond (y)":>12s}')
+            for n in (3, 5, 6, 8, 10, 12, 15):
+                print(f'      {n:5d} {int(np.sum(rx > n)):12d} '
+                      f'{int(np.sum(ry > n)):12d}')
+            print(f'      outside the {n_ap:g} sigma envelope: {out} '
+                  f'({100*out/(2*len(df_reference)):.3f}% of plane-particles) '
+                  f'-- scraped at injection')
+    return n_ap, amp_x, amp_y
+
+
+# Physical aperture = N_SIGMA_APERTURE sigma of the injected beam,
+#     A_x = n * sqrt(beta_x * eps_x + (D_x * sigma_delta)^2)
 # and the vacuum chamber = aperture + 5 mm. Pole radii / B_pole use the chamber.
+#
+# N_SIGMA_APERTURE IS NOT N_SIGMA. They are different quantities:
+#   N_SIGMA          action cut that DEFINES the core, and so eps. Raising it
+#                    makes eps bigger. It decides what counts as halo.
+#   N_SIGMA_APERTURE envelope factor for the chamber. It has to clear the halo
+#                    that N_SIGMA threw away, so it is normally much larger.
+# Setting the second equal to the first builds a chamber exactly at the cut
+# used to discard particles, i.e. one that scrapes every discarded particle.
+# Sizing to df_clean makes N_SIGMA_APERTURE = ceil(safety * N_SIGMA); sizing to
+# df instead would make it track the real halo. Which is right depends on
+# whether the discarded tail is real beam or instrumental junk.
+#
 # eps_x, eps_y: rms emittances of the beam core computed above (mm mrad = um).
 # sigma_delta: rms momentum spread of the MAIN BUNCH. The whole-distribution
 # spread (relative_spread, ~5 % with the tails) would give ~60 mm instead.
@@ -1256,9 +1628,316 @@ _main = select_main_bunch(df)
 sigma_delta_for_aperture = float(np.std(_main['p[MeV/c]']) / np.mean(_main['p[MeV/c]']))
 print(f'Aperture uses sigma_delta = {sigma_delta_for_aperture*1e3:.2f} per mil (main bunch), '
       f'eps_x = {emittance_x:.3f} um, eps_y = {emittance_y:.3f} um')
+
+# Sized to df_clean: the filtered core IS the beam to be transported, and the
+# tail the action cut removed is not treated as beam. Note the consequence --
+# the action filter guarantees J <= N_SIGMA^2 eps, so max amplitude comes out
+# at N_SIGMA and this envelope is just ceil(safety * N_SIGMA). It is a policy
+# multiplier, not a measurement. df is passed as df_reference so the tail that
+# would be scraped is still printed, without changing the number.
+# Set to a number to force the chamber envelope, or None to let the beam
+# decide. These are independent of N_SIGMA, which only defines eps.
+N_SIGMA_APERTURE_OVERRIDE = 5
+
+N_SIGMA_APERTURE, amp_x, amp_y = aperture_n_sigma_from_beam(
+    df_clean, df_clean, N_SIGMA, cover='max', safety=1.15,
+    df_reference=df, p0_mev=2860.0, override=N_SIGMA_APERTURE_OVERRIDE)
+
 aperture_mag, aperture_pole = physical_aperture_study(
     ring, emittance_x * 1e-6, emittance_y * 1e-6, sigma_delta_for_aperture, mode,
-    n_sigma_beam=5, chamber_margin=5e-3)
+    n_sigma_beam=N_SIGMA_APERTURE, chamber_margin=5e-3,
+    chamber_3d='cylinder', interactive_3d=True)
+
+# %% Ring-wide worst-case aperture sketch
+# One transverse cross-section standing in for the whole ring, built from
+# the maximum beta in each plane and the rms momentum spread. Same sigma
+# convention as physical_aperture_study above, and fed the same numbers,
+# so the two agree by construction.
+
+def _fmt_eps(e):
+    return f'{e*1e6:.3g} $\\mu$m' if e >= 1e-7 else f'{e*1e9:.3g} nm'
+
+
+def ring_beam_params(ring, coupling=0.01):
+    """
+    Equilibrium emittances and momentum spread from the ring's own radiation.
+    eps_y comes out numerically zero with no coupling and no vertical
+    excitation, so it is set from the coupling ratio instead.
+    Returns (eps_x, eps_y, sigma_delta).
+    """
+    r = ring.copy()
+    r.configure_radiation(model='mean')
+    try:
+        tw = r.twiss(radiation_analysis=True)
+    except TypeError:
+        tw = r.twiss(eneloss_and_damping=True)
+    eps_x = float(tw.eq_gemitt_x)
+    eps_y = float(tw.eq_gemitt_y)
+    if not np.isfinite(eps_y) or eps_y < 1e-20:
+        eps_y = coupling * eps_x
+    sigma_delta = float(np.sqrt(tw.eq_gemitt_zeta / tw.bets0))
+    return eps_x, eps_y, sigma_delta
+
+
+def aperture_sketch(ring, eps_x, eps_y, sigma_delta, n_sigma=3,
+                    chamber_margin=5e-3, ds=0.05, sizing='widest',
+                    tw=None, title=None, show_profile=True, source=None):
+    """
+    Draw the worst-case transverse aperture cross-section for the whole ring.
+
+    eps_x, eps_y   geometric rms emittances [m rad]
+    sigma_delta    rms relative momentum spread
+    n_sigma        beam envelope in rms beam sizes
+    chamber_margin clearance added to the envelope [m]
+    sizing
+        'widest' (default) -- the widest point of the beam in each plane:
+            sigma_x at the s where sigma_x(s) peaks, sigma_y at the s where
+            sigma_y(s) peaks. beta and D are read off the lattice at those
+            points, so each half-axis is a size the beam really reaches. The
+            two s are usually a few metres apart; both are reported.
+        'single_s' -- ONE location: the s where sqrt(sigma_x^2 + sigma_y^2) is
+            largest, i.e. the worst point for a ROUND chamber. The ellipse is
+            then a true cross-section, but one plane is normally well short of
+            its own maximum, so the chamber is grown to cover the rest of the
+            ring and the shortfall is drawn dashed.
+        'composite' -- each plane from its own maximum beta combined with the
+            ring's maximum |D|:
+                sigma_x = sqrt(beta_x^max eps_x + (|D_x|^max sigma_delta)^2)
+            Those maxima sit at different s, so this exceeds 'widest' whenever
+            |D| peaks away from beta^max. Most conservative.
+
+    Returns a dict of every number used.
+    """
+    if tw is None:
+        r = ring.copy()
+        try:
+            r.configure_radiation(model=None)
+        except Exception:
+            pass
+        r.cut_at_s(np.arange(ds, r.get_length() - ds / 2, ds))
+        tw = r.twiss4d()
+
+    s = np.asarray(tw.s)
+    betx, bety = np.asarray(tw.betx), np.asarray(tw.bety)
+    dx, dy = np.asarray(tw.dx), np.asarray(tw.dy)
+
+    sig_x_s = np.sqrt(betx * eps_x + (dx * sigma_delta) ** 2)
+    sig_y_s = np.sqrt(bety * eps_y + (dy * sigma_delta) ** 2)
+
+    ibx, iby = int(np.argmax(betx)), int(np.argmax(bety))
+    idx, idy = int(np.argmax(np.abs(dx))), int(np.argmax(np.abs(dy)))
+    isx, isy = int(np.argmax(sig_x_s)), int(np.argmax(sig_y_s))
+
+    bx_max, by_max = float(betx[ibx]), float(bety[iby])
+    dx_max, dy_max = float(abs(dx[idx])), float(abs(dy[idy]))
+
+    iw = int(np.argmax(np.hypot(sig_x_s, sig_y_s)))
+
+    if sizing == 'widest':
+        sx_bet, sx_dis = np.sqrt(betx[isx] * eps_x), abs(dx[isx]) * sigma_delta
+        sy_bet, sy_dis = np.sqrt(bety[isy] * eps_y), abs(dy[isy]) * sigma_delta
+        where = (f'widest point in each plane\n'
+                 f'x: s = {s[isx]:.2f} m, $\\beta_x$ = {betx[isx]:.2f} m, '
+                 f'$D_x$ = {dx[isx]:.3f} m     '
+                 f'y: s = {s[isy]:.2f} m, $\\beta_y$ = {bety[isy]:.2f} m')
+    elif sizing == 'single_s':
+        sx_bet, sx_dis = np.sqrt(betx[iw] * eps_x), abs(dx[iw]) * sigma_delta
+        sy_bet, sy_dis = np.sqrt(bety[iw] * eps_y), abs(dy[iw]) * sigma_delta
+        where = (f'single widest s = {s[iw]:.2f} m  '
+                 f'($\\beta_x$ = {betx[iw]:.2f}, $\\beta_y$ = {bety[iw]:.2f}, '
+                 f'$D_x$ = {dx[iw]:.3f} m)')
+    elif sizing == 'composite':
+        sx_bet, sx_dis = np.sqrt(bx_max * eps_x), dx_max * sigma_delta
+        sy_bet, sy_dis = np.sqrt(by_max * eps_y), dy_max * sigma_delta
+        where = '$\\beta^{max}$ composite (no single s)'
+    else:
+        raise ValueError(
+            "sizing must be 'widest', 'single_s' or 'composite'")
+
+    sx, sy = float(np.hypot(sx_bet, sx_dis)), float(np.hypot(sy_bet, sy_dis))
+    env_x, env_y = n_sigma * sx, n_sigma * sy
+
+    # the chamber must clear the beam EVERYWHERE, not only at the drawn point
+    req_x, req_y = n_sigma * float(sig_x_s[isx]), n_sigma * float(sig_y_s[isy])
+    grown_x, grown_y = req_x > env_x * 1.0001, req_y > env_y * 1.0001
+    ch_x = max(env_x, req_x) + chamber_margin
+    ch_y = max(env_y, req_y) + chamber_margin
+    bore_r = float(np.hypot(ch_x, ch_y))
+
+    out = dict(
+        sizing=sizing, n_sigma=n_sigma,
+        eps_x=eps_x, eps_y=eps_y, sigma_delta=sigma_delta,
+        betx_max=bx_max, bety_max=by_max,
+        s_betx_max=float(s[ibx]), s_bety_max=float(s[iby]),
+        dx_max=dx_max, dy_max=dy_max,
+        s_dx_max=float(s[idx]), s_dy_max=float(s[idy]),
+        sigma_x=sx, sigma_y=sy,
+        sigma_x_betatron=float(sx_bet), sigma_x_dispersive=float(sx_dis),
+        sigma_y_betatron=float(sy_bet), sigma_y_dispersive=float(sy_dis),
+        sigma_x_worst_s=float(sig_x_s[isx]), s_sigma_x_max=float(s[isx]),
+        sigma_y_worst_s=float(sig_y_s[isy]), s_sigma_y_max=float(s[isy]),
+        env_x=env_x, env_y=env_y,
+        chamber_x=ch_x, chamber_y=ch_y, chamber_margin=chamber_margin,
+        bore_r=bore_r,
+        s_widest=float(s[iw]),
+        betx_at_widest=float(betx[iw]), bety_at_widest=float(bety[iw]),
+        dx_at_widest=float(dx[iw]),
+        chamber_grown_x=bool(grown_x), chamber_grown_y=bool(grown_y),
+    )
+
+    mm = 1e3
+    if show_profile:
+        fig, (ax, axp) = plt.subplots(
+            1, 2, figsize=(14.0, 7.0),
+            gridspec_kw=dict(width_ratios=[1.0, 1.25]))
+    else:
+        fig, ax = plt.subplots(figsize=(8.0, 7.0))
+        axp = None
+
+    th = np.linspace(0, 2 * np.pi, 400)
+    ax.plot(bore_r * mm * np.cos(th), bore_r * mm * np.sin(th),
+            color='0.55', lw=1.4, ls=':', zorder=3,
+            label=f'circular bore  r = {bore_r*mm:.1f} mm')
+    ax.plot(ch_x * mm * np.cos(th), ch_y * mm * np.sin(th),
+            color='0.2', lw=2.4, zorder=4,
+            label=f'chamber  {ch_x*mm:.1f} $\\times$ {ch_y*mm:.1f} mm '
+                  f'(+{chamber_margin*mm:.0f} mm margin)')
+    ax.fill(env_x * mm * np.cos(th), env_y * mm * np.sin(th),
+            color='#5b9bd5', alpha=0.22, zorder=1)
+    ax.plot(env_x * mm * np.cos(th), env_y * mm * np.sin(th),
+            color='#1f4e79', lw=2, zorder=5,
+            label=f'{n_sigma:g}$\\sigma$ envelope  '
+                  f'{env_x*mm:.2f} $\\times$ {env_y*mm:.2f} mm')
+    ax.fill(sx * mm * np.cos(th), sy * mm * np.sin(th),
+            color='#d1495b', alpha=0.5, zorder=2)
+    ax.plot(sx * mm * np.cos(th), sy * mm * np.sin(th),
+            color='#8c1c2b', lw=1.6, zorder=6,
+            label=f'1$\\sigma$ beam  {sx*mm:.2f} $\\times$ {sy*mm:.2f} mm')
+    if grown_x or grown_y:
+        ax.plot(req_x * mm * np.cos(th), req_y * mm * np.sin(th),
+                color='#4a7c59', lw=1.5, ls='--', zorder=5,
+                label=f'{n_sigma:g}$\\sigma$ elsewhere in ring  '
+                      f'{req_x*mm:.2f} $\\times$ {req_y*mm:.2f} mm')
+
+    lim = bore_r * mm * 1.15
+    ax.annotate('', xy=(ch_x * mm, 0), xytext=(0, 0),
+                arrowprops=dict(arrowstyle='<->', color='0.2', lw=1.1))
+    ax.text(ch_x * mm / 2, -lim * 0.055, f'{ch_x*mm:.1f} mm',
+            ha='center', va='top', fontsize=9.5, color='0.2')
+    ax.annotate('', xy=(0, ch_y * mm), xytext=(0, 0),
+                arrowprops=dict(arrowstyle='<->', color='0.2', lw=1.1))
+    ax.text(lim * 0.02, ch_y * mm / 2, f'{ch_y*mm:.1f} mm', rotation=90,
+            ha='left', va='center', fontsize=9.5, color='0.2')
+    ax.annotate('', xy=(env_x * mm, -env_y * mm * 0.33),
+                xytext=(sx * mm, -env_y * mm * 0.33),
+                arrowprops=dict(arrowstyle='<->', color='#1f4e79', lw=1))
+    ax.text((sx + env_x) * mm / 2, -env_y * mm * 0.37,
+            f'{n_sigma:g}$\\sigma$', ha='center', va='top',
+            fontsize=9, color='#1f4e79')
+
+    ax.axhline(0, color='0.85', lw=0.6, zorder=0)
+    ax.axvline(0, color='0.85', lw=0.6, zorder=0)
+    ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_aspect('equal')
+    ax.set_xlabel('x [mm]'); ax.set_ylabel('y [mm]')
+    ax.set_title(title or 'Worst-case aperture cross-section', fontsize=11)
+    ax.legend(loc='upper right', fontsize=8.0, framealpha=0.94)
+
+    txt = (
+        f'$\\epsilon_x$ = {_fmt_eps(eps_x)}     '
+        f'$\\epsilon_y$ = {_fmt_eps(eps_y)}     '
+        f'$\\sigma_\\delta$ = {sigma_delta*100:.3f} %\n'
+        + (f'{source}\n' if source else '') +
+        f'{where}\n'
+        f'$\\sigma_x$ = $\\sqrt{{({sx_bet*mm:.3f})^2 + ({sx_dis*mm:.3f})^2}}$'
+        f' = {sx*mm:.3f} mm     '
+        f'$\\sigma_y$ = $\\sqrt{{({sy_bet*mm:.3f})^2 + ({sy_dis*mm:.3f})^2}}$'
+        f' = {sy*mm:.3f} mm\n'
+        f'(betatron $\\oplus$ dispersive)'
+    )
+    ax.text(0.5, -0.145, txt, transform=ax.transAxes, ha='center', va='top',
+            fontsize=8.4, linespacing=1.45,
+            bbox=dict(boxstyle='round,pad=0.4', fc='white', ec='0.75'))
+
+    if axp is not None:
+        axp.plot(s, n_sigma * sig_x_s * mm, color='#1f4e79', lw=1.2,
+                 label=f'{n_sigma:g}$\\sigma_x$(s)')
+        axp.plot(s, n_sigma * sig_y_s * mm, color='#c05640', lw=1.2,
+                 label=f'{n_sigma:g}$\\sigma_y$(s)')
+        axp.axhline(ch_x * mm, color='#1f4e79', ls='--', lw=1.2,
+                    label=f'chamber x  {ch_x*mm:.1f} mm')
+        axp.axhline(ch_y * mm, color='#c05640', ls='--', lw=1.2,
+                    label=f'chamber y  {ch_y*mm:.1f} mm')
+        lo, hi = axp.get_ylim()
+        axp.set_ylim(lo, hi + 0.30 * (hi - lo))
+        axp.plot([s[isx]], [n_sigma * sig_x_s[isx] * mm], marker='v',
+                 color='#1f4e79', ms=9, zorder=6, clip_on=False)
+        axp.plot([s[isy]], [n_sigma * sig_y_s[isy] * mm], marker='v',
+                 color='#c05640', ms=9, zorder=6, clip_on=False)
+        if sizing == 'single_s':
+            axp.axvline(s[iw], color='black', lw=1.6, alpha=0.85,
+                        label=f'chosen s = {s[iw]:.1f} m')
+        marks = ((isx, '#1f4e79', 'widest x'),
+                 (isy, '#c05640', 'widest y'),
+                 (idx, '#4a7c59', '$|D_x|^{max}$'))
+        for j, (i, c, lab) in enumerate(sorted(marks, key=lambda m: s[m[0]])):
+            axp.axvline(s[i], color=c, lw=0.9, alpha=0.55, ls='-.')
+            axp.annotate(f'{lab}\n{s[i]:.0f} m', xy=(s[i], hi),
+                         xytext=(0, 6 + 22 * (j % 2)),
+                         textcoords='offset points', color=c, fontsize=8.2,
+                         ha='center', va='bottom',
+                         bbox=dict(boxstyle='round,pad=0.18', fc='white',
+                                   ec=c, lw=0.7, alpha=0.9))
+        axp.set_xlim(s[0], s[-1])
+        axp.set_xlabel('s [m]')
+        axp.set_ylabel(f'{n_sigma:g}$\\sigma$ beam envelope [mm]')
+        axp.set_title('beam envelope around the ring  '
+                      '(the maxima do not coincide)', fontsize=11)
+        axp.grid(alpha=0.25)
+        axp.legend(loc='lower right', fontsize=8.0, ncol=2, framealpha=0.94)
+
+    print(f'--> Aperture sketch  [{sizing}]  n_sigma = {n_sigma:g}')
+    print(f'    INPUT eps_x = {eps_x*1e6:.4f} um   eps_y = {eps_y*1e6:.4f} um'
+          f'   sigma_delta = {sigma_delta*1e3:.3f} per mil')
+    print(f'    beta_x max  {bx_max:8.3f} m   at s = {s[ibx]:7.2f} m')
+    print(f'    beta_y max  {by_max:8.3f} m   at s = {s[iby]:7.2f} m')
+    print(f'    |D_x| max   {dx_max:8.4f} m   at s = {s[idx]:7.2f} m')
+    print(f'    |D_y| max   {dy_max:8.4f} m   at s = {s[idy]:7.2f} m')
+    print(f'    sigma_x     {sx*mm:8.3f} mm  '
+          f'(bet {sx_bet*mm:.3f} + disp {sx_dis*mm:.3f})')
+    print(f'    sigma_y     {sy*mm:8.3f} mm  '
+          f'(bet {sy_bet*mm:.3f} + disp {sy_dis*mm:.3f})')
+    print(f'    {n_sigma:g}-sigma env {env_x*mm:7.2f} x {env_y*mm:.2f} mm')
+    print(f'    chamber     {ch_x*mm:7.2f} x {ch_y*mm:.2f} mm   '
+          f'bore r = {bore_r*mm:.2f} mm')
+    print(f'    widest in x   s = {s[isx]:7.2f} m   sigma_x = '
+          f'{sig_x_s[isx]*mm:.3f} mm  (beta_x {betx[isx]:.2f}, '
+          f'D_x {dx[isx]:.4f} m)')
+    print(f'    widest in y   s = {s[isy]:7.2f} m   sigma_y = '
+          f'{sig_y_s[isy]*mm:.3f} mm  (beta_y {bety[isy]:.2f})')
+    if abs(s[isx] - s[isy]) > ds:
+        print(f'    the two widest points are {abs(s[isx]-s[isy]):.2f} m '
+              f'apart, so this cross-section is a per-plane worst case')
+    if grown_x or grown_y:
+        g = ' and '.join(p for p, f in (('x', grown_x), ('y', grown_y)) if f)
+        print(f'    NOTE: chamber grown in {g} to clear the beam elsewhere '
+              f'in the ring (dashed curve on the sketch)')
+    return out
+
+# %%
+aperture_sketch_data = aperture_sketch(
+    ring,
+    eps_x=emittance_x * 1e-6,
+    eps_y=emittance_y * 1e-6,
+    sigma_delta=sigma_delta_for_aperture,
+    n_sigma=N_SIGMA_APERTURE,
+    chamber_margin=5e-3,
+    sizing='widest',
+    source=f'$\\epsilon$ and envelope from df_clean '
+           f'({len(df_clean)}/{len(df)} particles, {N_SIGMA}$\\sigma$ action cut);'
+           f'  envelope {N_SIGMA_APERTURE:g}$\\sigma$',
+    title=f'{mode}  --  aperture at the widest point')
+plt.tight_layout()
+plt.show()
 
 # %%
 rand_num = 74
