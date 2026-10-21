@@ -81,7 +81,7 @@ def select_main_bunch(df_in, t_col='t[mm/c]', mad_k=10):
         return df_in.copy()
     return df_in[mask].copy()
 
-def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles=500, num_turns=100, seed=74):
+def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, marker_name, n_particles=500, num_turns=100, seed=74):
     R56, Vdeb, Phasdeb = params
     
     c = 299792458
@@ -109,12 +109,13 @@ def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles
     py_in = df_subset['yp[mrad]'].values / 1000.0
     
     delta_in = (p_f - fixed_e_mev) / fixed_e_mev
-    zeta_in = z_f  
+    zeta_in = z_f
 
-    x_matched = x_in + ring_tw.dx[0] * delta_in
-    px_matched = px_in + ring_tw.dpx[0] * delta_in
-    y_matched = y_in + ring_tw.dy[0] * delta_in
-    py_matched = py_in + ring_tw.dpy[0] * delta_in
+    marker_twiss = ring_tw.rows[marker_name]
+    x_matched = x_in + marker_twiss['dx'][0] * delta_in
+    px_matched = px_in + marker_twiss['dpx'][0] * delta_in
+    y_matched = y_in + marker_twiss['dy'][0] * delta_in
+    py_matched = py_in + marker_twiss['dpy'][0] * delta_in
 
     p_test = xp.Particles(
         p0c=p0c_ref,
@@ -131,7 +132,7 @@ def evaluate_ecs_performance(params, df_raw, ring, ring_tw, p0c_ref, n_particles
 
     return rms_spread, efficiency
 
-def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
+def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, marker_name, n_samples=150):
     np.random.seed(42)
     
     R56_samples = np.random.uniform(0.20, 0.45, n_samples)
@@ -147,7 +148,7 @@ def run_multi_objective_scan(df_raw, ring, ring_tw, p0c_ref, n_samples=150):
         Phasdeb = Phasdeb_samples[i]
         
         spread, eff = evaluate_ecs_performance(
-            [R56, Vdeb, Phasdeb], df_raw, ring, ring_tw, p0c_ref
+            [R56, Vdeb, Phasdeb], df_raw, ring, ring_tw, p0c_ref, marker_name
         )
         
         scan_results.append({
@@ -282,7 +283,7 @@ def remove_dispersion(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0):
     df_out[angle] = df_out[angle].values - ddisp * delta
     return df_out
 
-def filter_by_action(df, position, angle, n_sigma=3, max_iter=8):
+def filter_by_action(df, position, angle, n_sigma=3, max_iter=8, min_particles=20):
     df_iter = df.copy()
     for _ in range(max_iter):
         df_iter = remove_dispersion(df_iter, position, angle)
@@ -295,6 +296,8 @@ def filter_by_action(df, position, angle, n_sigma=3, max_iter=8):
 
         mask = J <= n_sigma**2 * eps
         if mask.sum() == len(df_iter):
+            break
+        if mask.sum() < min_particles:
             break
         df_iter = df_iter[mask].copy()
     return df_iter
@@ -536,7 +539,7 @@ def density_scatter(ax, x, y, s=2, cmap='viridis', **kwargs):
 
 def draw_action_ellipse(ax_plot, df_plot, pos_col, ang_col,
                         alpha, beta, emittance, n_sigma,
-                        color='hotpink', lw=2, ls='-'):
+                        color='hotpink', lw=2, ls='-', label=None):
     """
     Draw the n_sigma action ellipse -- the boundary of the particles kept by
     filter_by_action at the same n_sigma -- and label it with the emittance
@@ -559,39 +562,68 @@ def draw_action_ellipse(ax_plot, df_plot, pos_col, ang_col,
     J = gamma * x ** 2 + 2 * alpha * x * xp + beta * xp ** 2
     n_in, n_tot = int(np.sum(J <= n_sigma ** 2 * emittance)), len(df_plot)
 
+    head = label if label is not None else f'{n_sigma:g}$\\sigma$ beam core'
     ax_plot.plot(e_pos, e_ang, color=color, lw=lw, ls=ls,
-        label=f'{n_sigma:g}$\\sigma$ beam core ($\\epsilon$={emittance:.3g} $\\mu$m)\n'
+        label=f'{head} ($\\epsilon$={emittance:.3g} $\\mu$m)\n'
               f'{n_in}/{n_tot} particles inside ({100*n_in/n_tot:.1f}%)')
     return n_in, n_tot
 
 
 # %%
 
-# Beam-core definition. This ONE number sets the action cut, the emittance
-# that comes out of it, and the ellipse drawn on every phase-space plot.
-# The emittance depends strongly on it -- on a beam with 5% halo:
-#     3 sigma -> eps 2.41 (95.6% kept)      5 sigma -> eps 2.93 (98.8% kept)
-#     4 sigma -> eps 2.69 (97.9% kept)      6 sigma -> eps 3.21 (99.5% kept)
-# so everything downstream (normalised emittance, mismatch factors, the
-# physical-aperture study) inherits whatever is set here.
-N_SIGMA = 3
+moment_iters = 5
 
-df_clean = filter_by_action_xy(df, n_sigma=N_SIGMA)
-print(f"Action filter ({N_SIGMA} sigma): kept {len(df_clean)}/{len(df)} particles "
+history_x, Dt_x, Dpt_x = moment_based_twiss(df, 'x[mm]', 'xp[mrad]', iters=moment_iters)
+history_y, Dt_y, Dpt_y = moment_based_twiss(df, 'y[mm]', 'yp[mrad]', iters=moment_iters)
+
+def filter_by_moment_core(df_in, position, angle, iters=5, max_passes=20,
+                          p_col='p[MeV/c]', p0_mev=2860.0):
+    df_iter = df_in.copy()
+    for _ in range(max_passes):
+        history, Dt, Dpt = moment_based_twiss(df_iter, position, angle,
+                                              p_col=p_col, p0_mev=p0_mev, iters=iters)
+        _, eps, beta, alfa = history[-1]
+        delta = (df_iter[p_col].values - p0_mev) / p0_mev
+        pos = df_iter[position].values - Dt * (delta - delta.mean())
+        ang = df_iter[angle].values - Dpt * (delta - delta.mean())
+        pos = pos - pos.mean()
+        ang = ang - ang.mean()
+        gamma = (1 + alfa**2) / beta
+        J = gamma * pos**2 + 2 * alfa * pos * ang + beta * ang**2
+        J_max = 2 * eps * np.log(2 * len(df_iter))
+        mask = J <= J_max
+        if mask.all():
+            break
+        df_iter = df_iter[mask].copy()
+    return df_iter, {'eps': eps, 'beta': beta, 'alfa': alfa, 'J_max': J_max, 'Dt': Dt, 'Dpt': Dpt}
+
+df_core_x, core_x = filter_by_moment_core(df, 'x[mm]', 'xp[mrad]', iters=moment_iters)
+df_clean, core_y = filter_by_moment_core(df_core_x, 'y[mm]', 'yp[mrad]', iters=moment_iters)
+print(f"Moment-based core: kept {len(df_clean)}/{len(df)} particles "
       f"({100*len(df_clean)/len(df):.1f}%)")
 
-emittance_x=CalcEmittanceAuto(df_clean, 'x[mm]', 'xp[mrad]')
-m_emittance_x=CalcEmittanceManual(df_clean, 'x[mm]', 'xp[mrad]')
-print(f'Horizontal geometric emittance:{emittance_x} um, {m_emittance_x}um' )
+core_amp_x = np.sqrt(core_x['J_max'] / core_x['eps'])
+core_amp_y = np.sqrt(core_y['J_max'] / core_y['eps'])
+CORE_AMPLITUDE = max(core_amp_x, core_amp_y)
+print(f"Core boundary from the moment-based fit: x = {core_amp_x:.2f} rms, y = {core_amp_y:.2f} rms")
 
-emittance_y=CalcEmittanceAuto(df_clean, 'y[mm]', 'yp[mrad]')
-m_emittance_y=CalcEmittanceManual(df_clean, 'y[mm]', 'yp[mrad]')
-print(f'Vertical geometric emittance:{emittance_y} um, {m_emittance_y}um' )
+df_core_betatron = remove_dispersion(df_clean, 'x[mm]', 'xp[mrad]')
+df_core_betatron = remove_dispersion(df_core_betatron, 'y[mm]', 'yp[mrad]')
 
-ax, bx, gx, dx, ddx = get_twiss(df_clean, 'x[mm]', 'xp[mrad]')
-ay, by, gy, dy, ddy = get_twiss(df_clean, 'y[mm]', 'yp[mrad]')
-print(f"Beam Twiss: alpha_x={ax:.3f}, beta_x={bx:.3f} m, dx={dx:.3f} m,ddx={ddx:.3f} m")
-print(f"Beam Twiss: alpha_y={ay:.3f}, beta_y={by:.3f} m, dy={dy:.3f} m,ddy={ddy:.3f} m")
+emittance_x = CalcEmittanceAuto(df_core_betatron, 'x[mm]', 'xp[mrad]')
+m_emittance_x = CalcEmittanceManual(df_core_betatron, 'x[mm]', 'xp[mrad]')
+print(f'Horizontal geometric emittance (core): {emittance_x} um, {m_emittance_x} um')
+
+emittance_y = CalcEmittanceAuto(df_core_betatron, 'y[mm]', 'yp[mrad]')
+m_emittance_y = CalcEmittanceManual(df_core_betatron, 'y[mm]', 'yp[mrad]')
+print(f'Vertical geometric emittance (core): {emittance_y} um, {m_emittance_y} um')
+
+ax, bx, gx, _, _ = get_twiss(df_core_betatron, 'x[mm]', 'xp[mrad]')
+ay, by, gy, _, _ = get_twiss(df_core_betatron, 'y[mm]', 'yp[mrad]')
+_, _, _, dx, ddx = get_twiss(df_clean, 'x[mm]', 'xp[mrad]')
+_, _, _, dy, ddy = get_twiss(df_clean, 'y[mm]', 'yp[mrad]')
+print(f"Core beam Twiss: alpha_x={ax:.3f}, beta_x={bx:.3f} m, dx={dx:.3f} m, ddx={ddx:.3f} m")
+print(f"Core beam Twiss: alpha_y={ay:.3f}, beta_y={by:.3f} m, dy={dy:.3f} m, ddy={ddy:.3f} m")
 
 p_array=df['p[MeV/c]']
 
@@ -603,6 +635,15 @@ print(f"RMS Momentum Spread: {relative_spread} %")
 
 # %%
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+def draw_emittance_ellipse(ax_plot, df_all, df_core, position, angle, alpha, beta, eps):
+    pc, ac = df_core[position].values.mean(), df_core[angle].values.mean()
+    theta = np.linspace(0, 2 * np.pi, 400)
+    e_pos = pc + np.sqrt(eps * beta) * np.cos(theta)
+    e_ang = ac - np.sqrt(eps / beta) * (alpha * np.cos(theta) - np.sin(theta))
+    ax_plot.plot(e_pos, e_ang, color='hotpink', lw=2,
+        label=f'Core emittance ellipse ($\\epsilon$={eps:.3g} $\\mu$m)\n'
+              f'{len(df_core)}/{len(df_all)} particles in core ({100*len(df_core)/len(df_all):.1f}%)')
 
 sc0 = density_scatter(axes[0, 0], df['x[mm]'], df['xp[mrad]'])
 axes[0, 0].set_xlabel('x [mm]')
@@ -616,12 +657,10 @@ axes[0, 1].set_ylabel('yp [mrad]')
 axes[0, 1].set_title('Vertical Phase Space')
 fig.colorbar(sc1, ax=axes[0, 1], label='Relative Density')
 
-draw_action_ellipse(axes[0, 0], df, 'x[mm]', 'xp[mrad]',
-                    ax, bx, emittance_x, N_SIGMA)
+draw_emittance_ellipse(axes[0, 0], df, df_clean, 'x[mm]', 'xp[mrad]', ax, bx, emittance_x)
 axes[0, 0].legend(fontsize='small', loc='upper left', framealpha=0.9)
 
-draw_action_ellipse(axes[0, 1], df, 'y[mm]', 'yp[mrad]',
-                    ay, by, emittance_y, N_SIGMA)
+draw_emittance_ellipse(axes[0, 1], df, df_clean, 'y[mm]', 'yp[mrad]', ay, by, emittance_y)
 axes[0, 1].legend(fontsize='small', loc='upper left', framealpha=0.9)
 
 main_bunch = select_main_bunch(df)
@@ -641,10 +680,6 @@ folder=mf.results_dir(design, config, phase, changes=changes, metric='InjectionE
 plt.savefig(f'{folder}/phase_space_plots.png')
 
 # %%
-moment_iters = 5
-history_x, Dt_x, Dpt_x = moment_based_twiss(df, 'x[mm]', 'xp[mrad]', iters=moment_iters)
-history_y, Dt_y, Dpt_y = moment_based_twiss(df, 'y[mm]', 'yp[mrad]', iters=moment_iters)
-
 print("\nMoment-based (Gaussian-fit) Twiss, horizontal:")
 for it, eps, beta, alfa in history_x:
     print(f"  iter {it}: eps={eps:.4f} um, beta={beta:.4f} m, alfa={alfa:.4f}")
@@ -668,9 +703,9 @@ for ax_i, history, beta_action, alfa_action, eps_action, plane_label in [
     x_action = np.sqrt(eps_action * beta_action) * np.cos(theta_cmp)
     xp_action = -np.sqrt(eps_action / beta_action) * (alfa_action * np.cos(theta_cmp) - np.sin(theta_cmp))
     ax_i.plot(x_action, xp_action, color='red', lw=2.5, linestyle='--',
-              label=f'Action-based, n_sigma={N_SIGMA} (\u03b5={eps_action:.3f})')
+              label=f'Moment-filtered core beam (\u03b5={eps_action:.3f})')
 
-    ax_i.set_title(f'{plane_label}: Moment-based vs Action-based Emittance')
+    ax_i.set_title(f'{plane_label}: Moment-based Iterations vs Core Beam Emittance')
     ax_i.axhline(0, color='black', lw=0.5, ls='--')
     ax_i.axvline(0, color='black', lw=0.5, ls='--')
     ax_i.axis('equal')
@@ -1327,11 +1362,15 @@ def aperture_cross_section(s_ap, env_x, env_y, sig_x, sig_y, n_sigma_beam,
     Ax, Ay = float(a.max()), float(b.max())
     isx, isy = int(a.argmax()), int(b.argmax())
     Cx, Cy = Ax + chamber_margin, Ay + chamber_margin
-    bore = float(np.hypot(Cx, Cy))
+    # Smallest circle containing the elliptical chamber. The farthest point
+    # of an ellipse from its centre is the end of the major axis, so this is
+    # max(a, b) -- NOT hypot(a, b), which is the bounding rectangle's diagonal
+    # and ~32% too large here. Matches 'chamber_r' in the per-magnet table.
+    bore = float(max(Cx, Cy))
 
     mm = 1e3
     if ax is None:
-        fig, ax = plt.subplots(figsize=(8.6, 8.4))
+        fig, ax = plt.subplots(figsize=(8.0, 8.8))
     else:
         fig = ax.figure
 
@@ -1376,9 +1415,9 @@ def aperture_cross_section(s_ap, env_x, env_y, sig_x, sig_y, n_sigma_beam,
                 mec='#8c1c2b', mew=1.8, zorder=8)
         ax.annotate(f'{lab}\ns = {s_at:.1f} m',
                     xy=(xx*mm, yy*mm),
-                    xytext=(14 if xx else 10, 10 if xx else 14),
+                    xytext=(-16, -26) if xx else (16, 12),
                     textcoords='offset points', fontsize=8.2, color='#8c1c2b',
-                    ha='left', va='bottom',
+                    ha='right' if xx else 'left', va='top' if xx else 'bottom',
                     bbox=dict(boxstyle='round,pad=0.2', fc='white',
                               ec='#8c1c2b', lw=0.7, alpha=0.9))
 
@@ -1390,7 +1429,8 @@ def aperture_cross_section(s_ap, env_x, env_y, sig_x, sig_y, n_sigma_beam,
     ax.set_title(f'Aperture requirement, beam\'s-eye view ({mode_tag})\n'
                  f'all {n_sigma_beam:g}$\\sigma$ cross-sections of the ring '
                  f'superimposed', fontsize=11)
-    ax.legend(loc='upper right', fontsize=8.2, framealpha=0.95)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.085), ncol=2,
+              fontsize=8.6, framealpha=0.95, borderaxespad=0.)
 
     Nsx = Cx/float(sig_x.max()); Nsy = Cy/float(sig_y.max())
     txt = (f'required beam half-aperture   x {Ax*mm:6.2f} mm  (widest at s = {s_ap[isx]:.1f} m)\n'
@@ -1400,7 +1440,7 @@ def aperture_cross_section(s_ap, env_x, env_y, sig_x, sig_y, n_sigma_beam,
            f'acceptance   {Nsx:.2f} $\\sigma_x$ / {Nsy:.2f} $\\sigma_y$'
            f'   =   {Nsx**2:.0f} / {Nsy**2:.0f} rms emittances\n'
            f'beam fills {100*(1-unused):.0f}% of the elliptical aperture')
-    ax.text(0.5, -0.115, txt, transform=ax.transAxes, ha='center', va='top',
+    ax.text(0.5, -0.165, txt, transform=ax.transAxes, ha='center', va='top',
             fontsize=8.4, family='monospace', linespacing=1.5,
             bbox=dict(boxstyle='round,pad=0.45', fc='white', ec='0.7'))
 
@@ -1640,7 +1680,7 @@ print(f'Aperture uses sigma_delta = {sigma_delta_for_aperture*1e3:.2f} per mil (
 N_SIGMA_APERTURE_OVERRIDE = 5
 
 N_SIGMA_APERTURE, amp_x, amp_y = aperture_n_sigma_from_beam(
-    df_clean, df_clean, N_SIGMA, cover='max', safety=1.15,
+    df_clean, df_clean, CORE_AMPLITUDE, cover='max', safety=1.15,
     df_reference=df, p0_mev=2860.0, override=N_SIGMA_APERTURE_OVERRIDE)
 
 aperture_mag, aperture_pole = physical_aperture_study(
@@ -1762,7 +1802,9 @@ def aperture_sketch(ring, eps_x, eps_y, sigma_delta, n_sigma=3,
     grown_x, grown_y = req_x > env_x * 1.0001, req_y > env_y * 1.0001
     ch_x = max(env_x, req_x) + chamber_margin
     ch_y = max(env_y, req_y) + chamber_margin
-    bore_r = float(np.hypot(ch_x, ch_y))
+    # smallest circle containing the elliptical chamber = max half-axis
+    # (see the note in aperture_cross_section)
+    bore_r = float(max(ch_x, ch_y))
 
     out = dict(
         sizing=sizing, n_sigma=n_sigma,
@@ -1933,7 +1975,7 @@ aperture_sketch_data = aperture_sketch(
     chamber_margin=5e-3,
     sizing='widest',
     source=f'$\\epsilon$ and envelope from df_clean '
-           f'({len(df_clean)}/{len(df)} particles, {N_SIGMA}$\\sigma$ action cut);'
+           f'({len(df_clean)}/{len(df)} particles, moment-based core);'
            f'  envelope {N_SIGMA_APERTURE:g}$\\sigma$',
     title=f'{mode}  --  aperture at the widest point')
 plt.tight_layout()
@@ -1942,9 +1984,9 @@ plt.show()
 # %%
 rand_num = 74
 n_subset = 500
-df_subset = df.sample(n=n_subset, random_state=rand_num)
+df_subset = df_clean.sample(n=min(n_subset, len(df_clean)), random_state=rand_num)
 
-p0c_avg_mev = df['p[MeV/c]'].mean()
+p0c_avg_mev = df_clean['p[MeV/c]'].mean()
 p0c_avg = p0c_avg_mev * 1e6
 ref_particle_avg = xp.Particles(p0c=p0c_avg, mass0=xp.ELECTRON_MASS_EV)
 
@@ -1982,7 +2024,7 @@ def match_coordinates(df_in, p0c_ref, ref_particle, dx, ddx, dy, ddy,
 
 # %%
 x_m_full, px_m_full, y_m_full, py_m_full, delta_full, zeta_full = match_coordinates(
-    df, p0c_avg, ref_particle_avg,
+    df_clean, p0c_avg, ref_particle_avg,
     dx0, ddx0, dy0, ddy0,
     beam_disp_x=(dx*1e-3, ddx*1e-3), beam_disp_y=(dy*1e-3, ddy*1e-3),
     beam_optics_x=(bx, ax), beam_optics_y=(by, ay),
@@ -2034,11 +2076,11 @@ plt.savefig(f'{folder}/injected_beam_vs_ring_twiss.png')
 plt.show()
 
 # %%
-delta_before = (df['p[MeV/c]'].values * 1e6 - p0c_avg) / p0c_avg
-x_before = df['x[mm]'].values * 1e-3 - (dx * 1e-3) * delta_before
-px_before = df['xp[mrad]'].values * 1e-3 - (ddx * 1e-3) * delta_before
-y_before = df['y[mm]'].values * 1e-3 - (dy * 1e-3) * delta_before
-py_before = df['yp[mrad]'].values * 1e-3 - (ddy * 1e-3) * delta_before
+delta_before = (df_clean['p[MeV/c]'].values * 1e6 - p0c_avg) / p0c_avg
+x_before = df_clean['x[mm]'].values * 1e-3 - (dx * 1e-3) * delta_before
+px_before = df_clean['xp[mrad]'].values * 1e-3 - (ddx * 1e-3) * delta_before
+y_before = df_clean['y[mm]'].values * 1e-3 - (dy * 1e-3) * delta_before
+py_before = df_clean['yp[mrad]'].values * 1e-3 - (ddy * 1e-3) * delta_before
 x_before, px_before = optics_match_transform(x_before, px_before, bx, ax, betx0, alfx0)
 y_before, py_before = optics_match_transform(y_before, py_before, by, ay, bety0, alfy0)
 
@@ -2464,7 +2506,7 @@ def beam_acceptance_scan(track_line, df_in, e_mev, mode_tag,
     return df_acc
 
 
-df_acceptance = df.sample(n=min(3000, len(df)), random_state=rand_num)
+df_acceptance = df_clean.sample(n=min(3000, len(df_clean)), random_state=rand_num)
 acc_results = beam_acceptance_scan(ring, df_acceptance, best_energy_mev, mode)
 
 if mode == 'perfect':

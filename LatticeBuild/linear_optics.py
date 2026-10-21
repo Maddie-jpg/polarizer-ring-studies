@@ -434,7 +434,7 @@ def _beta_bound_setup(arc1R, FDF=True):
     """
     names = list(arc1R.element_names)
     knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
-             'kQFDoub', 'kQDDoub', 'kQFtr', 'kQDtr']
+             'kQFDoub', 'kQDDoub']
     if any(n.startswith('QDDoubDS_') for n in names):
         knobs.append('kQDDoubDS')
     pref = ('QFA_M', 'QDA_M', 'QFDS_', 'QDDS_', 'QDDoubDS_',
@@ -1148,7 +1148,12 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 
 def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
                            match_WP=True, ds_waist_x=True, field_expansion_bends=True):
-    """Three-fold (D1) ring with F-D-F straights.
+    """Three-fold (D1) ring with F-D-F straights, entered through a D-F-D triplet.
+
+    The straight entry is QDDoub - QFDoub - QDDoub2, a symmetric D-F-D on the
+    shared kQDDoub/kQFDoub knobs, followed by the long drift and the F-D-F
+    triplet. QDDoub2 costs l_quad + l_doub = 0.55 m per sextant, taken out of
+    l_tripl (2.5 -> 1.95 m) so the circumference is unchanged.
 
     Matching order (always): arc and straight cells, then the betas through
     the matching cell, dispersion suppressor and straight, then -- only if
@@ -1183,7 +1188,13 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
             'dl_noben': 0.95,   'l_quad':   0.30,
             'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
             'dl_drift': -0.0,   'dl_trans': 0.20,
-            'l_doub':   0.25,   'l_tripl':  2.5,    'l_trips':  0.40,
+            # l_tripl was 2.5. The new QDDoub2 and its DrDoub add
+            # l_quad + l_doub = 0.55 m per sextant, taken back out of the long
+            # straight drift so the circumference is unchanged (3.30 m over the
+            # six sextants). The RF cavity is 1.5 m, so 0.45 m of clearance is
+            # left and _insert_rf's check still passes -- but it is now the
+            # binding constraint on l_tripl.
+            'l_doub':   0.25,   'l_tripl':  1.95,   'l_trips':  0.40,
             'l_sext':   0.20,'l_trans':  'l_drift+dl_trans',
                     'l_DSL':    '2*l_drift + l_bend + dl_noben',
         })
@@ -1245,9 +1256,16 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
                       pdr.new(f'{"QFDS" if swap_DS else "QDDS"}_{name}',
                               'QFDS' if swap_DS else 'QDDS'),
                       pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
-                      # ---- F-D-F straight: D outside, F either side of drift ----
+                      # ---- D-F-D entry triplet, then the F-D-F straight ----
+                      # QDDoub2 turns the old QDDoub-QFDoub doublet into a
+                      # D-F-D triplet sitting immediately before DrTripl and
+                      # the F-D-F triplet. It is built from the 'QDDoub'
+                      # element type, so it shares kQDDoub and is powered with
+                      # the other outer quad automatically -- the triplet is
+                      # symmetric and the match gains no new variable.
                       pdr.place('DrTrans'),pdr.new(f'QDDoub_{name}',   'QDDoub'),
                       pdr.place('DrDoub'), pdr.new(f'QFDoub_{name}',   'QFDoub'),
+                      pdr.place('DrDoub'), pdr.new(f'QDDoub2_{name}',  'QDDoub'),
                       pdr.place('DrTripl'),pdr.new(f'QFTrip_{name}1',  'QFtr')]
             if fall == 'symm':
                 comps = [pdr.new(f'QFA_{name}CH', 'QFarcH')] + comps + \
@@ -1266,7 +1284,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
 
     arc1R = makesextant('xR', 'symm')
     # Marker at the centre of the long drift. The anchor is resolved from the
-    # lattice: QFDoub in this F-D-F straight, QDDoub in a D-F-D one. Hard-coding
+    # lattice: QDDoub2 now that the straight is entered through a D-F-D triplet
+    # (it was QFDoub with the plain doublet). Hard-coding
     # QDDoub here is what put the marker 0.55 m (l_doub + l_quad) upstream of
     # the straight centre when the triplet was reordered to F-D-F.
     _ctr_anchor = _straight_anchor(arc1R)

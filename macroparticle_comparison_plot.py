@@ -3,10 +3,16 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+from scipy.optimize import curve_fit
 
-# Fill in the two real files.
-CURRENT_FILE = 'PositronBeam_2p86GeV_PolarizedEbeam/beam_ECS_04092026.dat'
-PREVIOUS_FILE_UNCOMPRESSED = 'PositronBeam_2p86GeV/Beam_3GHzOption_2.86GeV_20260421.dat'
+# Fill in the real files. Chronological order: First -> First (Compressed)
+# -> Second -> Current. "Current" always means the newest file -- when a
+# newer one arrives, rename what's currently "Current" down to the next
+# ordinal ("Second" -> whatever comes after) and point CURRENT_FILE at the
+# new one, same pattern used to add this fourth distribution.
+FIRST_FILE = 'PositronBeam_2p86GeV/Beam_3GHzOption_2.86GeV_20260421.dat'
+SECOND_FILE = 'PositronBeam_2p86GeV/beam_ECS_04092026.dat'
+CURRENT_FILE = '/home/mwatson/Documents/laughing-octo-bassoon/PositronBeam_2p86GeV/beam_ECS_09102026.dat'
 
 # Same Energy Compressor System parameters as macroparticles.py.
 R56 = 0.352963
@@ -23,7 +29,7 @@ def apply_energy_compressor(df):
     (z_i = t[mm/c]*1e-3) and stores the result back into a column still
     named 't[mm/c]' -- so it ends up in METERS despite the name. Converted
     back to mm here (*1e3) so this dataset plots on the same t-axis scale
-    as the other two, uncompressed, mm-based datasets."""
+    as the other, uncompressed, mm-based datasets."""
     df_out = df.copy()
     Eref = np.mean(df_out['p[MeV/c]'].values)
     delta_i = df_out['p[MeV/c]'].values / Eref - 1
@@ -36,23 +42,28 @@ def apply_energy_compressor(df):
     return df_out
 
 
+first_df = pd.read_csv(FIRST_FILE, sep=r'\s+')
+first_compressed_df = apply_energy_compressor(first_df)
+# Second and Current are already ECS output (both filenames carry "_ECS_"),
+# so neither gets apply_energy_compressor() -- same reasoning as before,
+# just now applying to two files instead of one.
+second_df = pd.read_csv(SECOND_FILE, sep=r'\s+')
 current_df = pd.read_csv(CURRENT_FILE, sep=r'\s+')
-previous_df = pd.read_csv(PREVIOUS_FILE_UNCOMPRESSED, sep=r'\s+')
-previous_compressed_df = apply_energy_compressor(previous_df)
 
-p_std_before = previous_df['p[MeV/c]'].std()
-p_std_after = previous_compressed_df['p[MeV/c]'].std()
-t_std_before = previous_df['t[mm/c]'].std()
-t_std_after = previous_compressed_df['t[mm/c]'].std()
-print(f"Previous file momentum spread:  before={p_std_before:.3f} MeV/c, "
+p_std_before = first_df['p[MeV/c]'].std()
+p_std_after = first_compressed_df['p[MeV/c]'].std()
+t_std_before = first_df['t[mm/c]'].std()
+t_std_after = first_compressed_df['t[mm/c]'].std()
+print(f"First Distribution momentum spread:  before={p_std_before:.3f} MeV/c, "
       f"after={p_std_after:.3f} MeV/c  ({100*(p_std_after/p_std_before-1):+.1f}%)")
-print(f"Previous file t-spread:         before={t_std_before:.3f} mm, "
+print(f"First Distribution t-spread:         before={t_std_before:.3f} mm, "
       f"after={t_std_after:.3f} mm  ({100*(t_std_after/t_std_before-1):+.1f}%)")
 
 datasets = [
-    ('Current', current_df, 'tab:blue'),
-    ('Previous (uncompressed)', previous_df, 'tab:orange'),
-    ('Previous (compressed)', previous_compressed_df, 'tab:green'),
+    ('First Distribution', first_df, 'tab:orange'),
+    ('First Distribution (Compressed)', first_compressed_df, 'tab:green'),
+    ('Second Distribution', second_df, 'tab:blue'),
+    ('Current Distribution', current_df, 'tab:red'),
 ]
 
 
@@ -129,11 +140,15 @@ def filter_by_action_xy(df, n_sigma=3, max_iter=5):
 
 
 def get_twiss_xy(df, pos_col, ang_col):
-    """Now matches macroparticles.py's actual reported emittance: runs the
-    same filter_by_action() (dispersion removal + iterative action cut,
-    n_sigma=3) before computing beta/alpha/eps, instead of using the raw,
-    unfiltered dataframe directly."""
-    df_clean = filter_by_action(df, pos_col, ang_col, n_sigma=3)
+    """Matches macroparticles.py's actual reported emittance exactly: runs
+    the SAME coupled filter_by_action_xy() cut (x filtered, then y
+    filtered on the x-filtered result, n_sigma=3, max_iter=5) that
+    macroparticles.py applies once and reuses for BOTH planes, then reads
+    off whichever plane's Twiss was asked for from that shared result.
+    Previously this filtered pos_col/ang_col on its own, un-coupled from
+    the other plane's cut -- close to macroparticles.py's numbers but not
+    identical to them, the same issue found in the ellipse-vs-sigma plot."""
+    df_clean = filter_by_action_xy(df, n_sigma=3, max_iter=5)
     alpha, beta, gamma, _, _ = get_twiss(df_clean, pos_col, ang_col)
     eps = CalcEmittanceAuto(df_clean, pos_col, ang_col)
     return beta, alpha, eps
@@ -155,17 +170,20 @@ for plane, pos_col, ang_col in [('horizontal', 'x[mm]', 'xp[mrad]'),
                                  ('vertical', 'y[mm]', 'yp[mrad]')]:
     print(f"  {plane}:")
     for label, df_i, _ in datasets:
-        df_clean = filter_by_action(df_i, pos_col, ang_col, n_sigma=3)
+        # Coupled x-then-y cut (filter_by_action_xy), same shared
+        # df_clean macroparticles.py uses for both planes -- not an
+        # independent single-plane filter_by_action() call.
+        df_clean = filter_by_action_xy(df_i, n_sigma=3, max_iter=5)
         pos = df_clean[pos_col].values
         ang = df_clean[ang_col].values
         alpha, beta, gamma, _, _ = get_twiss(df_clean, pos_col, ang_col)
         eps = CalcEmittanceAuto(df_clean, pos_col, ang_col)
         corr = np.corrcoef(pos, ang)[0, 1]
-        print(f"    {label:26s} beta={beta:8.3f}  alpha={alpha:7.3f}  "
+        print(f"    {label:32s} beta={beta:8.3f}  alpha={alpha:7.3f}  "
               f"eps={eps:7.3f}  std_pos={pos.std():7.3f}  std_ang={ang.std():7.3f}  "
               f"corr={corr:+.3f}  N={len(df_clean)}/{len(df_i)}")
 
-print("\nBetatron mismatch between the three distributions:")
+print("\nBetatron mismatch between all distributions (pairwise):")
 for plane, pos_col, ang_col in [('horizontal', 'x[mm]', 'xp[mrad]'),
                                  ('vertical', 'y[mm]', 'yp[mrad]')]:
     twiss = {label: get_twiss_xy(df_i, pos_col, ang_col) for label, df_i, _ in datasets}
@@ -182,8 +200,8 @@ for plane, pos_col, ang_col in [('horizontal', 'x[mm]', 'xp[mrad]'),
 def plot_phase_space_comparison(pos_col, ang_col, xlabel, ylabel, title, out_file):
     """Same scatter + marginal-histogram layout, reused for longitudinal,
     horizontal, and vertical. Note: the energy compressor only touches
-    t[mm/c]/p[MeV/c] -- for pos_col/ang_col = x/xp or y/yp,
-    'Previous (uncompressed)' and 'Previous (compressed)' will sit exactly
+    t[mm/c]/p[MeV/c] -- for pos_col/ang_col = x/xp or y/yp, 'First
+    Distribution' and 'First Distribution (Compressed)' will sit exactly
     on top of each other, since apply_energy_compressor() never modifies
     the transverse columns. That's correct (a longitudinal-only
     compressor shouldn't touch x/xp/y/yp), not a plotting bug."""
@@ -233,51 +251,86 @@ sigma_colors = plt.cm.viridis(np.linspace(0, 1, len(sigma_values)))
 theta = np.linspace(0, 2 * np.pi, 200)
 
 
-def sigma_cut_ellipses(df, pos_col, ang_col):
-    """Returns [(label, x_ellipse, xp_ellipse, color), ...] for each
-    sigma_values entry, reused by both the clean ellipse-only plot and the
-    scatter-background version below. Now uses the SAME filter_by_action()
-    pipeline as macroparticles.py (dispersion removal + iterative action
-    cut) for each sigma value, instead of a plain single-pass Mahalanobis
-    cut with no dispersion removal -- so n_sigma=3 here reproduces exactly
-    what macroparticles.py reports as its emittance. Label includes the
-    geometric emittance (um), same "mm*mrad reported directly as um"
-    convention already used throughout macroparticles.py.
+def sigma_cut_ellipses_xy(df):
+    """For each sigma_values entry, returns both planes' ellipses, built
+    from ONE shared, sequentially-filtered population per n_sigma --
+    matching macroparticles.py's actual pipeline exactly:
 
-    Note: for n_sigma=None (no cut), dispersion is still removed (a single
-    remove_dispersion() pass, no filtering) so it's a fair "no outlier cut,
-    but still dispersion-free" baseline -- comparing against the truly raw,
-    dispersion-INCLUDED population would conflate two different effects.
+        df_clean = filter_by_action_xy(df, n_sigma=N_SIGMA)   # x filtered,
+                                                                 # then y
+                                                                 # filtered
+                                                                 # on the
+                                                                 # x-filtered
+                                                                 # result
+        ax, bx, ... = get_twiss(df_clean, 'x[mm]', 'xp[mrad]')  # same df_clean
+        ay, by, ... = get_twiss(df_clean, 'y[mm]', 'yp[mrad]')  # same df_clean
+
+    i.e. the horizontal AND vertical Twiss both come from the one combined
+    (x-then-y) cut, not from independently filtering each plane. The
+    previous version of this function filtered x and y separately
+    (filter_by_action per plane, un-coupled), which is why its numbers at
+    n_sigma=3 were close to but not identical to macroparticles.py's
+    reported 3-sigma emittance (e.g. N=21925/ε=1.261 μm here vs
+    N=21921/ε=1.26 μm there) -- the vertical cut was never being applied
+    before measuring the horizontal emittance, and vice versa.
+
+    filter_by_action_xy is called with max_iter=5, matching
+    macroparticles.py's filter_by_action_xy(df, n_sigma=N_SIGMA) call,
+    whose max_iter defaults to 5 (not filter_by_action's own default of 8).
+
+    Returns {'x': [(label, x_ell, xp_ell, color), ...],
+             'y': [(label, y_ell, yp_ell, color), ...]}.
     """
-    results = []
+    results = {'x': [], 'y': []}
     for n_sigma, c in zip(sigma_values, sigma_colors):
         if n_sigma is None:
-            df_i = remove_dispersion(df, pos_col, ang_col)
+            df_i = remove_dispersion(df, 'x[mm]', 'xp[mrad]')
+            df_i = remove_dispersion(df_i, 'y[mm]', 'yp[mrad]')
             tag = f'No cut (N={len(df_i)})'
         else:
-            df_i = filter_by_action(df, pos_col, ang_col, n_sigma=n_sigma)
-            tag = f'{n_sigma}\u03c3 (N={len(df_i)})'
+            df_i = filter_by_action_xy(df, n_sigma=n_sigma, max_iter=5)
+            tag = f'{n_sigma}σ (N={len(df_i)})'
 
-        alpha, beta, gamma, _, _ = get_twiss(df_i, pos_col, ang_col)
-        eps = CalcEmittanceAuto(df_i, pos_col, ang_col)
-
-        x_ell = np.sqrt(eps * beta) * np.cos(theta)
-        xp_ell = -np.sqrt(eps / beta) * (alpha * np.cos(theta) - np.sin(theta))
-        label = f'{tag}, \u03b5={eps:.3f} \u03bcm'
-        results.append((label, x_ell, xp_ell, c))
+        for plane, pos_col, ang_col in [('x', 'x[mm]', 'xp[mrad]'), ('y', 'y[mm]', 'yp[mrad]')]:
+            alpha, beta, gamma, _, _ = get_twiss(df_i, pos_col, ang_col)
+            eps = CalcEmittanceAuto(df_i, pos_col, ang_col)
+            # amp = n_sigma*sqrt(eps), matching draw_action_ellipse() in
+            # macroparticles.py exactly. This is the actual cut BOUNDARY --
+            # the ellipse where J = gamma*x^2+2*alpha*x*xp+beta*xp^2 equals
+            # n_sigma^2*eps, i.e. the edge filter_by_action's mask uses.
+            # Previously this used amp=sqrt(eps) (no n_sigma factor at
+            # all), which draws the 1-sigma RMS ellipse of the filtered
+            # population instead of the n_sigma boundary that produced it
+            # -- correct emittance, wrong ellipse, which is why these
+            # ellipses looked roughly 3x too small at the "3sigma" label
+            # compared to macroparticles.py's plot. n_sigma=None has no
+            # boundary to scale to (nothing was cut), so it stays at
+            # amp=sqrt(eps): the population's own unscaled RMS ellipse.
+            amp = (n_sigma if n_sigma is not None else 1.0) * np.sqrt(eps)
+            x_ell = amp * np.sqrt(beta) * np.cos(theta)
+            xp_ell = -amp / np.sqrt(beta) * (alpha * np.cos(theta) - np.sin(theta))
+            label = f'{tag}, ε={eps:.3f} μm'
+            results[plane].append((label, x_ell, xp_ell, c))
     return results
 
 
+# Twiss-vs-sigma analysis always runs on current_df -- i.e. whichever file
+# is CURRENT_FILE above, so this automatically tracks the newest
+# distribution without any further changes here when a newer file arrives.
+# Computed ONCE per plot (not per-axis) so both planes' ellipses come from
+# the same shared x-then-y filtered population at each sigma, per plane.
+ellipses_by_plane = sigma_cut_ellipses_xy(current_df)
+
 fig, axes = plt.subplots(1, 2, figsize=(13, 6))
 
-for ax, pos_col, ang_col, plane_label in [
-    (axes[0], 'x[mm]', 'xp[mrad]', 'Horizontal'),
-    (axes[1], 'y[mm]', 'yp[mrad]', 'Vertical'),
+for ax, pos_col, ang_col, plane, plane_label in [
+    (axes[0], 'x[mm]', 'xp[mrad]', 'x', 'Horizontal'),
+    (axes[1], 'y[mm]', 'yp[mrad]', 'y', 'Vertical'),
 ]:
     pos_full = current_df[pos_col].values
     ang_full = current_df[ang_col].values
 
-    for label, x_ell, xp_ell, c in sigma_cut_ellipses(current_df, pos_col, ang_col):
+    for label, x_ell, xp_ell, c in ellipses_by_plane[plane]:
         ax.plot(x_ell, xp_ell, color=c, label=label)
 
     ax.set_title(f'{plane_label} Twiss Ellipse vs. Sigma Cut (Current)')
@@ -296,9 +349,9 @@ plt.show()
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 6))
 
-for ax, pos_col, ang_col, plane_label in [
-    (axes[0], 'x[mm]', 'xp[mrad]', 'Horizontal'),
-    (axes[1], 'y[mm]', 'yp[mrad]', 'Vertical'),
+for ax, pos_col, ang_col, plane, plane_label in [
+    (axes[0], 'x[mm]', 'xp[mrad]', 'x', 'Horizontal'),
+    (axes[1], 'y[mm]', 'yp[mrad]', 'y', 'Vertical'),
 ]:
     pos_full = current_df[pos_col].values
     ang_full = current_df[ang_col].values
@@ -306,7 +359,7 @@ for ax, pos_col, ang_col, plane_label in [
     ax.scatter(pos_full, ang_full, s=2, alpha=0.15, color='gray', zorder=1,
                label=f'Particles (N={len(pos_full)})')
 
-    for label, x_ell, xp_ell, c in sigma_cut_ellipses(current_df, pos_col, ang_col):
+    for label, x_ell, xp_ell, c in ellipses_by_plane[plane]:
         ax.plot(x_ell, xp_ell, color=c, label=label, linewidth=2, zorder=2)
 
     # Zoom to the 0.5-99.5 percentile range with margin, rather than the
@@ -330,6 +383,142 @@ for ax, pos_col, ang_col, plane_label in [
 
 plt.tight_layout()
 plt.savefig('current_twiss_vs_sigma_with_particles.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+
+def getrms_gaussfit(xis, maxnmax=50, max_doublings=20):
+    """Verbatim from macroparticles.py. Robust average/variance via
+    histogram + Gaussian fit -- doubles nbins until the tallest bin drops
+    below maxnmax counts, then fits a Gaussian to the histogram. The fit
+    is what makes this robust to a handful of far-out particles, since
+    they barely move where a fitted peak sits, unlike a raw np.var()
+    which they can dominate."""
+    xis = np.asarray(xis, dtype=float)
+    minxi = xis.min() - 0.001 * (xis.max() - xis.min())
+    maxxi = xis.max() + 0.001 * (xis.max() - xis.min())
+    nbins = max(2 ** int(np.floor(np.log2(len(xis) / maxnmax))), 1)
+    nmax = 2 * maxnmax
+    n_doublings = 0
+    counts, edges = None, None
+    while nmax > maxnmax and n_doublings < max_doublings:
+        nbins *= 2
+        counts, edges = np.histogram(xis, nbins, range=[minxi, maxxi])
+        nmax = counts.max()
+        n_doublings += 1
+    centers = (edges[:-1] + edges[1:]) / 2
+
+    def gauss(x, amp, xav, xvar):
+        return amp * np.exp(-(x - xav) ** 2 / (2 * xvar))
+
+    p0 = [counts.max(), xis.mean(), xis.var()]
+    popt, _ = curve_fit(gauss, centers, counts, p0=p0)
+    return popt[1], popt[2]
+
+
+def moment_based_twiss(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0,
+                        iters=5, maxnmax=50):
+    """Verbatim from macroparticles.py. Iterative moment/projection-based
+    Twiss reconstruction: normalize the (dispersion-subtracted)
+    coordinates using the current beta/alpha guess, take three
+    projections at 0/120/240 degrees in that normalized frame, get each
+    projection's variance via getrms_gaussfit(), and reconstruct an
+    updated beta/alpha/emittance from the three variances. Has no sigma
+    cut at all -- there's nothing to tighten or loosen, it converges by
+    iterating, which is why this comparison plot sweeps iteration count
+    instead of n_sigma. Returns (history, Dt, Dpt) where history is a
+    list of (iteration, eps, beta, alfa) tuples, one per iteration."""
+    pos = df[position].values
+    ang = df[angle].values
+    delta = (df[p_col].values - p0_mev) / p0_mev
+
+    pos_av, ang_av, delta_av = pos.mean(), ang.mean(), delta.mean()
+    var_delta = np.var(delta)
+
+    Dt = np.cov(pos, delta, ddof=0)[0, 1] / var_delta
+    Dpt = np.cov(ang, delta, ddof=0)[0, 1] / var_delta
+
+    pos_beta = pos - Dt * (delta - delta_av)
+    ang_beta = ang - Dpt * (delta - delta_av)
+
+    xxbet = np.mean((pos - pos_av - Dt * (delta - delta_av)) ** 2)
+    xpxpbet = np.mean((ang - ang_av - Dpt * (delta - delta_av)) ** 2)
+    xxpbet = np.mean((pos - pos_av - Dt * (delta - delta_av)) * (ang - ang_av - Dpt * (delta - delta_av)))
+    eps_ref = np.sqrt(xxbet * xpxpbet - xxpbet ** 2)
+    beta_ref, alfa_ref = xxbet / eps_ref, -xxpbet / eps_ref
+
+    history = []
+    for it in range(iters):
+        xi = pos_beta / np.sqrt(beta_ref)
+        xip = np.sqrt(beta_ref) * ang_beta + alfa_ref * pos_beta / np.sqrt(beta_ref)
+        xi1 = (-xi + np.sqrt(3) * xip) / 2
+        xi2 = (xi + np.sqrt(3) * xip) / 2
+
+        _, xivar = getrms_gaussfit(xi, maxnmax)
+        _, xi1var = getrms_gaussfit(xi1, maxnmax)
+        _, xi2var = getrms_gaussfit(xi2, maxnmax)
+
+        betnoreps = xivar
+        alfnoreps = (xi1var - xi2var) / np.sqrt(3)
+        gamnoreps = (2 * (xi1var + xi2var) - xivar) / 3
+        eps = np.sqrt(betnoreps * gamnoreps - alfnoreps ** 2)
+        betn, alfn = betnoreps / eps, alfnoreps / eps
+        alfa_ref = betn * alfa_ref + alfn
+        beta_ref = betn * beta_ref
+
+        history.append((it + 1, eps, beta_ref, alfa_ref))
+    return history, Dt, Dpt
+
+
+# Moment-based Twiss has no n_sigma cut, so it's swept over iteration
+# count instead -- same comparison macroparticles.py makes in
+# moment_vs_action_emittance.png (that script's version runs on its one
+# injected-beam df; here it runs on current_df, the same dataset the
+# sigma-cut plots above use, so the two comparison plots line up).
+moment_iters = 5
+fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+
+for ax, pos_col, ang_col, plane, plane_label in [
+    (axes[0], 'x[mm]', 'xp[mrad]', 'x', 'Horizontal'),
+    (axes[1], 'y[mm]', 'yp[mrad]', 'y', 'Vertical'),
+]:
+    history, Dt, Dpt = moment_based_twiss(current_df, pos_col, ang_col, iters=moment_iters)
+
+    colors_it = plt.cm.viridis(np.linspace(0, 1, len(history)))
+    for (it, eps, beta, alfa), c in zip(history, colors_it):
+        x_ell = np.sqrt(eps * beta) * np.cos(theta)
+        xp_ell = -np.sqrt(eps / beta) * (alfa * np.cos(theta) - np.sin(theta))
+        ax.plot(x_ell, xp_ell, color=c, label=f'Moment-based iter {it} (ε={eps:.3f} μm)')
+
+    # Naive reference: the plain covariance-based RMS ellipse of the FULL,
+    # UNFILTERED population (dispersion removed, but no action cut at
+    # all) -- not the 3-sigma action-based estimate used elsewhere in
+    # this script. This is what moment_based_twiss is actually meant to
+    # be compared against: CalcEmittanceAuto on the raw distribution is
+    # exactly the quantity that the long skewed tail (traced earlier in
+    # this project) drags upward, while the moment-based iterations
+    # should settle toward a stable value despite that same tail being
+    # present in their input too (moment_based_twiss also runs on
+    # current_df, unfiltered -- its robustness comes from the Gaussian-fit
+    # variance estimator, not from discarding any particles).
+    df_dispfree = remove_dispersion(current_df, pos_col, ang_col)
+    alpha_naive, beta_naive, gamma_naive, _, _ = get_twiss(df_dispfree, pos_col, ang_col)
+    eps_naive = CalcEmittanceAuto(df_dispfree, pos_col, ang_col)
+    x_naive = np.sqrt(eps_naive * beta_naive) * np.cos(theta)
+    xp_naive = -np.sqrt(eps_naive / beta_naive) * (alpha_naive * np.cos(theta) - np.sin(theta))
+    ax.plot(x_naive, xp_naive, color='red', lw=2.5, linestyle='--',
+            label=f'Naive full-distribution covariance (ε={eps_naive:.3f} μm)')
+
+    ax.set_title(f'{plane_label}: Moment-based vs Naive Covariance, Full Distribution (Current)')
+    ax.set_xlabel(pos_col)
+    ax.set_ylabel(ang_col)
+    ax.axhline(0, color='black', lw=0.5, ls='--')
+    ax.axvline(0, color='black', lw=0.5, ls='--')
+    ax.axis('equal')
+    ax.grid(True, linestyle=':', alpha=0.5)
+    ax.legend(fontsize='small')
+
+plt.tight_layout()
+plt.savefig('current_moment_vs_action_emittance.png', dpi=150, bbox_inches='tight')
 plt.show()
 
 plt.figure(figsize=(9, 6))
