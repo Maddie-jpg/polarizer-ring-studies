@@ -75,6 +75,14 @@ POLARITY_LIMITS = {
     'kQFtr':   (0., 15.),  'kQDtr':   (-15., 0.),
 }
 
+# The F-D-F triplet knobs, split deliberately between the two matchers:
+#   matchingBeta  does NOT vary them. The triplet keeps whatever
+#                 triplet_seed set, so the beta match cannot cross into the
+#                 other triplet basin while chasing closure.
+#   matchingWP    DOES vary them, where the tune targets need the freedom.
+# _beta_bound_setup(include_triplet=...) is the single switch.
+TRIPLET_KNOBS = ('kQFtr', 'kQDtr')
+
 
 def _knob_limits(k):
     """Limits for a matching knob: KNOB_LIMITS, else its polarity, else default."""
@@ -95,10 +103,17 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
     tw0 = arc1R.twiss(method='4d', **bc)
     mux0, muy0 = tw0.mux[-1], tw0.muy[-1]
 
-    knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF)
+    # include_triplet=True: the triplet is free here and nowhere else.
+    knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF,
+                                            include_triplet=True)
     vary = [xt.Vary(k, step=1e-5,
                     limits=_knob_limits(k))
             for k in knob_names if k not in FIXED_KNOBS]
+    _missing = [k for k in TRIPLET_KNOBS
+                if k not in knob_names and k not in FIXED_KNOBS]
+    if _missing:
+        raise RuntimeError(f'matchingWP: triplet knobs {_missing} are not '
+                           f'free; the tune match needs them.')
 
     targets = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
@@ -188,9 +203,13 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
               bety=tw_cell.bety[0], alfy=tw_cell.alfy[0],
               dx=tw_cell.dx[0],     dpx=tw_cell.dpx[0])
 
-    knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF)
+    # include_triplet=False: the triplet is matched in matchingWP only.
+    knob_names, mk_list = _beta_bound_setup(arc1R, FDF=FDF,
+                                            include_triplet=False)
     vary = [xt.Vary(k, step=1e-5, limits=_knob_limits(k))
             for k in knob_names if k not in FIXED_KNOBS]
+    assert not any(k in TRIPLET_KNOBS for k in knob_names), \
+        'matchingBeta must not vary the triplet'
 
     closure = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
@@ -425,18 +444,25 @@ def _check_triplet_basin(pdr, kf_max=3.0):
     return kf
 
 
-def _beta_bound_setup(arc1R, FDF=True):
+def _beta_bound_setup(arc1R, FDF=True, include_triplet=False):
     """
     Return (knob_names, marker_names) for the bounded sextant match.
 
     Both are derived from the line rather than hard-coded, so they follow
     N_cells_S and the triplet topology instead of silently going stale.
+
+    include_triplet adds TRIPLET_KNOBS to the vary list. False for
+    matchingBeta (the triplet stays at triplet_seed), True for matchingWP.
+    The markers are unaffected: beta is bounded at the triplet either way,
+    whether or not its strength is free.
     """
     names = list(arc1R.element_names)
     knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
              'kQFDoub', 'kQDDoub']
     if any(n.startswith('QDDoubDS_') for n in names):
         knobs.append('kQDDoubDS')
+    if include_triplet:
+        knobs += [k for k in TRIPLET_KNOBS if k not in knobs]
     pref = ('QFA_M', 'QDA_M', 'QFDS_', 'QDDS_', 'QDDoubDS_',
             'QFDoub_', 'QDDoub_', 'QFTrip_' if FDF else 'QDTrip_')
     seen, mks = set(), []
