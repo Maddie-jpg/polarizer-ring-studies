@@ -778,6 +778,12 @@ plot_twiss_with_particles(df_clean, 'y[mm]', 'yp[mrad]', ay, by, emittance_y)
 
 # %%
 
+p_core_mean_mev = float(df_clean['p[MeV/c]'].mean())
+bg_core = p_core_mean_mev / 0.51099895000
+nemittance_x = emittance_x * 1e-6 * bg_core
+nemittance_y = emittance_y * 1e-6 * bg_core
+print(f"Normalised emittance (core): x = {nemittance_x:.4e} m rad, y = {nemittance_y:.4e} m rad")
+
 beam_results = {
     "x": {
         "alpha": float(ax),
@@ -785,7 +791,8 @@ beam_results = {
         "gamma": float(gx),
         "dispersion": float(dx),
         "dispersion_prime": float(ddx),
-        "emittance_geo": float(emittance_x)
+        "emittance_geo": float(emittance_x),
+        "emittance_norm": float(nemittance_x)
     },
     "y": {
         "alpha": float(ay),
@@ -793,7 +800,8 @@ beam_results = {
         "gamma": float(gy),
         "dispersion": float(dy),
         "dispersion_prime": float(ddy),
-        "emittance_geo": float(emittance_y)
+        "emittance_geo": float(emittance_y),
+        "emittance_norm": float(nemittance_y)
     },
     "longitudinal": {
         "delta_rms": float(relative_spread / 100)
@@ -801,6 +809,7 @@ beam_results = {
     "metadata": {
         "particle_type": "positron",
         "design_energy_mev": 2860.0,
+        "p_mean_mev": p_core_mean_mev,
         "n_particles": len(df_clean['ID'])
     }
 }

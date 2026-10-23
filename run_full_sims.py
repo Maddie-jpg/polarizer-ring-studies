@@ -5,9 +5,12 @@ For each lattice the scripts below are run in turn as separate processes, with
 the lattice passed through the DESIGN, CONFIG, MODE, PHASE and CHANGES
 environment variables (read by paths.study_from_env in each script):
 
-    perfect              analysis.py, macroparticles.py,
+    perfect              macroparticles.py, analysis.py,
                          spin_tracking_single_seed.py, spin_tracking.py
-    misaligned/corrected analysis.py, macroparticles.py
+    misaligned/corrected macroparticles.py, analysis.py
+
+macroparticles.py runs first: analysis.py takes the normalised emittances for
+its DA/MA studies from the TwissResults.json it writes.
 
 The lattice JSONs must already exist (build them with LatticeBuild/lattice_build.py).
 
@@ -21,10 +24,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 
 SCRIPTS = {
-    'perfect':    ['analysis.py', 'macroparticles.py',
+    'perfect':    ['macroparticles.py', 'analysis.py',
                    'spin_tracking_single_seed.py', 'spin_tracking.py'],
-    'misaligned': ['analysis.py', 'macroparticles.py'],
-    'corrected':  ['analysis.py', 'macroparticles.py'],
+    'misaligned': ['macroparticles.py', 'analysis.py'],
+    'corrected':  ['macroparticles.py', 'analysis.py'],
 }
 
 

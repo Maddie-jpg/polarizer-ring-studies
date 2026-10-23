@@ -33,10 +33,10 @@ cell_tr = pdr.lines['cell_tr']
 ref_twiss = ring.twiss6d()
 line_table = ring.get_table()
 
-gamma0 = ring.particle_ref.gamma0[0]
-beta0 = ring.particle_ref.beta0[0]
-n_emittancex = 1.354177116369456e-6 * gamma0 * beta0
-n_emittancey = 1.420755089827341e-6 * gamma0 * beta0
+n_emittancex, n_emittancey = paths.injected_beam_nemittance(
+    study['design'], study['config'], study['phase'], study['changes'])
+print(f"Normalised emittances from the macroparticle distribution: "
+      f"x = {n_emittancex:.4e} m rad, y = {n_emittancey:.4e} m rad")
 
 
 def two_integer_range(q):
