@@ -32,13 +32,83 @@ if _REPO_ROOT not in sys.path:
     sys.path.append(_REPO_ROOT)
 import config as cfg
 
+_DRIFT_CLASSES = ('Drift', 'DriftSlice')
+
+
+def _element_length(line, name):
+    """
+    True length of an element.
+
+    DriftSlice stores `weight` and `parent_name`, NOT `length`, so a plain
+    getattr(el, 'length', 0.0) silently returns 0.0 for every drift that a
+    sextupole (or any other insertion) has split. That is what made
+    get_safe_insertion treat sextupole-region drifts as unusable and hug the
+    quad edge instead of centring in the drift.
+    """
+    el = line.element_dict[name]
+    L = getattr(el, 'length', None)
+    if L is not None:
+        return float(L)
+    w = getattr(el, 'weight', None)
+    parent = getattr(el, 'parent_name', None)
+    if w is not None and parent is not None and parent in line.element_dict:
+        return float(w) * float(getattr(line.element_dict[parent], 'length', 0.))
+    return 0.0
+
+
+def _drift_span(line, idx, direction):
+    """
+    Walk away from element `idx` in `direction` (+1 downstream, -1 upstream)
+    over contiguous drift space, and return
+
+        (drift_length, bounding_index)
+
+    Drift and DriftSlice both count towards the length; zero-length elements
+    (Marker, BPM) are transparent and stepped over, because a BPM marker
+    inserted earlier splits the drift without consuming any of it. The walk
+    stops at the first element with real length -- the magnet bounding the
+    drift. bounding_index is None if the line end is reached first.
+    """
+    names = line.element_names
+    j = idx + direction
+    total = 0.0
+    while 0 <= j < len(names):
+        cls = line.element_dict[names[j]].__class__.__name__
+        L = _element_length(line, names[j])
+        if cls in _DRIFT_CLASSES:
+            total += L
+            j += direction
+            continue
+        if L == 0.0:                       # marker / BPM: transparent
+            j += direction
+            continue
+        return total, j                    # real magnet bounds the drift
+    return total, None
+
+
 def get_safe_insertion(ring, prefix, elem, sign, default_offset):
-    
+    """
+    Return (anchor_element, from_anchor, offset) placing a corrector at the
+    CENTRE of the drift space next to prefix+elem.
+
+    The anchor is always the END of the magnet that bounds the drift on its
+    upstream side, and the offset is +drift/2, so the corrector centre lands
+    exactly mid-drift:
+
+        sign '-'   [upstream magnet]===|<-- drift/2 -->K<-- -->|===[the quad]
+        sign '+'   [the quad]=========|<-- drift/2 -->K<-- -->|===[next magnet]
+
+    Previously this anchored on the quad's own start/end with a fixed
+    +-l_kick/2 whenever the neighbouring drift was not a plain `Drift` long
+    enough to hold the kicker. In a sextupole region the neighbour is a
+    DriftSlice (the sextupole split the drift) whose length read as 0.0, so
+    that fallback fired every time and the corrector was jammed hard against
+    the quad face.
+    """
     ref_element = prefix + elem
     names = ring.element_names
 
     if ref_element not in names:
-
         try:
             l_kick_val = ring.vars['l_kick']._value
         except Exception:
@@ -56,59 +126,34 @@ def get_safe_insertion(ring, prefix, elem, sign, default_offset):
         )
 
     idx = names.index(ref_element)
-    ref_length = getattr(ring.element_dict[ref_element], 'length', 0.0)
-
     try:
         l_kick = ring.vars['l_kick']._value
     except Exception:
-        l_kick = 0.1  # matches the default set in insert_correctors
+        l_kick = 0.1
 
-    def neighbor(i):
-        if not (0 <= i < len(names)):
-            return None, 0.0
-        el = ring.element_dict[names[i]]
-        return el.__class__.__name__, getattr(el, 'length', 0.0)
+    want = -1 if sign == '-' else +1
+    span, bound = _drift_span(ring, idx, want)
+    other, other_bound = _drift_span(ring, idx, -want)
 
-    prev_cls, prev_len = neighbor(idx - 1)
-    next_cls, next_len = neighbor(idx + 1)
+    # Preferred side first, then the other side, then whichever is larger.
+    if span < l_kick and other >= l_kick:
+        want, span, bound = -want, other, other_bound
 
-    margin = 1e-6  # small clearance beyond the kicker's own length
+    if span < l_kick:
+        raise RuntimeError(
+            f"get_safe_insertion: no drift beside '{ref_element}' can hold a "
+            f"{l_kick} m corrector (upstream {span if want<0 else other:.4f} m, "
+            f"downstream {other if want<0 else span:.4f} m). Shorten l_kick or "
+            f"open up the layout.")
 
-    def usable(cls, length):
-        # a plain, un-split Drift AND actually long enough to hold the
-        # kicker with a little room to spare -- being class=='Drift' alone
-        # isn't sufficient, as the IR-triplet case above showed.
-        return cls == 'Drift' and length > l_kick + margin
-
-    def centered_offset(length):
-        # distance from ref_element's center to the center of a neighbor
-        # of this REAL, measured length -- not the caller's guess.
-        return (length + ref_length) / 2
-
-    prev_usable = usable(prev_cls, prev_len)
-    next_usable = usable(next_cls, next_len)
-    want_prev = (sign == '-')
-
-    if want_prev and prev_usable:
-        return ref_element, 'center', f'-({centered_offset(prev_len)})'
-    if (not want_prev) and next_usable:
-        return ref_element, 'center', f'+({centered_offset(next_len)})'
-
-    # Preferred side wasn't actually usable -- use whichever side is
-    if prev_usable:
-        return ref_element, 'center', f'-({centered_offset(prev_len)})'
-    if next_usable:
-        return ref_element, 'center', f'+({centered_offset(next_len)})'
-
-    # Neither side is a plain, long-enough-to-fit open drift -> hug the
-    # quad's own edge instead (small, fixed offset, cannot overshoot).
-    # The returned anchor is the point ON THE QUAD the offset is measured
-    # from (passed to ring.insert as from_anchor), so the kicker centre ends
-    # up l_kick/2 outside the quad edge, never inside the quad.
-    if sign == '-':
-        return ref_element, 'start', '-l_kick/2'
-    else:
-        return ref_element, 'end', '+l_kick/2'
+    if want < 0:
+        # drift sits between the bounding magnet and the quad: anchor on that
+        # magnet's end. If nothing bounds it, fall back to the quad's start.
+        if bound is None:
+            return ref_element, 'start', -span / 2.0
+        return names[bound], 'end', span / 2.0
+    # drift sits after the quad: the quad itself is the upstream magnet
+    return ref_element, 'end', span / 2.0
         
 def insert_BPMs(pdr, start_at_turn, stop_at_turn, fRev):
 

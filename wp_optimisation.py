@@ -969,6 +969,36 @@ def tune_scan_realistic(pdr, ring, arc1R, cell_arc, cell_tr, qx_range, qy_range,
              f"pre-scan values: {list(k0.keys())}")
 
 
+def trim_failed_edges(QX, QY, DA_map, maps=None):
+    """Drop outer rows/columns of the grid where every point failed (DA NaN)."""
+    ok = np.isfinite(DA_map)
+    rows = np.where(ok.any(axis=1))[0]
+    cols = np.where(ok.any(axis=0))[0]
+    r = slice(rows[0], rows[-1] + 1)
+    c = slice(cols[0], cols[-1] + 1)
+    trimmed = None if maps is None else {k: v[r, c] for k, v in maps.items()}
+    return QX[r, c], QY[r, c], DA_map[r, c], trimmed
+
+
+def fill_metric_gaps(QX, QY, z, valid):
+    """Fill NaN cells of a metric map that sit inside the region where the DA
+    scan succeeded, by linear interpolation from the computed neighbours
+    (nearest neighbour where linear can't reach). Cells where the scan itself
+    failed stay NaN."""
+    from scipy.interpolate import griddata
+    known = np.isfinite(z)
+    holes = valid & ~known
+    if not holes.any() or known.sum() < 4:
+        return z
+    pts = np.column_stack([QX[known], QY[known]])
+    out = z.copy()
+    out[holes] = griddata(pts, z[known], (QX[holes], QY[holes]), method='linear')
+    still = holes & ~np.isfinite(out)
+    if still.any():
+        out[still] = griddata(pts, z[known], (QX[still], QY[still]), method='nearest')
+    return out
+
+
 def plot_metric_maps(QX, QY, maps, DA_map=None, current_qx=None, current_qy=None,
                      keys=None):
     """One panel per metric from wp_da_scan.metric_maps (plus the DA first).
@@ -980,7 +1010,10 @@ def plot_metric_maps(QX, QY, maps, DA_map=None, current_qx=None, current_qy=None
     nc = 4
     nr = int(np.ceil(len(panels) / nc))
     fig, axs = plt.subplots(nr, nc, figsize=(4.2 * nc, 3.6 * nr), squeeze=False)
+    valid = np.isfinite(DA_map) if DA_map is not None else None
     for ax, (k, z) in zip(axs.flat, panels):
+        if valid is not None and k != 'DA':
+            z = fill_metric_gaps(QX, QY, z, valid)
         is_rdt = k.startswith('f') and k[1:5].isdigit()
         zz = np.log10(z) if is_rdt else z
         lab = {'DA': r'min DA [$\sigma$]', 'det_xx': r'$dQ_x/dJ_x$ [1/m]',
@@ -1057,29 +1090,54 @@ current_qx, current_qy = ref_twiss.qx, ref_twiss.qy
 # (e.g. 15.22, 13.72 -> Qx 14.22-16.22, Qy 12.72-14.72).
 # one_integer_range(q) gives the integer square instead, two_integer_range
 # the old 2x2 integer-aligned window.
-qx_range = centred_range(current_qx, 1.0)
-qy_range = centred_range(current_qy, 1.0)
+half_width = 0.9
+qy_floor = 13.0
+qx_range = centred_range(current_qx, half_width)
+qy_range = (max(current_qy - half_width, qy_floor), current_qy + half_width)
 
-# Parallel version of tune_scan_realistic (wp_da_scan.py): one worker process
-# per CPU core, each with its own copy of the lattice, so `ring`/`arc1R` here
-# are never touched. ~n_cores times faster than the serial loop above.
-#   Coarse first (per_unit=10, 530 turns), then refine around the best region
-#   with a smaller window and more turns.
-#   sext_knobs=['k2XFarc', 'k2XDarc'] re-zeros chromaticity at every point
-#   (slower, but compares working points like with like).
+import gc
 import wp_da_scan
-per_unit = 10          # grid points per unit of tune (0.1 spacing -> 20 per axis);
-                       # keep it even -> no point on an integer or half-integer.
-                       # 20 gives 0.05 spacing but 4x the points (1600).
-QX, QY, DA_map, scan_records = wp_da_scan.run_parallel(
-    paths.lattice_json_path(study['design'], study['config'], 'perfect',
-                            study['phase'], study['changes']),
-    grid_points_aligned(*qx_range, per_unit), grid_points_aligned(*qy_range, per_unit),
-    nemitt_x=n_emittancex, nemitt_y=n_emittancey,
-    n_turns=530, n_particles=200, radiation='mean',
-    sext_knobs=None, n_workers=None,          # None = all cores but one
-)
-plot_tune_scan(QX, QY, DA_map, current_qx=current_qx, current_qy=current_qy)
+per_unit = 20
+rows_per_chunk = 4
+
+qx_scan = grid_points_aligned(*qx_range, per_unit)
+qy_scan = grid_points_aligned(*qy_range, per_unit)
+print(f"DA scan: {len(qx_scan)} x {len(qy_scan)} = {len(qx_scan)*len(qy_scan)} points "
+      f"in chunks of {rows_per_chunk} rows ({rows_per_chunk*len(qx_scan)} points each)")
+
+lattice_json = paths.lattice_json_path(study['design'], study['config'], 'perfect',
+                                       study['phase'], study['changes'])
+QX_parts, QY_parts, DA_parts, scan_records = [], [], [], None
+for c0 in range(0, len(qy_scan), rows_per_chunk):
+    qy_chunk = qy_scan[c0:c0 + rows_per_chunk]
+    print(f"--- chunk Qy {qy_chunk[0]:.3f}-{qy_chunk[-1]:.3f} "
+          f"(rows {c0 + 1}-{c0 + len(qy_chunk)} of {len(qy_scan)}) ---")
+    QX_c, QY_c, DA_c, rec_c = wp_da_scan.run_parallel(
+        lattice_json, qx_scan, qy_chunk,
+        nemitt_x=n_emittancex, nemitt_y=n_emittancey,
+        n_turns=530, n_particles=200, radiation='mean',
+        sext_knobs=None, n_workers=None,
+    )
+    QX_parts.append(QX_c)
+    QY_parts.append(QY_c)
+    DA_parts.append(DA_c)
+    if scan_records is None:
+        scan_records = rec_c
+    elif isinstance(scan_records, dict):
+        scan_records.update(rec_c)
+    else:
+        scan_records.extend(rec_c)
+    del QX_c, QY_c, DA_c, rec_c
+    gc.collect()
+
+QX = np.concatenate(QX_parts, axis=0)
+QY = np.concatenate(QY_parts, axis=0)
+DA_map = np.concatenate(DA_parts, axis=0)
+del QX_parts, QY_parts, DA_parts
+gc.collect()
+
+QX_t, QY_t, DA_t, _ = trim_failed_edges(QX, QY, DA_map)
+plot_tune_scan(QX_t, QY_t, DA_t, current_qx=current_qx, current_qy=current_qy)
 plt.show()
 
 best_qx, best_qy, best_da = best_from_map(QX, QY, DA_map)
@@ -1088,7 +1146,8 @@ best_qx, best_qy, best_da = best_from_map(QX, QY, DA_map)
 # re-matched optics, on the same grid as the DA -- and how well each one
 # tracks the DA (rank correlation; strongly negative = "bigger is worse").
 metric = wp_da_scan.metric_maps(scan_records, QX[0], QY[:, 0])
-plot_metric_maps(QX, QY, metric, DA_map, current_qx=current_qx, current_qy=current_qy)
+QX_p, QY_p, DA_p, metric_p = trim_failed_edges(QX, QY, DA_map, metric)
+plot_metric_maps(QX_p, QY_p, metric_p, DA_p, current_qx=current_qx, current_qy=current_qy)
 plt.show()
 print_metric_correlations(metric, DA_map)
 print(f"Best point in scanned window: Qx={best_qx:.4f}, Qy={best_qy:.4f}, "
