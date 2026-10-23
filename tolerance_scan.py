@@ -5,7 +5,8 @@ tolerance_scan.py
 Two-stage study for one lattice configuration (D{design}/C{config}/{phase}deg):
 
 Stage 1 -- physical aperture
-    * Takes the injected positron distribution (or CLIC-PDR fallback numbers),
+    * Takes the injected positron distribution and, in the Twiss frame and
+      emittance of the beam core from macroparticles.py (TwissResults.json),
       finds the largest single-particle Courant-Snyder invariant W_max and
       momentum deviation delta_max that contain a fraction `--containment` of
       the beam.
@@ -201,38 +202,41 @@ def insert_error_kicks(pdr, line, mags):
 # =============================================================================
 # Stage 1: injected beam and physical aperture
 # =============================================================================
-def injected_beam_requirements(dist_file, p0c, gamma_beta, containment,
-                               fallback_nemitt=7e-3, fallback_delta=0.03):
-    """W_max (Courant-Snyder invariant, m) per plane and delta_max."""
+def injected_beam_requirements(dist_file, p0c, gamma_beta, containment, beam_twiss,
+                               fallback_delta=0.03):
+    """W_max (Courant-Snyder invariant, m) per plane and delta_max.
+
+    The emittance and the Twiss frame (alpha, beta) in which W is evaluated
+    come from the macroparticle distribution calculation (beam_twiss =
+    paths.load_injected_beam(...), written by macroparticles.py)."""
+    eps_core = {pl: beam_twiss[pl]['emittance_geo'] * 1e-6 for pl in ('x', 'y')}
     if dist_file and os.path.exists(dist_file):
         df = pd.read_csv(dist_file, sep=r'\s+')
         delta = (df['p[MeV/c]'].values * 1e6 - p0c) / p0c
         dd = delta - delta.mean()
-        res = {'source': dist_file, 'n_particles': len(df)}
+        res = {'source': dist_file, 'twiss_source': 'macroparticles.py TwissResults.json',
+               'n_particles': len(df)}
         for plane, (pc, ac) in {'x': ('x[mm]', 'xp[mrad]'), 'y': ('y[mm]', 'yp[mrad]')}.items():
             u = df[pc].values * 1e-3
             up = df[ac].values * 1e-3
-            # remove the beam's own dispersive correlation before computing invariants
             D = np.cov(u, dd)[0, 1] / np.var(dd)
             Dp = np.cov(up, dd)[0, 1] / np.var(dd)
             u = u - u.mean() - D * dd
             up = up - up.mean() - Dp * dd
-            s11, s22, s12 = np.var(u), np.var(up), np.cov(u, up)[0, 1]
-            eps = np.sqrt(s11 * s22 - s12**2)
-            beta, alpha = s11 / eps, -s12 / eps
+            beta = beam_twiss[plane]['beta']
+            alpha = beam_twiss[plane]['alpha']
             gamma = (1 + alpha**2) / beta
             W = gamma * u**2 + 2 * alpha * u * up + beta * up**2
-            res[f'eps_rms_{plane}'] = eps
+            res[f'eps_rms_{plane}'] = eps_core[plane]
             res[f'W_max_{plane}'] = float(np.quantile(W, containment))
         res['delta_mean'] = float(delta.mean())
         res['delta_max'] = float(np.quantile(np.abs(delta), containment))
         return res, df
-    log(f'Distribution file not found ({dist_file}); using CLIC PDR fallback: '
-        f'eps_rms,n = {fallback_nemitt} m, W_max = 20 eps_rms, delta_max = {fallback_delta}')
-    eps = fallback_nemitt / gamma_beta
-    return {'source': 'CLIC PDR fallback (Antoniou, CLIC-Note-989)',
-            'eps_rms_x': eps, 'eps_rms_y': eps,
-            'W_max_x': 20 * eps, 'W_max_y': 20 * eps,
+    log(f'Distribution file not found ({dist_file}); using the macroparticle core emittances '
+        f'with W_max = 20 eps_rms, delta_max = {fallback_delta}')
+    return {'source': 'macroparticles.py TwissResults.json (no distribution file)',
+            'eps_rms_x': eps_core['x'], 'eps_rms_y': eps_core['y'],
+            'W_max_x': 20 * eps_core['x'], 'W_max_y': 20 * eps_core['y'],
             'delta_mean': 0.0, 'delta_max': fallback_delta}, None
 
 
@@ -601,7 +605,8 @@ def main():
     gb = ring.particle_ref.gamma0[0] * ring.particle_ref.beta0[0]
 
     # ---------------- stage 1 ----------------
-    beam, dist_df = injected_beam_requirements(args.dist, p0c, gb, args.containment)
+    beam_twiss = paths.load_injected_beam(args.design, args.config, args.phase, args.changes)
+    beam, dist_df = injected_beam_requirements(args.dist, p0c, gb, args.containment, beam_twiss)
     log('Injected beam: ' + ', '.join(f'{k}={v:.3g}' if isinstance(v, float) else f'{k}={v}'
                                        for k, v in beam.items()))
     df_req = required_aperture(ring, mags, beam, args.d_co)

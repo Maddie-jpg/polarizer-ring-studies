@@ -55,6 +55,41 @@ def results_dir(design, config, phase, changes=None, metric=None, sub=None, sub2
     return str(path)
 
 
+ELECTRON_MASS_MEV = 0.51099895000
+
+
+def injected_beam_json_path(design, config, phase=90, changes=None):
+    """TwissResults.json written by macroparticles.py for the injected beam core."""
+    return (RESULTS_DIR / f'D{design}' / f'C{config}' / f'{phase}deg{_tag(changes)}'
+            / 'InjectionEfficiency' / 'BeamSource' / 'TwissResults.json')
+
+
+def load_injected_beam(design, config, phase=90, changes=None):
+    """Twiss, emittances and momentum of the injected beam core, as calculated
+    from the macroparticle distribution by macroparticles.py."""
+    import json
+    path = injected_beam_json_path(design, config, phase, changes)
+    if not path.exists():
+        raise FileNotFoundError(
+            f'{path} not found. Run macroparticles.py for D{design} C{config} '
+            f'{phase}deg{_tag(changes)} first: DA/MA studies take their emittances '
+            f'from the macroparticle distribution.')
+    with open(path) as f:
+        return json.load(f)
+
+
+def injected_beam_nemittance(design, config, phase=90, changes=None):
+    """Normalised rms emittances (nemitt_x, nemitt_y) [m rad] of the injected
+    beam core from the macroparticle distribution (macroparticles.py)."""
+    beam = load_injected_beam(design, config, phase, changes)
+    if 'emittance_norm' in beam['x'] and 'emittance_norm' in beam['y']:
+        return float(beam['x']['emittance_norm']), float(beam['y']['emittance_norm'])
+    meta = beam.get('metadata', {})
+    bg = meta.get('p_mean_mev', meta.get('design_energy_mev', 2860.0)) / ELECTRON_MASS_MEV
+    return (float(beam['x']['emittance_geo']) * 1e-6 * bg,
+            float(beam['y']['emittance_geo']) * 1e-6 * bg)
+
+
 def load_lattice(design, config, mode='perfect', phase=90, changes=None):
     """Load a saved lattice and return the xtrack Environment.
 

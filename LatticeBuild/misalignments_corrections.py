@@ -86,6 +86,39 @@ def _drift_span(line, idx, direction):
     return total, None
 
 
+def _bounded_by_sextupole(line, idx, direction):
+    """True if the drift beside element idx (direction +1 downstream, -1
+    upstream) ends at a sextupole."""
+    _, bound = _drift_span(line, idx, direction)
+    if bound is None:
+        return False
+    return 'Sextupole' in line.element_dict[line.element_names[bound]].__class__.__name__
+
+
+def sextupole_free_side(line, quad_name, min_drift=None):
+    """Side of quad_name for its BPM and corrector: '+' (downstream) or '-'
+    (upstream), whichever neighbouring drift has no sextupole and can hold a
+    corrector (min_drift, default l_kick or 0.1 m). Downstream when both
+    qualify; if neither fits a corrector, the sextupole-free side; downstream
+    when nothing else decides. Read from the lattice, so it is the same in R
+    and L sextants, where the beam meets the elements in opposite order."""
+    if min_drift is None:
+        try:
+            min_drift = line.vars['l_kick']._value
+        except Exception:
+            min_drift = 0.1
+    idx = list(line.element_names).index(quad_name)
+    free = {d: not _bounded_by_sextupole(line, idx, d) for d in (+1, -1)}
+    room = {d: _drift_span(line, idx, d)[0] >= min_drift for d in (+1, -1)}
+    for d in (+1, -1):
+        if free[d] and room[d]:
+            return '+' if d > 0 else '-'
+    for d in (+1, -1):
+        if free[d]:
+            return '+' if d > 0 else '-'
+    return '+'
+
+
 def get_safe_insertion(ring, prefix, elem, sign, default_offset):
     """
     Return (anchor_element, from_anchor, offset) placing a corrector at the
@@ -266,14 +299,7 @@ def insert_correctors(pdr):
 
     def sign_and_offset(prefix, suffix, plane):
         is_center = bool(re.search(r'[RL]C$', suffix))
-        if is_center:
-            sign = '+'
-        elif 'R' in suffix:
-            sign = '-'
-        elif 'L' in suffix:
-            sign = '+'
-        else:
-            raise ValueError(f"Can't infer side (R/L) for {prefix}{suffix}")
+        sign = sextupole_free_side(ring, prefix + suffix)
 
         if plane == 'h' and prefix == 'QFA_' and is_center:
             dynamic_offset = '(((l_drift/2)+l_quad)/2)-l_sext'
@@ -515,8 +541,8 @@ def insert_correctors_var2(pdr):
     # '1R0' entry referenced a nonexistent element). Discovery adapts to
     # whatever cell numbering / sector count a given lattice actually uses.
     #
-    # sign convention (unchanged): R-side -> '-', L-side -> '+',
-    # centre quads (suffix ending 'C' or 'CH') -> '+'.
+    # side: sextupole_free_side() -- the drift next to the quad that has no
+    # sextupole, the same side as the quad's BPM.
     # ------------------------------------------------------------------
     all_names = list(ring.element_names)
 
@@ -542,25 +568,11 @@ def insert_correctors_var2(pdr):
             out.append(suf)
         return sorted(set(out))
 
-    def sign_for(suffix):
-        s = suffix.upper()
-        if s.endswith('C') or s.endswith('CH'):   # centre quad
-            return '+'
-        if 'R' in s:
-            return '-'
-        if 'L' in s:
-            return '+'
-        return None   # can't determine -> skip, reported below
-
     def build_list(prefixes):
         out, skipped = [], []
         for prefix in prefixes:
             for suf in suffixes_for(prefix):
-                sg = sign_for(suf)
-                if sg is None:
-                    skipped.append(prefix + suf)
-                    continue
-                out.append([suf, sg, prefix])
+                out.append([suf, sextupole_free_side(ring, prefix + suf), prefix])
         return out, skipped
 
     # vertical correctors go on the DEFOCUSING (QD*) quads
@@ -617,62 +629,22 @@ def insert_correctors_var2(pdr):
     return pdr
 
 def insert_BPMs_all_as_markers(pdr):
-   
-   ring=pdr.lines['ring']
-
-   bpm = xt.Marker()
-
-
-   tab_r=ring.get_table()
-   
-   quads_ring = tab_r.rows[tab_r.element_type == 'Quadrupole'].name
-
-   for elem_name in quads_ring:
-        element = ring[elem_name]
-        
-        if element.k1 > 0:
-            ring.insert(
-                'BPMx_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-        
-        if element.k1 < 0:
-            ring.insert(
-                'BPMy_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-
-   period=pdr.lines['period']
-   tab_p=period.get_table()
-   quads_period = tab_p.rows[tab_p.element_type == 'Quadrupole'].name
-
-   for elem_name in quads_period:
-        element = period[elem_name]
-        
-        if element.k1 > 0:
-            period.insert(
-                'BPMx_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-        
-        if element.k1 < 0:
-            period.insert(
-                'BPMy_'+elem_name,
-                bpm,
-                at=0.0,
-                from_=elem_name,
-                from_anchor='end'
-            )
-   return pdr
+    """BPM marker at the face of every quadrupole of the ring and the period
+    (BPMx_ on focusing, BPMy_ on defocusing quads), on the side whose drift
+    has no sextupole (sextupole_free_side), so the BPM and the corrector of
+    each quad share the sextupole-free drift."""
+    bpm = xt.Marker()
+    for line in (pdr.lines['ring'], pdr.lines['period']):
+        tab = line.get_table()
+        for elem_name in tab.rows[tab.element_type == 'Quadrupole'].name:
+            k1 = line[elem_name].k1
+            if k1 == 0:
+                continue
+            downstream = sextupole_free_side(line, elem_name) == '+'
+            line.insert(('BPMx_' if k1 > 0 else 'BPMy_') + elem_name, bpm,
+                        at=0.0, from_=elem_name,
+                        from_anchor='end' if downstream else 'start')
+    return pdr
 
 def misalignments(line, sigma, seed=None, cut=2.5):
     rng = np.random.default_rng(seed)

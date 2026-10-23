@@ -443,8 +443,9 @@ for d in (-max_dp, max_dp):
 # actionable. 6 sigma is a more standard footprint range.
 r_max = 8.0
 fp0 = None
-nemitt_x = 1.3e-3
-nemitt_y = 1.2e-3 
+nemitt_x, nemitt_y = paths.injected_beam_nemittance(design, config, phase, changes)
+print(f"Normalised emittances from the macroparticle distribution: "
+      f"x = {nemitt_x:.4e} m rad, y = {nemitt_y:.4e} m rad")
 
 while r_max >= 1:
     try:
@@ -661,11 +662,7 @@ if mode=='perfect':
 
     tw = line.twiss(eneloss_and_damping=True)
 
-    gamma0 = ring.particle_ref.gamma0[0]
-    beta0 = ring.particle_ref.beta0[0]
-
-    n_emittancex = 1.354177116369456e-6 * gamma0 * beta0
-    n_emittancey = 1.420755089827341e-6 * gamma0 * beta0
+    n_emittancex, n_emittancey = nemitt_x, nemitt_y
 
     parameters['study_parameters'] = {
         'ini_cond_type' : 'grid_DA', # grid_DA, grid_MA, distribution_matched, distribution_injected
@@ -790,8 +787,8 @@ if mode=='perfect':
 
     
     '''fp = line.get_footprint(
-        nemitt_x=13000e-6, 
-        nemitt_y=12000e-6,
+        nemitt_x=nemitt_x, 
+        nemitt_y=nemitt_y,
         mode='uniform_action_grid',
         x_norm_range=(0.1, 4),  # Lowered from 6 to 4 sigmas
         y_norm_range=(0.1, 4),  # Lowered from 6 to 4 sigmas
