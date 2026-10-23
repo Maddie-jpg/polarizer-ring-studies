@@ -165,6 +165,28 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         except Exception:
             opt.step(50, broyden=True, rcond=1e-4)
 
+    # With the dispersion suppressor in the last FODO cell (no QDDS) the
+    # closure + tune targets use every knob, so the beta-bound penalty keeps
+    # the ramp just short of them (Dx ~ 5 mm at the sextant end, which the
+    # periodic ring turns into ~8 cm in the straight). Finish with the hard
+    # targets alone, starting from the bounded solution.
+    if not any(n.startswith('QDDS_') for n in arc1R.element_names):
+        hard = [xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
+                xt.TargetSet(mux=target_mux, muy=target_muy, at=xt.END, tol=1e-8),
+                xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
+                ] + _ds_waist_targets(arc1R)
+        opt = arc1R.match(method='4d', solve=False, verbose=False, **bc,
+                          vary=vary, targets=hard, assert_within_tol=False)
+        try:
+            opt.solve(n_steps=40)
+        except Exception:
+            opt.step(50, broyden=True, rcond=1e-4)
+        tw_p = arc1R.twiss(method='4d', **bc)
+        print(f'matchingWP polish -> END dx={tw_p.dx[-1]:+.1e} alfx={tw_p.alfx[-1]:+.1e} '
+              f'alfy={tw_p.alfy[-1]:+.1e} Qx,Qy={n_periods*tw_p.mux[-1]:.4f},'
+              f'{n_periods*tw_p.muy[-1]:.4f} betx<={tw_p.betx.max():.2f} '
+              f'bety<={tw_p.bety.max():.2f} (bound {BETA_MAX:g} m)')
+
     if MakePlot:
         arc1R.twiss(method='4d', **bc).plot()
     return opt
@@ -457,8 +479,10 @@ def _beta_bound_setup(arc1R, FDF=True, include_triplet=False):
     whether or not its strength is free.
     """
     names = list(arc1R.element_names)
-    knobs = ['kQFarcM', 'kQDarcM', 'kQFDS', 'kQDDS',
-             'kQFDoub', 'kQDDoub']
+    knobs = ['kQFarcM', 'kQDarcM', 'kQFDS']
+    if any(n.startswith('QDDS_') for n in names):
+        knobs.append('kQDDS')
+    knobs += ['kQFDoub', 'kQDDoub']
     if any(n.startswith('QDDoubDS_') for n in names):
         knobs.append('kQDDoubDS')
     if include_triplet:
@@ -1075,7 +1099,7 @@ def _match_cells_3fold(pdr, cell_arc, cell_tr, mu_cell=0.25):
 def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
                            arc1R, wp_constants, n_periods=6,
                            betay_DS_target=None, FDF=True, bounded=True,
-                           trim_knobs=('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM'),
+                           trim_knobs=None,
                            trim_warn_frac=0.05, match_WP=True):
     """
     Match the sextant, then trim the ring tunes globally.
@@ -1104,8 +1128,20 @@ def _run_standard_matching(ring, cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
     match_WP=False (only with bounded=False) stops after the beta match: no
     tune match and no global trim, so the ring keeps whatever tunes the
     beta-matched optics give. Those tunes are printed and returned in tw.
+
+    trim_knobs=None picks the global-trim knobs from the layout: the arc
+    knobs (kQFarc, kQDarc, kQFarcM, kQDarcM) when there is a separate
+    dispersion suppressor, and the F-D-F triplet (kQFtr, kQDtr) when the
+    last FODO cell is the suppressor (no QDDS in arc1R). In that layout
+    kQFarcM/kQDarcM ARE the suppressor, and kQFarc/kQDarc change the
+    dispersion entering it, so trimming with them leaks dispersion into the
+    straight; the triplet sits where D = 0 and cannot.
     """
     qx_t, qy_t = wp_constants
+    if trim_knobs is None:
+        ds_in_last_cell = not any(n.startswith('QDDS_') for n in arc1R.element_names)
+        trim_knobs = (TRIPLET_KNOBS if ds_in_last_cell else
+                      ('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM'))
 
     if not bounded:
         tw_tr = cell_tr.twiss(method='4d')
@@ -1173,7 +1209,8 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 # ---------------------------------------------------------------------------
 
 def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
-                           match_WP=True, ds_waist_x=True, field_expansion_bends=True):
+                           match_WP=True, ds_waist_x=True, field_expansion_bends=True,
+                           ds_in_last_cell=False):
     """Three-fold (D1) ring with F-D-F straights, entered through a D-F-D triplet.
 
     The straight entry is QDDoub - QFDoub - QDDoub2, a symmetric D-F-D on the
@@ -1196,6 +1233,15 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
         BendDS) as a soft-fringe BFieldExpansion magnet; False uses hard-edge
         xt.Bend. Use False for spin tracking or anything needing radiation:
         BFieldExpansion does not radiate and cannot be spin-tracked.
+    ds_in_last_cell : False (default) keeps the separate dispersion
+        suppressor (QFDS - DrDSL/QDDoubDS - QDDS - BendDS) between the arc and
+        the D-F-D triplet. True removes it: the last FODO cell suppresses the
+        dispersion itself, through its matching quads QFA_M/QDA_M, and closes
+        on QFDS as its last F quad, straight into the D-F-D triplet. Its bends
+        are ordinary arc bends (the ring bend angle is shared over 2*N_cells_S
+        bends, no BendDS). The 3.55 m per sextant freed (DrDSL + QDDS + Drarc
+        + BendDS) is added to the long RF drift l_tripl, so the circumference
+        is unchanged.
     """
     
     pdr, quad_edge, bend_edge = _make_env(fringe_fields)
@@ -1226,9 +1272,12 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
         })
 
 
+    if ds_in_last_cell:
+        pdr.vars['l_tripl'] = '1.95 + l_DSL + l_quad + l_drift + l_bendDS'
     pdr.vars({
         'N_cells_S': 8,
-        'hBarc': '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
+        'hBarc': ('6.283185307/(6*2*N_cells_S*l_bend)' if ds_in_last_cell else
+                  '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))'),
         'kQFarc':  2.9478,  'kQDarc':  -2.9231,
         'kQFarcM': 2.8846,  'kQDarcM': -2.7567,
         'kQFDS':   2.8042,  'kQDDS':   -2.2858,
@@ -1236,7 +1285,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
         'kQFtr':   4.4429,  'kQDtr':   -2.4723,
     })
     U0 = (0.88463e-31)*E0**4*(2.*np.pi) / (
-        6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']))
+        6*(2*pdr['N_cells_S']*pdr['l_bend']
+           + (0. if ds_in_last_cell else pdr['l_bendDS'])))
 
     _make_base_elements(pdr, quad_edge, bend_edge,
                         field_expansion_bends=field_expansion_bends)
@@ -1262,7 +1312,15 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
             comps[-1] = pdr.new(f'QFA_M{name}{n-1}', 'QFarcM')
             comps += [pdr.place('Drarc'),  pdr.new(f'Bend1_{name}{n}', 'Bend'),
                       pdr.place('Drarc'),  pdr.new(f'QDA_M{name}{n}',  'QDarcM'),
-                      pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend'),
+                      pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend')]
+            if ds_in_last_cell:
+                comps += [pdr.place('DrarcS'), pdr.new(f'QFDS_{name}', 'QFDS'),
+                          pdr.place('DrTrans'),pdr.new(f'QDDoub_{name}',  'QDDoub'),
+                          pdr.place('DrDoub'), pdr.new(f'QFDoub_{name}',  'QFDoub'),
+                          pdr.place('DrDoub'), pdr.new(f'QDDoub2_{name}', 'QDDoub'),
+                          pdr.place('DrTripl'),pdr.new(f'QFTrip_{name}1', 'QFtr')]
+            else:
+                comps += [
                       # swap_DS=True reverses the suppressor poles so the
                       # DS->straight boundary alternates (QFDS next to QDDoub)
                       # instead of putting QDDS beside QDDoub. MEASURED: worse.
@@ -1328,7 +1386,8 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     # arc1R included so the extra DS quad is present where matching runs.
     # It reuses the QDDoub element/kQDDoub knob, so matching powers it with
     # the existing doublet quad automatically.
-    insert_DS_betay_quads(pdr, ring, period, arc1R)
+    if not ds_in_last_cell:
+        insert_DS_betay_quads(pdr, ring, period, arc1R)
     if ds_waist_x:
         insert_DS_waist_markers(pdr, arc1R, period)   # not ring: RF goes there
 
