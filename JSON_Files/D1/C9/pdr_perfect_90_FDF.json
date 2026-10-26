@@ -11,21 +11,21 @@
    "dl_noben": 0.95,
    "dl_trans": 0.2,
    "hBarc": 0.15399963987745097,
-   "k2XDarc": -118.76861198129667,
+   "k2XDarc": -115.45405457148235,
    "k2XDarc_delta": 0.0,
-   "k2XFarc": 77.67638571553132,
+   "k2XFarc": 75.46363968277745,
    "k2XFarc_delta": 0.0,
-   "kQDDS": 2.9091991045752295,
-   "kQDDoub": -2.7740719510505567,
-   "kQDDoubDS": -3.026047668057933,
+   "kQDDS": 3.920818617396088,
+   "kQDDoub": -2.7483648633848197,
+   "kQDDoubDS": -3.9042455172456356,
    "kQDarc": -2.921746107628472,
-   "kQDarcM": -2.6960613083444267,
-   "kQDtr": -4.134751831015471,
-   "kQFDS": 2.5573855058826758,
-   "kQFDoub": 4.736734866210353,
+   "kQDarcM": -2.7608632829759014,
+   "kQDtr": -3.579588008186032,
+   "kQFDS": 2.581365923110831,
+   "kQFDoub": 2.641310524648558,
    "kQFarc": 2.9475157461273707,
-   "kQFarcM": 3.0479215779771103,
-   "kQFtr": 2.5328213317067227,
+   "kQFarcM": 3.0880096362602716,
+   "kQFtr": 1.9170079306524346,
    "l_DSL": 2.3499999999999996,
    "l_bend": 0.4,
    "l_bendDS": 0.4,
@@ -35,7 +35,7 @@
    "l_quad": 0.3,
    "l_sext": 0.1,
    "l_trans": 0.7,
-   "l_tripl": 1.95,
+   "l_tripl": 2.5,
    "l_trips": 0.4,
    "t_turn_s": 0.0
   }
@@ -742,14 +742,6 @@
    "vars['kQFDoub']"
   ],
   [
-   "element_refs['QDDoub2_xR'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_xR'].k1",
-   "vars['kQDDoub']"
-  ],
-  [
    "element_refs['QFTrip_xR1'].length",
    "vars['l_quad']"
   ],
@@ -1204,14 +1196,6 @@
   [
    "element_refs['QFDoub_PR'].k1",
    "vars['kQFDoub']"
-  ],
-  [
-   "element_refs['QDDoub2_PR'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_PR'].k1",
-   "vars['kQDDoub']"
   ],
   [
    "element_refs['QFTrip_PR1'].length",
@@ -1670,14 +1654,6 @@
    "vars['kQFDoub']"
   ],
   [
-   "element_refs['QDDoub2_PL'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_PL'].k1",
-   "vars['kQDDoub']"
-  ],
-  [
    "element_refs['QFTrip_PL1'].length",
    "vars['l_quad']"
   ],
@@ -2134,14 +2110,6 @@
    "vars['kQFDoub']"
   ],
   [
-   "element_refs['QDDoub2_1R'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_1R'].k1",
-   "vars['kQDDoub']"
-  ],
-  [
    "element_refs['QFTrip_1R1'].length",
    "vars['l_quad']"
   ],
@@ -2588,14 +2556,6 @@
   [
    "element_refs['QFDoub_2L'].k1",
    "vars['kQFDoub']"
-  ],
-  [
-   "element_refs['QDDoub2_2L'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_2L'].k1",
-   "vars['kQDDoub']"
   ],
   [
    "element_refs['QFTrip_2L1'].length",
@@ -3046,14 +3006,6 @@
    "vars['kQFDoub']"
   ],
   [
-   "element_refs['QDDoub2_2R'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_2R'].k1",
-   "vars['kQDDoub']"
-  ],
-  [
    "element_refs['QFTrip_2R1'].length",
    "vars['l_quad']"
   ],
@@ -3500,14 +3452,6 @@
   [
    "element_refs['QFDoub_3L'].k1",
    "vars['kQFDoub']"
-  ],
-  [
-   "element_refs['QDDoub2_3L'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_3L'].k1",
-   "vars['kQDDoub']"
   ],
   [
    "element_refs['QFTrip_3L1'].length",
@@ -3958,14 +3902,6 @@
    "vars['kQFDoub']"
   ],
   [
-   "element_refs['QDDoub2_3R'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_3R'].k1",
-   "vars['kQDDoub']"
-  ],
-  [
    "element_refs['QFTrip_3R1'].length",
    "vars['l_quad']"
   ],
@@ -4412,14 +4348,6 @@
   [
    "element_refs['QFDoub_1L'].k1",
    "vars['kQFDoub']"
-  ],
-  [
-   "element_refs['QDDoub2_1L'].length",
-   "vars['l_quad']"
-  ],
-  [
-   "element_refs['QDDoub2_1L'].k1",
-   "vars['kQDDoub']"
   ],
   [
    "element_refs['QFTrip_1L1'].length",
@@ -12322,69 +12250,35 @@
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "weight": 0.19999999999991758
+   "weight": 0.1999999999999318
   },
   "DrDoub..11": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.049999999999979394,
+   "slice_offset": 0.04999999999998295,
    "weight": 0.19999999999998863
   },
   "DrDoub..12": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.09999999999997655,
-   "weight": 0.19999999999998863
+   "slice_offset": 0.0999999999999801,
+   "weight": 0.20000000000001705
   },
   "DrDoub..13": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.1499999999999737,
-   "weight": 0.20000000000001705
+   "slice_offset": 0.14999999999998437,
+   "weight": 0.19999999999998863
   },
   "DrDoub..14": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.19999999999997797,
-   "weight": 0.2000000000000881
-  },
-  "DrDoub..15": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "weight": 0.19999999999990337
-  },
-  "DrDoub..16": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.04999999999997584,
-   "weight": 0.19999999999998863
-  },
-  "DrDoub..17": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.099999999999973,
-   "weight": 0.19999999999998863
-  },
-  "DrDoub..18": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.14999999999997016,
-   "weight": 0.20000000000001705
-  },
-  "DrDoub..19": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.19999999999997442,
-   "weight": 0.20000000000010232
+   "slice_offset": 0.19999999999998153,
+   "weight": 0.2000000000000739
   },
   "DrDoub..2": {
    "__class__": "DriftSlice",
@@ -12392,74 +12286,6 @@
    "radiation_flag": 1,
    "slice_offset": 0.09999999999999787,
    "weight": 0.19999999999998863
-  },
-  "DrDoub..20": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "weight": 0.1999999999999318
-  },
-  "DrDoub..21": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.04999999999998295,
-   "weight": 0.19999999999998863
-  },
-  "DrDoub..22": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.0999999999999801,
-   "weight": 0.19999999999998863
-  },
-  "DrDoub..23": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.14999999999997726,
-   "weight": 0.20000000000001705
-  },
-  "DrDoub..24": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.19999999999998153,
-   "weight": 0.2000000000000739
-  },
-  "DrDoub..25": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "weight": 0.1999999999999318
-  },
-  "DrDoub..26": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.04999999999998295,
-   "weight": 0.19999999999998863
-  },
-  "DrDoub..27": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.0999999999999801,
-   "weight": 0.20000000000001705
-  },
-  "DrDoub..28": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.14999999999998437,
-   "weight": 0.19999999999998863
-  },
-  "DrDoub..29": {
-   "__class__": "DriftSlice",
-   "parent_name": "DrDoub",
-   "radiation_flag": 1,
-   "slice_offset": 0.19999999999998153,
-   "weight": 0.2000000000000739
   },
   "DrDoub..3": {
    "__class__": "DriftSlice",
@@ -12479,35 +12305,35 @@
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "weight": 0.19999999999998863
+   "weight": 0.19999999999991758
   },
   "DrDoub..6": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.04999999999999716,
+   "slice_offset": 0.049999999999979394,
    "weight": 0.19999999999998863
   },
   "DrDoub..7": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.09999999999999432,
-   "weight": 0.20000000000001705
+   "slice_offset": 0.09999999999997655,
+   "weight": 0.19999999999998863
   },
   "DrDoub..8": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.14999999999999858,
-   "weight": 0.19999999999998863
+   "slice_offset": 0.1499999999999737,
+   "weight": 0.20000000000001705
   },
   "DrDoub..9": {
    "__class__": "DriftSlice",
    "parent_name": "DrDoub",
    "radiation_flag": 1,
-   "slice_offset": 0.19999999999999574,
-   "weight": 0.20000000000001705
+   "slice_offset": 0.19999999999997797,
+   "weight": 0.2000000000000881
   },
   "DrTrans": {
    "__class__": "Drift",
@@ -12806,902 +12632,1113 @@
   },
   "DrTripl": {
    "__class__": "Drift",
-   "length": 1.95
+   "length": 2.5
   },
   "DrTripl..0": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.5000000000000008
+   "weight": 0.5
   },
   "DrTripl..0..0": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..1": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.04999999999999716,
-   "weight": 0.025641025641027826
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..10": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.5,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.4999999999999929,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..11": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.5499999999999972,
-   "weight": 0.025641025641027826
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..12": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.6000000000000014,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.5999999999999943,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..13": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.6499999999999986,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..14": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.6999999999999957,
-   "weight": 0.025641025641027826
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..15": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.75,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.7499999999999929,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..16": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.7999999999999972,
-   "weight": 0.025641025641027826
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..17": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.8500000000000014,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.8499999999999943,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..18": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.8999999999999986,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..19": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.9499999999999957,
-   "weight": 0.012820512820515792
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..2": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.10000000000000142,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.09999999999999432,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..20": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.3589743589743604
+   "slice_offset": 0.9999999999999929,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..21": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.7000000000000028,
-   "weight": 0.14102564102564036
+   "slice_offset": 1.0499999999999972,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..0..22": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.0999999999999943,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..0..23": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.1499999999999986,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..0..24": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.1999999999999957,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..3": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.14999999999999858,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..4": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.19999999999999574,
-   "weight": 0.025641025641027826
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..5": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.25,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.2499999999999929,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..6": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.29999999999999716,
-   "weight": 0.025641025641027826
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..7": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.3500000000000014,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.3499999999999943,
+   "weight": 0.020000000000001704
   },
   "DrTripl..0..8": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.3999999999999986,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..0..9": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.44999999999999574,
-   "weight": 0.025641025641027826
+   "weight": 0.019999999999998862
   },
   "DrTripl..1": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.9750000000000015,
-   "weight": 0.4999999999999993
+   "slice_offset": 1.25,
+   "weight": 0.5
   },
   "DrTripl..1..0": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.9750000000000015,
-   "weight": 0.012820512820512091
+   "slice_offset": 1.25,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..1": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.0,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.2999999999999972,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..10": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.4499999999999957,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.749999999999993,
+   "weight": 0.020000000000001704
   },
   "DrTripl..1..11": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.5,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.7999999999999972,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..12": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.5499999999999972,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.8499999999999943,
+   "weight": 0.020000000000001704
   },
   "DrTripl..1..13": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.6000000000000014,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.8999999999999986,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..14": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.6499999999999986,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.9499999999999957,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..15": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.6999999999999957,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.999999999999993,
+   "weight": 0.020000000000001704
   },
   "DrTripl..1..16": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.75,
-   "weight": 0.025641025641024183
+   "slice_offset": 2.049999999999997,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..17": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.7999999999999972,
-   "weight": 0.02564102564102783
+   "slice_offset": 2.0999999999999943,
+   "weight": 0.020000000000001704
   },
   "DrTripl..1..18": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.8500000000000014,
-   "weight": 0.025641025641024183
+   "slice_offset": 2.1499999999999986,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..19": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.8999999999999986,
-   "weight": 0.025641025641026348
+   "slice_offset": 2.1999999999999957,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..2": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.0499999999999972,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.3499999999999943,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..1..20": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.249999999999993,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..1..21": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.299999999999997,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..1..22": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.3499999999999943,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..1..23": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.3999999999999986,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..1..24": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.4499999999999957,
+   "weight": 0.020000000000001704
   },
   "DrTripl..1..3": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.1000000000000014,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.3999999999999986,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..4": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.1499999999999986,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.4499999999999957,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..5": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.1999999999999957,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.499999999999993,
+   "weight": 0.020000000000001704
   },
   "DrTripl..1..6": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.25,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.5499999999999972,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..7": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.2999999999999972,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.5999999999999943,
+   "weight": 0.020000000000001704
   },
   "DrTripl..1..8": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.3500000000000014,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.6499999999999986,
+   "weight": 0.019999999999998862
   },
   "DrTripl..1..9": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.3999999999999986,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.6999999999999957,
+   "weight": 0.019999999999998862
   },
   "DrTripl..10": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.39999999999997726,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.39999999999997016,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..100": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.3999999999999773,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..101": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.4499999999999815,
+   "weight": 0.02000000000000739
+  },
+  "DrTripl..102": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "weight": 0.5
+  },
+  "DrTripl..103": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.25,
+   "weight": 0.5
+  },
+  "DrTripl..104": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "weight": 0.5
+  },
+  "DrTripl..105": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.25,
+   "weight": 0.5
+  },
+  "DrTripl..106": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "weight": 0.2
+  },
+  "DrTripl..107": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 0.5,
+   "weight": 0.6
+  },
+  "DrTripl..108": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.0,
+   "weight": 0.2
   },
   "DrTripl..11": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.4499999999999744,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..12": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.4999999999999787,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.4999999999999716,
+   "weight": 0.020000000000001704
   },
   "DrTripl..13": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.5499999999999758,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..14": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.599999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..15": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.6499999999999773,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.6499999999999702,
+   "weight": 0.020000000000001704
   },
   "DrTripl..16": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.6999999999999744,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..17": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.7499999999999787,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.7499999999999716,
+   "weight": 0.020000000000001704
   },
   "DrTripl..18": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.7999999999999758,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..19": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.849999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..2": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.025641025641013254
+   "weight": 0.019999999999990338
   },
   "DrTripl..20": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.8999999999999773,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.8999999999999702,
+   "weight": 0.020000000000001704
   },
   "DrTripl..21": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.9499999999999744,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..22": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.9999999999999787,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.9999999999999716,
+   "weight": 0.020000000000001704
   },
   "DrTripl..23": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.0499999999999758,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..24": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.099999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..25": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.1499999999999773,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.1499999999999702,
+   "weight": 0.020000000000001704
   },
   "DrTripl..26": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.1999999999999744,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..27": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.2499999999999787,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.2499999999999716,
+   "weight": 0.020000000000001704
   },
   "DrTripl..28": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.2999999999999758,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..29": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.349999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..3": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.04999999999997584,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..30": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.3999999999999773,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.3999999999999702,
+   "weight": 0.020000000000001704
   },
   "DrTripl..31": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.4499999999999744,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..32": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.4999999999999787,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.4999999999999716,
+   "weight": 0.020000000000001704
   },
   "DrTripl..33": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.5499999999999758,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..34": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.599999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..35": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.6499999999999773,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.6499999999999702,
+   "weight": 0.020000000000001704
   },
   "DrTripl..36": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.6999999999999744,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..37": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.7499999999999716,
-   "weight": 0.02564102564102783
+   "weight": 0.020000000000001704
   },
   "DrTripl..38": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.7999999999999758,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..39": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 1.849999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..4": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.099999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..40": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.8999999999999773,
-   "weight": 0.02564102564103728
+   "slice_offset": 1.8999999999999702,
+   "weight": 0.020000000000001704
   },
   "DrTripl..41": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.025641025641016897
+   "slice_offset": 1.9499999999999744,
+   "weight": 0.019999999999998862
   },
   "DrTripl..42": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.04999999999998295,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.9999999999999716,
+   "weight": 0.020000000000001704
   },
   "DrTripl..43": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.0999999999999801,
-   "weight": 0.02564102564102783
+   "slice_offset": 2.049999999999976,
+   "weight": 0.019999999999998862
   },
   "DrTripl..44": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.14999999999998437,
-   "weight": 0.025641025641024183
+   "slice_offset": 2.099999999999973,
+   "weight": 0.019999999999998862
   },
   "DrTripl..45": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.19999999999998153,
-   "weight": 0.025641025641024183
+   "slice_offset": 2.14999999999997,
+   "weight": 0.020000000000001704
   },
   "DrTripl..46": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.24999999999997868,
-   "weight": 0.02564102564102783
+   "slice_offset": 2.1999999999999744,
+   "weight": 0.019999999999998862
   },
   "DrTripl..47": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.29999999999998295,
-   "weight": 0.025641025641024183
+   "slice_offset": 2.2499999999999716,
+   "weight": 0.019999999999998862
   },
   "DrTripl..48": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.3499999999999801,
-   "weight": 0.02564102564102783
+   "slice_offset": 2.2999999999999687,
+   "weight": 0.020000000000001704
   },
   "DrTripl..49": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.39999999999998437,
-   "weight": 0.025641025641024183
+   "slice_offset": 2.349999999999973,
+   "weight": 0.019999999999998862
   },
   "DrTripl..5": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.14999999999997726,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.14999999999997016,
+   "weight": 0.020000000000001704
   },
   "DrTripl..50": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.4499999999999815,
-   "weight": 0.025641025641024183
+   "slice_offset": 2.39999999999997,
+   "weight": 0.020000000000001704
   },
   "DrTripl..51": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.4999999999999787,
-   "weight": 0.02564102564102783
+   "slice_offset": 2.4499999999999744,
+   "weight": 0.020000000000010232
   },
   "DrTripl..52": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.549999999999983,
-   "weight": 0.025641025641024183
+   "weight": 0.01999999999999318
   },
   "DrTripl..53": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.5999999999999801,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.04999999999998295,
+   "weight": 0.019999999999998862
   },
   "DrTripl..54": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.6499999999999844,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.0999999999999801,
+   "weight": 0.020000000000001704
   },
   "DrTripl..55": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.6999999999999815,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.14999999999998437,
+   "weight": 0.019999999999998862
   },
   "DrTripl..56": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.7499999999999787,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.19999999999998153,
+   "weight": 0.019999999999998862
   },
   "DrTripl..57": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.799999999999983,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.24999999999997868,
+   "weight": 0.020000000000001704
   },
   "DrTripl..58": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.8499999999999801,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.29999999999998295,
+   "weight": 0.019999999999998862
   },
   "DrTripl..59": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.8999999999999844,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.3499999999999801,
+   "weight": 0.020000000000001704
   },
   "DrTripl..6": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.19999999999997442,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
   },
   "DrTripl..60": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.9499999999999815,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.39999999999998437,
+   "weight": 0.019999999999998862
   },
   "DrTripl..61": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.9999999999999787,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.4499999999999815,
+   "weight": 0.019999999999998862
   },
   "DrTripl..62": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.049999999999983,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.4999999999999787,
+   "weight": 0.020000000000001704
   },
   "DrTripl..63": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.09999999999998,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.549999999999983,
+   "weight": 0.019999999999998862
   },
   "DrTripl..64": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.1499999999999844,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.5999999999999801,
+   "weight": 0.020000000000001704
   },
   "DrTripl..65": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.1999999999999815,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.6499999999999844,
+   "weight": 0.019999999999998862
   },
   "DrTripl..66": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.2499999999999787,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.6999999999999815,
+   "weight": 0.019999999999998862
   },
   "DrTripl..67": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.299999999999983,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.7499999999999787,
+   "weight": 0.020000000000001704
   },
   "DrTripl..68": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.34999999999998,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.799999999999983,
+   "weight": 0.019999999999998862
   },
   "DrTripl..69": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.3999999999999844,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.8499999999999801,
+   "weight": 0.020000000000001704
   },
   "DrTripl..7": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.24999999999997868,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.24999999999997158,
+   "weight": 0.020000000000001704
   },
   "DrTripl..70": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.4499999999999815,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.8999999999999844,
+   "weight": 0.019999999999998862
   },
   "DrTripl..71": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.4999999999999787,
-   "weight": 0.02564102564102783
+   "slice_offset": 0.9499999999999815,
+   "weight": 0.019999999999998862
   },
   "DrTripl..72": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.549999999999983,
-   "weight": 0.025641025641024183
+   "slice_offset": 0.9999999999999787,
+   "weight": 0.020000000000001704
   },
   "DrTripl..73": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.59999999999998,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.049999999999983,
+   "weight": 0.019999999999998862
   },
   "DrTripl..74": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.6499999999999844,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.09999999999998,
+   "weight": 0.020000000000001704
   },
   "DrTripl..75": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.6999999999999815,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.1499999999999844,
+   "weight": 0.019999999999998862
   },
   "DrTripl..76": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.7499999999999787,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.1999999999999815,
+   "weight": 0.019999999999998862
   },
   "DrTripl..77": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.799999999999983,
-   "weight": 0.025641025641024183
+   "slice_offset": 1.2499999999999787,
+   "weight": 0.020000000000001704
   },
   "DrTripl..78": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.84999999999998,
-   "weight": 0.02564102564102783
+   "slice_offset": 1.299999999999983,
+   "weight": 0.019999999999998862
   },
   "DrTripl..79": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.8999999999999844,
-   "weight": 0.025641025641033634
+   "slice_offset": 1.34999999999998,
+   "weight": 0.020000000000001704
   },
   "DrTripl..8": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.29999999999997584,
-   "weight": 0.025641025641024183
+   "weight": 0.019999999999998862
   },
   "DrTripl..80": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.6410256410256411
+   "slice_offset": 1.3999999999999844,
+   "weight": 0.019999999999998862
   },
   "DrTripl..81": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.25,
-   "weight": 0.358974358974359
+   "slice_offset": 1.4499999999999815,
+   "weight": 0.019999999999998862
   },
   "DrTripl..82": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.3589743589743604
+   "slice_offset": 1.4999999999999787,
+   "weight": 0.020000000000001704
   },
   "DrTripl..83": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.7000000000000028,
-   "weight": 0.6410256410256395
+   "slice_offset": 1.549999999999983,
+   "weight": 0.019999999999998862
   },
   "DrTripl..84": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "weight": 0.11538461538461611
+   "slice_offset": 1.59999999999998,
+   "weight": 0.020000000000001704
   },
   "DrTripl..85": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 0.22500000000000142,
-   "weight": 0.7692307692307693
+   "slice_offset": 1.6499999999999844,
+   "weight": 0.019999999999998862
   },
   "DrTripl..86": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
-   "slice_offset": 1.7250000000000014,
-   "weight": 0.11538461538461464
+   "slice_offset": 1.6999999999999815,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..87": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.7499999999999787,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..88": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.799999999999983,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..89": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.84999999999998,
+   "weight": 0.020000000000001704
   },
   "DrTripl..9": {
    "__class__": "DriftSlice",
    "parent_name": "DrTripl",
    "radiation_flag": 1,
    "slice_offset": 0.349999999999973,
-   "weight": 0.02564102564102783
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..90": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.8999999999999844,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..91": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.9499999999999815,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..92": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 1.9999999999999787,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..93": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.049999999999983,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..94": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.09999999999998,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..95": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.1499999999999844,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..96": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.1999999999999815,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..97": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.2499999999999787,
+   "weight": 0.020000000000001704
+  },
+  "DrTripl..98": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.299999999999983,
+   "weight": 0.019999999999998862
+  },
+  "DrTripl..99": {
+   "__class__": "DriftSlice",
+   "parent_name": "DrTripl",
+   "radiation_flag": 1,
+   "slice_offset": 2.34999999999998,
+   "weight": 0.019999999999998862
   },
   "DrTrips": {
    "__class__": "Drift",
@@ -23698,7 +23735,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23708,7 +23745,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23718,7 +23755,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23728,7 +23765,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23738,7 +23775,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23748,7 +23785,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23758,7 +23795,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23826,7 +23863,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -23894,7 +23931,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "prototype": "QDarcM",
@@ -25390,7 +25427,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -25399,7 +25436,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25409,7 +25446,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25419,7 +25456,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25429,7 +25466,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25439,7 +25476,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25449,7 +25486,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25459,7 +25496,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25527,7 +25564,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25595,7 +25632,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.9091991045752295,
+   "k1": 3.920818617396088,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDS",
@@ -25663,334 +25700,70 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
-  },
-  "QDDoub2_1L": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_1R": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_2L": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_2R": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_3L": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_3R": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_PL": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_PL..0": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1,
-   "weight": 0.16666666666658614
-  },
-  "QDDoub2_PL..1": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1,
-   "slice_offset": 0.04999999999997584,
-   "weight": 0.1666666666666809
-  },
-  "QDDoub2_PL..2": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1,
-   "slice_offset": 0.0999999999999801,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_PL..3": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1,
-   "slice_offset": 0.14999999999997726,
-   "weight": 0.1666666666666809
-  },
-  "QDDoub2_PL..4": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1,
-   "slice_offset": 0.19999999999998153,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_PL..5": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1,
-   "slice_offset": 0.24999999999997868,
-   "weight": 0.16666666666673768
-  },
-  "QDDoub2_PL..entry_map": {
-   "__class__": "ThinSliceQuadrupoleEntry",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1
-  },
-  "QDDoub2_PL..exit_map": {
-   "__class__": "ThinSliceQuadrupoleExit",
-   "parent_name": "QDDoub2_PL",
-   "radiation_flag": 1,
-   "slice_offset": 0.3
-  },
-  "QDDoub2_PL_entry": {
-   "__class__": "Marker"
-  },
-  "QDDoub2_PL_exit": {
-   "__class__": "Marker"
-  },
-  "QDDoub2_PR": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_PR..0": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1,
-   "weight": 0.16666666666658614
-  },
-  "QDDoub2_PR..1": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1,
-   "slice_offset": 0.04999999999997584,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_PR..2": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1,
-   "slice_offset": 0.099999999999973,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_PR..3": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1,
-   "slice_offset": 0.14999999999997016,
-   "weight": 0.1666666666666809
-  },
-  "QDDoub2_PR..4": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1,
-   "slice_offset": 0.19999999999997442,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_PR..5": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1,
-   "slice_offset": 0.24999999999997158,
-   "weight": 0.1666666666667614
-  },
-  "QDDoub2_PR..entry_map": {
-   "__class__": "ThinSliceQuadrupoleEntry",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1
-  },
-  "QDDoub2_PR..exit_map": {
-   "__class__": "ThinSliceQuadrupoleExit",
-   "parent_name": "QDDoub2_PR",
-   "radiation_flag": 1,
-   "slice_offset": 0.3
-  },
-  "QDDoub2_PR_entry": {
-   "__class__": "Marker"
-  },
-  "QDDoub2_PR_exit": {
-   "__class__": "Marker"
-  },
-  "QDDoub2_xR": {
-   "__class__": "Quadrupole",
-   "edge_entry_active": 1,
-   "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
-   "length": 0.3,
-   "order": 5,
-   "prototype": "QDDoub",
-   "radiation_flag": 1
-  },
-  "QDDoub2_xR..0": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_xR..1": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1,
-   "slice_offset": 0.04999999999999716,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_xR..2": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1,
-   "slice_offset": 0.09999999999999432,
-   "weight": 0.1666666666666809
-  },
-  "QDDoub2_xR..3": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1,
-   "slice_offset": 0.14999999999999858,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_xR..4": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1,
-   "slice_offset": 0.19999999999999574,
-   "weight": 0.1666666666666572
-  },
-  "QDDoub2_xR..5": {
-   "__class__": "ThickSliceQuadrupole",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1,
-   "slice_offset": 0.2499999999999929,
-   "weight": 0.16666666666669033
-  },
-  "QDDoub2_xR..entry_map": {
-   "__class__": "ThinSliceQuadrupoleEntry",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1
-  },
-  "QDDoub2_xR..exit_map": {
-   "__class__": "ThinSliceQuadrupoleExit",
-   "parent_name": "QDDoub2_xR",
-   "radiation_flag": 1,
-   "slice_offset": 0.3
-  },
-  "QDDoub2_xR_entry": {
-   "__class__": "Marker"
-  },
-  "QDDoub2_xR_exit": {
-   "__class__": "Marker"
   },
   "QDDoubDS_1L": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_1R": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_2L": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_2R": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_3L": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_3R": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_PL": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_PR": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
   },
   "QDDoubDS_xR": {
    "__class__": "Quadrupole",
-   "k1": -3.026047668057933,
+   "k1": -3.9042455172456356,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -25999,7 +25772,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26009,7 +25782,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26019,7 +25792,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26029,7 +25802,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26039,7 +25812,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26049,7 +25822,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26059,7 +25832,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26127,7 +25900,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26195,7 +25968,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.7740719510505567,
+   "k1": -2.7483648633848197,
    "length": 0.3,
    "order": 5,
    "prototype": "QDDoub",
@@ -26263,7 +26036,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.3,
    "order": 5,
    "prototype": "QDtr",
@@ -26273,7 +26046,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.3,
    "order": 5,
    "prototype": "QDtr",
@@ -26283,7 +26056,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.3,
    "order": 5,
    "prototype": "QDtr",
@@ -26293,7 +26066,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.15,
    "order": 5,
    "prototype": "QDtrH",
@@ -26340,7 +26113,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.15,
    "order": 5,
    "prototype": "QDtrH",
@@ -26387,7 +26160,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.15,
    "order": 5,
    "prototype": "QDtrH",
@@ -26444,7 +26217,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.15,
    "order": 5,
    "prototype": "QDtrH",
@@ -26454,7 +26227,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.15,
    "order": 5,
    "prototype": "QDtrH",
@@ -26473,7 +26246,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -2.6960613083444267,
+   "k1": -2.7608632829759014,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -26482,7 +26255,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -26491,7 +26264,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": -4.134751831015471,
+   "k1": -3.579588008186032,
    "length": 0.15,
    "order": 5,
    "radiation_flag": 1
@@ -26950,7 +26723,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -26960,7 +26733,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -26970,7 +26743,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -26980,7 +26753,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -26990,7 +26763,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -27000,7 +26773,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -27010,7 +26783,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -27078,7 +26851,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -27146,7 +26919,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "prototype": "QFarcM",
@@ -28609,7 +28382,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -28618,7 +28391,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28628,7 +28401,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28638,7 +28411,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28648,7 +28421,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28658,7 +28431,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28668,7 +28441,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28678,7 +28451,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28746,7 +28519,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28814,7 +28587,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5573855058826758,
+   "k1": 2.581365923110831,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDS",
@@ -28882,7 +28655,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -28891,7 +28664,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -28901,7 +28674,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -28911,7 +28684,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -28921,7 +28694,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -28931,7 +28704,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -28941,7 +28714,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -28951,7 +28724,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -29019,7 +28792,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -29087,7 +28860,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 4.736734866210353,
+   "k1": 2.641310524648558,
    "length": 0.3,
    "order": 5,
    "prototype": "QFDoub",
@@ -29155,7 +28928,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29165,7 +28938,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29175,7 +28948,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29185,7 +28958,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29195,7 +28968,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29205,7 +28978,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29215,7 +28988,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29283,7 +29056,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29351,7 +29124,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29439,7 +29212,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29449,7 +29222,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "prototype": "QFtr",
@@ -29477,7 +29250,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 3.0479215779771103,
+   "k1": 3.0880096362602716,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -29486,7 +29259,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.3,
    "order": 5,
    "radiation_flag": 1
@@ -29495,7 +29268,7 @@
    "__class__": "Quadrupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k1": 2.5328213317067227,
+   "k1": 1.9170079306524346,
    "length": 0.15,
    "order": 5,
    "radiation_flag": 1
@@ -29519,7 +29292,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "radiation_flag": 1
@@ -29528,7 +29301,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29538,7 +29311,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29548,7 +29321,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29558,7 +29331,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29568,7 +29341,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29578,7 +29351,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29588,7 +29361,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29598,7 +29371,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29608,7 +29381,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29618,7 +29391,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29628,7 +29401,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29638,7 +29411,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29648,7 +29421,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29658,7 +29431,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29668,7 +29441,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29678,7 +29451,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29688,7 +29461,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29698,7 +29471,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29708,7 +29481,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29718,7 +29491,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29728,7 +29501,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29738,7 +29511,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29748,7 +29521,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29758,7 +29531,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29768,7 +29541,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29778,7 +29551,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29788,7 +29561,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29798,7 +29571,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29808,7 +29581,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29818,7 +29591,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29828,7 +29601,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29838,7 +29611,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD1arc",
@@ -29848,7 +29621,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "radiation_flag": 1
@@ -29857,7 +29630,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29867,7 +29640,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29877,7 +29650,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29887,7 +29660,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29897,7 +29670,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29907,7 +29680,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29917,7 +29690,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29927,7 +29700,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29937,7 +29710,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29947,7 +29720,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29957,7 +29730,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29967,7 +29740,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29977,7 +29750,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29987,7 +29760,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -29997,7 +29770,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30007,7 +29780,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30017,7 +29790,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30027,7 +29800,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30037,7 +29810,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30047,7 +29820,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30057,7 +29830,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30067,7 +29840,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30077,7 +29850,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30087,7 +29860,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30097,7 +29870,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30107,7 +29880,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30117,7 +29890,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30127,7 +29900,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30137,7 +29910,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30147,7 +29920,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30157,7 +29930,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30167,7 +29940,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": -118.76861198129667,
+   "k2": -115.45405457148235,
    "length": 0.1,
    "order": 5,
    "prototype": "XD2arc",
@@ -30177,7 +29950,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "radiation_flag": 1
@@ -30186,7 +29959,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30196,7 +29969,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30206,7 +29979,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30216,7 +29989,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30226,7 +29999,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30236,7 +30009,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30246,7 +30019,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30256,7 +30029,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30266,7 +30039,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30276,7 +30049,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30286,7 +30059,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30296,7 +30069,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30306,7 +30079,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30316,7 +30089,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30326,7 +30099,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30336,7 +30109,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30346,7 +30119,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30356,7 +30129,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30366,7 +30139,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30376,7 +30149,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30386,7 +30159,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30396,7 +30169,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30406,7 +30179,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30416,7 +30189,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30426,7 +30199,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30436,7 +30209,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30446,7 +30219,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30456,7 +30229,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30466,7 +30239,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30476,7 +30249,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30486,7 +30259,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30496,7 +30269,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF1arc",
@@ -30506,7 +30279,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "radiation_flag": 1
@@ -30515,7 +30288,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30525,7 +30298,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30535,7 +30308,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30545,7 +30318,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30555,7 +30328,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30565,7 +30338,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30575,7 +30348,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30585,7 +30358,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30595,7 +30368,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30605,7 +30378,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30615,7 +30388,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30625,7 +30398,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30635,7 +30408,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30645,7 +30418,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30655,7 +30428,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30665,7 +30438,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30675,7 +30448,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30685,7 +30458,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30695,7 +30468,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30705,7 +30478,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30715,7 +30488,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30725,7 +30498,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30735,7 +30508,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30745,7 +30518,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30755,7 +30528,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30765,7 +30538,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30775,7 +30548,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30785,7 +30558,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30795,7 +30568,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30805,7 +30578,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30815,7 +30588,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30825,7 +30598,7 @@
    "__class__": "Sextupole",
    "edge_entry_active": 1,
    "edge_exit_active": 1,
-   "k2": 77.67638571553132,
+   "k2": 75.46363968277745,
    "length": 0.1,
    "order": 5,
    "prototype": "XF2arc",
@@ -30837,13 +30610,9 @@
   },
   "||drift_2": {
    "__class__": "Drift",
-   "length": 0.975
+   "length": 1.25
   },
   "||drift_3": {
-   "__class__": "Drift",
-   "length": 0.9750000000000003
-  },
-  "||drift_4": {
    "__class__": "Drift",
    "length": 0.39999999999999947
   }
@@ -31022,10 +30791,6 @@
      },
      "QFDoub_xR",
      {
-      "name": "DrDoub"
-     },
-     "QDDoub2_xR",
-     {
       "name": "DrTripl"
      },
      "QFTrip_xR1",
@@ -31119,11 +30884,8 @@
     "QDDoub_xR",
     "DrDoub",
     "QFDoub_xR",
-    "DrDoub",
-    "QDDoub2_xR",
-    "DrTripl..0..20",
+    "DrTripl..0",
     "DSW_xR",
-    "DrTripl..0..21",
     "CtrS1_xR1",
     "DrTripl..1",
     "QFTrip_xR1",
@@ -31468,9 +31230,9 @@
     "QF_cell_tr1",
     "||drift_2",
     "Mkr_cell_tr",
-    "||drift_3",
+    "||drift_2",
     "QF_cell_tr2",
-    "||drift_4",
+    "||drift_3",
     "QD_cell_trH2"
    ],
    "env_particles": {},
@@ -31710,8 +31472,6 @@
         "QDDoub_PR",
         "DrDoub",
         "QFDoub_PR",
-        "DrDoub",
-        "QDDoub2_PR",
         "DrTripl",
         "QFTrip_PR1",
         "DrTrips",
@@ -31859,8 +31619,6 @@
         "DrTrips",
         "QFTrip_PL1",
         "DrTripl",
-        "QDDoub2_PL",
-        "DrDoub",
         "QFDoub_PL",
         "DrDoub",
         "QDDoub_PL",
@@ -32159,22 +31917,18 @@
     "QDDoub_PR",
     "DrDoub",
     "QFDoub_PR",
-    "DrDoub",
-    "QDDoub2_PR",
-    "DrTripl..82",
+    "DrTripl..104",
     "DSW_PR",
-    "DrTripl..83",
+    "DrTripl..105",
     "QFTrip_PR1",
     "DrTrips",
     "QDTripC_PR2H",
     "QDTripC_PL2H",
     "DrTrips",
     "QFTrip_PL1",
-    "DrTripl..80",
+    "DrTripl..102",
     "DSW_PL",
-    "DrTripl..81",
-    "QDDoub2_PL",
-    "DrDoub",
+    "DrTripl..103",
     "QFDoub_PL",
     "DrDoub",
     "QDDoub_PL",
@@ -32520,8 +32274,6 @@
         "QDDoub_1R",
         "DrDoub",
         "QFDoub_1R",
-        "DrDoub",
-        "QDDoub2_1R",
         "DrTripl",
         "QFTrip_1R1",
         "DrTrips",
@@ -32529,8 +32281,6 @@
         "DrTrips",
         "QFTrip_2L1",
         "DrTripl",
-        "QDDoub2_2L",
-        "DrDoub",
         "QFDoub_2L",
         "DrDoub",
         "QDDoub_2L",
@@ -32676,8 +32426,6 @@
         "QDDoub_2R",
         "DrDoub",
         "QFDoub_2R",
-        "DrDoub",
-        "QDDoub2_2R",
         "DrTripl",
         "QFTrip_2R1",
         "DrTrips",
@@ -32685,8 +32433,6 @@
         "DrTrips",
         "QFTrip_3L1",
         "DrTripl",
-        "QDDoub2_3L",
-        "DrDoub",
         "QFDoub_3L",
         "DrDoub",
         "QDDoub_3L",
@@ -32832,8 +32578,6 @@
         "QDDoub_3R",
         "DrDoub",
         "QFDoub_3R",
-        "DrDoub",
-        "QDDoub2_3R",
         "DrTripl",
         "QFTrip_3R1",
         "DrTrips"
@@ -32980,8 +32724,6 @@
         "DrTrips",
         "QFTrip_1L1",
         "DrTripl",
-        "QDDoub2_1L",
-        "DrDoub",
         "QFDoub_1L",
         "DrDoub",
         "QDDoub_1L",
@@ -33278,19 +33020,15 @@
     "QDDoub_1R",
     "DrDoub",
     "QFDoub_1R",
-    "DrDoub",
-    "QDDoub2_1R",
-    "DrTripl..84",
+    "DrTripl..106",
     "RFCav_1",
-    "DrTripl..86",
+    "DrTripl..108",
     "QFTrip_1R1",
     "DrTrips",
     "QDTripC_2L2",
     "DrTrips",
     "QFTrip_2L1",
     "DrTripl",
-    "QDDoub2_2L",
-    "DrDoub",
     "QFDoub_2L",
     "DrDoub",
     "QDDoub_2L",
@@ -33504,8 +33242,6 @@
     "QDDoub_2R",
     "DrDoub",
     "QFDoub_2R",
-    "DrDoub",
-    "QDDoub2_2R",
     "DrTripl",
     "QFTrip_2R1",
     "DrTrips",
@@ -33513,8 +33249,6 @@
     "DrTrips",
     "QFTrip_3L1",
     "DrTripl",
-    "QDDoub2_3L",
-    "DrDoub",
     "QFDoub_3L",
     "DrDoub",
     "QDDoub_3L",
@@ -33728,8 +33462,6 @@
     "QDDoub_3R",
     "DrDoub",
     "QFDoub_3R",
-    "DrDoub",
-    "QDDoub2_3R",
     "DrTripl",
     "QFTrip_3R1",
     "DrTrips",
@@ -33737,8 +33469,6 @@
     "DrTrips",
     "QFTrip_1L1",
     "DrTripl",
-    "QDDoub2_1L",
-    "DrDoub",
     "QFDoub_1L",
     "DrDoub",
     "QDDoub_1L",
