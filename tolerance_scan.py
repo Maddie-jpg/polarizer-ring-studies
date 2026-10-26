@@ -499,8 +499,8 @@ def track_momentum_acceptance(line, tw, beam, gamma_beta, amplitude=0.05):
 # ============================================================================
 #  Summary
 # ============================================================================
-def summarise(runs, out_dir):
-    """Work out the tolerance and draw the two summary plots."""
+def summarise(runs, out_dir, apertures, study):
+    """Work out the tolerance, draw the summary plots, and write it out for use."""
     df = runs.copy()
     # 'ok' comes back from CSV as object dtype if any row failed
     df['ok'] = df['ok'].fillna(False).astype(bool)
@@ -568,6 +568,46 @@ def summarise(runs, out_dir):
     if tolerance is None:
         log('  Scale 0 already fails, so there is no tolerance to quote. '
             'The alignment errors alone are enough to break the pass criteria.')
+        log('  Nothing written to the error file; the other studies stay '
+            'alignment-only.')
+        return
+
+    write_adopted_errors(tolerance, apertures, study, out_dir)
+
+
+def write_adopted_errors(scale, apertures, study, out_dir):
+    """Write the adopted field-quality level where the other scripts find it.
+
+    misalignments_corrections.load_multipole_errors() reads this file. If it is
+    absent, every lattice is built with alignment and main-field errors only;
+    if it is present, these harmonics go on as well. So this one file is what
+    makes the tolerance the error level the Chapter 4 results actually carry,
+    rather than a number quoted on its own.
+    """
+    adopted = {
+        'adopted_scale': float(scale),
+        'table_name': ERROR_TABLE,
+        'harmonics': ERROR_TABLES[ERROR_TABLE],
+        'R_ref': {t: a['R_ref'] for t, a in apertures.items()},
+        'criteria': {'DA_required': DA_REQUIRED, 'pass_target': PASS_TARGET,
+                     'required_sigma': REQUIRED_SIGMA,
+                     'required_delta': REQUIRED_DELTA,
+                     'required_emit_x': REQUIRED_EMIT_X,
+                     'required_emit_y': REQUIRED_EMIT_Y},
+        'scanned': {'scales': list(SCALES), 'n_seeds': N_SEEDS,
+                    'first_seed': FIRST_SEED, 'turns': TURNS},
+        'study': study,
+        'written': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'written_by': os.path.basename(__file__),
+    }
+    repo_root = os.path.abspath(os.path.dirname(__file__))
+    for path in (os.path.join(repo_root, 'multipole_errors.json'),
+                 os.path.join(out_dir, 'multipole_errors.json')):
+        with open(path, 'w') as f:
+            json.dump(adopted, f, indent=2)
+    log(f'Adopted scale {scale:g}x written to multipole_errors.json - every '
+        f'lattice built from now on carries these errors. Delete or rename '
+        f'that file to go back to alignment errors only.')
 
 
 def save_run(row, csv_path):
@@ -724,7 +764,8 @@ def main():
                 f'MA = [{row["MA_neg"]*100:.2f}, {row["MA_pos"]*100:.2f}] % '
                 f'(needs +-{beam["delta_max"]*100:.2f} %)  [{row["runtime_s"]:.0f} s]')
 
-    summarise(pd.read_csv(csv_path), out_dir)
+    study = {'design': design, 'config': config, 'phase': phase, 'changes': changes}
+    summarise(pd.read_csv(csv_path), out_dir, apertures, study)
     log(f'Results in {out_dir}')
 
 
