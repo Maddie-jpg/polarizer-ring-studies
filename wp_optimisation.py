@@ -24,6 +24,10 @@ from LatticeBuild.linear_optics import matchingWP, matchingBeta, _match_cells_3f
 import xutil_DA_CC.xsuite_utilities as xutil
 
 study = paths.study_from_env()
+# Every figure and data file from this script goes here, e.g.
+# Results/D1/C9/90deg_FDF/WorkingPoint/
+WP_DIR = paths.results_dir(study['design'], study['config'], study['phase'],
+                           study['changes'], metric='WorkingPoint')
 pdr = paths.load_lattice(study['design'], study['config'], 'perfect',
                          study['phase'], study['changes'])
 ring = pdr.lines['ring']
@@ -374,10 +378,10 @@ scan = scan_mux_muy_emittance(
     n_mux=20, n_muy=20,
 )
 fig, axes = plot_mux_muy_4panel(scan)
-fig.savefig('wp_plots.png')
+fig.savefig(f'{WP_DIR}/phase_advance_scan.png', dpi=300, bbox_inches='tight')
 
 fig2, ax2 = plot_mux_muy_combined_chroma(scan)
-fig2.savefig('combined_chroma_plot.png')
+fig2.savefig(f'{WP_DIR}/combined_chroma_plot.png', dpi=300, bbox_inches='tight')
 
 # Guard: kQFarc/kQDarc are shared globally between cell_arc and ring (both
 # come from `pdr`), so if the scan above ever again leaves them at a bad
@@ -731,8 +735,9 @@ QX, QY, maps = scan_working_point(
     n_points=400,
 )
 
-plot_rdt_lines_combined(QX, QY, maps, qx_range, qy_range,
-                        current_qx=current_qx, current_qy=current_qy)
+fig_rdt = plot_rdt_lines_combined(QX, QY, maps, qx_range, qy_range,
+                                  current_qx=current_qx, current_qy=current_qy)
+fig_rdt.savefig(f'{WP_DIR}/rdt_resonance_lines.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 best_qx, best_qy, combined_score = find_best_working_point(QX, QY, maps)
@@ -1116,7 +1121,7 @@ for c0 in range(0, len(qy_scan), rows_per_chunk):
         lattice_json, qx_scan, qy_chunk,
         nemitt_x=n_emittancex, nemitt_y=n_emittancey,
         n_turns=530, n_particles=200, radiation='mean',
-        sext_knobs=None, n_workers=None,
+        sext_knobs=['k2XFarc', 'k2XDarc'], n_workers=None,
     )
     QX_parts.append(QX_c)
     QY_parts.append(QY_c)
@@ -1137,7 +1142,8 @@ del QX_parts, QY_parts, DA_parts
 gc.collect()
 
 QX_t, QY_t, DA_t, _ = trim_failed_edges(QX, QY, DA_map)
-plot_tune_scan(QX_t, QY_t, DA_t, current_qx=current_qx, current_qy=current_qy)
+fig_da = plot_tune_scan(QX_t, QY_t, DA_t, current_qx=current_qx, current_qy=current_qy)
+fig_da.savefig(f'{WP_DIR}/tune_scan_min_DA.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 best_qx, best_qy, best_da = best_from_map(QX, QY, DA_map)
@@ -1147,9 +1153,25 @@ best_qx, best_qy, best_da = best_from_map(QX, QY, DA_map)
 # tracks the DA (rank correlation; strongly negative = "bigger is worse").
 metric = wp_da_scan.metric_maps(scan_records, QX[0], QY[:, 0])
 QX_p, QY_p, DA_p, metric_p = trim_failed_edges(QX, QY, DA_map, metric)
-plot_metric_maps(QX_p, QY_p, metric_p, DA_p, current_qx=current_qx, current_qy=current_qy)
+fig_m = plot_metric_maps(QX_p, QY_p, metric_p, DA_p, current_qx=current_qx, current_qy=current_qy)
+fig_m.savefig(f'{WP_DIR}/tune_scan_metric_maps.png', dpi=300, bbox_inches='tight')
 plt.show()
-print_metric_correlations(metric, DA_map)
+
+# Correlation table: printed as before, and also saved as text
+import contextlib, io, json
+_buf = io.StringIO()
+with contextlib.redirect_stdout(_buf):
+    print_metric_correlations(metric, DA_map)
+print(_buf.getvalue(), end='')
+with open(f'{WP_DIR}/tune_scan_correlations.txt', 'w') as f:
+    f.write(_buf.getvalue())
+
+# Raw scan data, so the figures can be redrawn without rerunning the scan
+np.savez(f'{WP_DIR}/tune_scan_data.npz', QX=QX, QY=QY, DA_map=DA_map,
+         current_qx=current_qx, current_qy=current_qy, **metric)
+with open(f'{WP_DIR}/tune_scan_records.json', 'w') as f:
+    json.dump(scan_records, f, indent=1, default=float)
+print(f'Working-point figures and data saved to {WP_DIR}')
 print(f"Best point in scanned window: Qx={best_qx:.4f}, Qy={best_qy:.4f}, "
       f"min_DA={best_da:.2f} sigma")
 

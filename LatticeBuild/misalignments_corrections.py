@@ -11,6 +11,8 @@ Contents
 --------
 Instrumentation  insert_BPMs*, insert_correctors*, insert_bpms_and_correctors
 Errors           misalignments (magnets), misalignments_correctors, bpm_reading_errors
+                 insert_multipole_errors / apply_multipole_errors - field-quality
+                 errors, applied only if multipole_errors.json exists
 Correction       orbit_correction, report_eigenvector_counts
 Workflow         prepare_seed_line  - misalign + (optionally) correct one seed
                  setup_spin_reference - set g-2 and energy for spin tracking
@@ -18,8 +20,11 @@ Workflow         prepare_seed_line  - misalign + (optionally) correct one seed
 All error sigmas are in m (shifts) and rad (rolls). Defaults live in config.py.
 """
 
+import os
 import re
 import sys
+import json
+from math import factorial
 from pathlib import Path
 
 import numpy as np
@@ -695,6 +700,10 @@ def misalignments(line, sigma, seed=None, cut=2.5):
             elif t == 'DipoleEdge':
                 ref.k = ref.k * (1 + eps)             # edge focusing follows the field
 
+    # Field-quality errors on top, if a tolerance scan has set a level.
+    # No file -> nothing happens and this is the alignment-only model.
+    apply_multipole_errors(line, seed, cut=cut)
+
     return line
 
 def misalignments_correctors(line, sigma, seed=None, cut=2.5):
@@ -748,6 +757,145 @@ def bpm_reading_errors(bpm_names, sigma, rng, cut=2.5):
 # Shared workflow helpers - use these instead of copying the steps into scripts
 # =============================================================================
 
+# =============================================================================
+# Multipole field errors (section 2.5.2)
+# =============================================================================
+# tolerance_scan.py writes the adopted field-quality level to a JSON file.
+# If that file exists, the error multipoles it describes are added to every
+# lattice built here; if it does not, nothing happens and the lattice carries
+# alignment and main-field errors only, exactly as before.
+#
+# The kicks have to be their own thin Multipole elements. Setting knl/ksl on a
+# thick Bend/Quadrupole/Sextupole has no effect in this version of Xtrack
+# (checked 26/10: no change in px/py even with the values set at construction
+# and num_multipole_kicks raised), which is why they are inserted rather than
+# written onto the magnets.
+
+MULTIPOLE_ERROR_FILE = getattr(
+    cfg, 'MULTIPOLE_ERROR_FILE',
+    str(Path(_REPO_ROOT) / 'multipole_errors.json'))
+
+_MPE_PREFIX = 'MPE'          # MPEs_<magnet> at the start, MPEe_<magnet> at the end
+_MPE_N_KNL = 14              # room for harmonics up to b14 / a14
+_MAIN_ORDER = {'Bend': 1, 'Quadrupole': 2, 'Sextupole': 3}
+
+
+def load_multipole_errors(path=None):
+    """Return the adopted multipole error settings, or None if there are none.
+
+    None is the normal case while the tolerance scan has not been run yet.
+    """
+    path = path or MULTIPOLE_ERROR_FILE
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        errors = json.load(f)
+    missing = {'adopted_scale', 'harmonics', 'R_ref'} - set(errors)
+    if missing:
+        print(f'WARNING: {path} is missing {sorted(missing)}; ignoring it')
+        return None
+    return errors
+
+
+def insert_multipole_errors(pdr, line=None, path=None):
+    """Put empty thin multipoles at the ends of every magnet, ready to be filled.
+
+    Called for you by insert_bpms_and_correctors. Does nothing if there is no
+    error file, so a lattice built without one is unchanged.
+    """
+    errors = load_multipole_errors(path)
+    if errors is None:
+        return pdr
+
+    line = line if line is not None else pdr.lines['ring']
+    tt = line.get_table()
+    if any(t in ('BFieldExpansion', 'ThickSliceBFieldExpansion') for t in tt.element_type):
+        print('WARNING: multipole errors are only set up for hard-edge magnets; '
+              'skipping them for this lattice.')
+        return pdr
+
+    places = []
+    for magnet_type in _MAIN_ORDER:
+        for m in tt.rows[tt.element_type == magnet_type].name:
+            for end in ('start', 'end'):
+                name = f'{_MPE_PREFIX}{end[0]}_{m}'
+                pdr.new(name, xt.Multipole,
+                        knl=np.zeros(_MPE_N_KNL), ksl=np.zeros(_MPE_N_KNL))
+                places.append(pdr.place(name, at=f'{m}@{end}'))
+    line.insert(places)
+    print(f'Multipole errors: inserted {len(places)} thin kicks '
+          f'(scale {errors["adopted_scale"]}x the {errors.get("table_name", "?")} table)')
+    return pdr
+
+
+def apply_multipole_errors(line, seed, errors=None, cut=2.5):
+    """Fill the thin kicks with the adopted harmonic content.
+
+    Each harmonic is a fixed fraction b_n of its magnet's own integrated
+    strength, scaled by the reference radius:
+
+        knl[n-1] = K_(m-1)L * b_n * (n-1)!/(m-1)! * R_ref^(m-n)
+
+    Half goes at the magnet entry and half at the exit. The kicks inherit the
+    magnet's shift and roll, so feed-down from the misalignments is automatic.
+
+    Does nothing if there is no error file or the kicks were never inserted.
+    """
+    errors = errors if errors is not None else load_multipole_errors()
+    if errors is None:
+        return line
+    if not any(n.startswith(_MPE_PREFIX) for n in line.get_table().name):
+        return line                      # insert_multipole_errors was never run
+
+    scale = errors['adopted_scale']
+    # its own random stream, so the alignment draws above are untouched
+    rng = np.random.default_rng([seed if seed is not None else 0, 1])
+    tt = line.get_table()
+    refs = line.element_refs
+
+    for magnet_type, m_order in _MAIN_ORDER.items():
+        harmonics = errors['harmonics'].get(magnet_type, [])
+        R_ref = errors['R_ref'].get(magnet_type)
+        if not harmonics or R_ref is None:
+            continue
+        for m in tt.rows[tt.element_type == magnet_type].name:
+            # drawn for every harmonic whether or not it is used, so the
+            # stream does not depend on which harmonics are switched on
+            draws = [_truncnorm(cut, rng) for _ in harmonics]
+            if magnet_type == 'Quadrupole':
+                KL = refs[m].k1 * refs[m].length
+            elif magnet_type == 'Sextupole':
+                KL = refs[m].k2 * refs[m].length
+            else:
+                KL = refs[m].k0 * refs[m].length
+
+            for (component, n, systematic, random_rms), z in zip(harmonics, draws):
+                bn = scale * (systematic + random_rms * z)
+                strength = (0.5 * bn * factorial(n - 1) / factorial(m_order - 1)
+                            * R_ref ** (m_order - n))
+                for end in 'se':
+                    kick = refs[f'{_MPE_PREFIX}{end}_{m}']
+                    if component == 'b':
+                        kick.knl[n - 1] = KL * strength
+                    else:
+                        kick.ksl[n - 1] = KL * strength
+            # follow the host magnet so feed-down happens by itself
+            for end in 'se':
+                kick = line[f'{_MPE_PREFIX}{end}_{m}']
+                kick.shift_x = line[m].shift_x
+                kick.shift_y = line[m].shift_y
+                kick.rot_s_rad = line[m].rot_s_rad
+    return line
+
+
+def _truncnorm(cut, rgen):
+    """Standard normal with anything beyond +-cut redrawn (not clipped)."""
+    v = rgen.normal()
+    while abs(v) > cut:
+        v = rgen.normal()
+    return v
+
+
 def insert_bpms_and_correctors(pdr, design, config):
     """Insert BPM markers and orbit correctors into pdr.lines['ring'] in place.
 
@@ -760,6 +908,7 @@ def insert_bpms_and_correctors(pdr, design, config):
         insert_correctors_var2(pdr)
     else:
         insert_correctors(pdr)
+    insert_multipole_errors(pdr)      # no-op unless multipole_errors.json exists
     return pdr
 
 
