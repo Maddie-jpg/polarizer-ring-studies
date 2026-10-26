@@ -46,11 +46,12 @@ SEED = cfg.DEFAULT_SEED
 #%% Build
 if mode == 'perfect':
     # Linear optics - choose the builder for this design
-    pdr = lo.three_fold_periodicity(fringe_fields=True, matched=True, WP=(15.125, 15.175),
+    pdr = lo.three_fold_periodicity(fringe_fields=True, matched=True, WP=(15.2, 13.87),
                                     phase_advance=0.25, betay_DS_target=7.0,
                                     triplet_seed=(1.8, -3.2),
                                     match_WP=True,               # betas always matched first; False = skip the WP match
-                                    field_expansion_bends=False)   # False = hard-edge xt.Bend (needed for spin / radiation)
+                                    field_expansion_bends=False,
+                                    dfd_entry=True)   # False = hard-edge xt.Bend (needed for spin / radiation)
     sc.config_D1_C9(pdr)
 
     # Example for design 2:
