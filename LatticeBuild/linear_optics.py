@@ -160,7 +160,10 @@ def matchingWP(qx, qy, cell_arc_opt, cell_arc, arc1R, n_periods=6,
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(mux=mux0, muy=muy0, at=xt.END, tol=1e-8, tag='phase'),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-    ] + _ds_waist_targets(arc1R)        # horizontal DS waist, if markers exist
+    ] + _ds_waist_targets(arc1R) \
+      + _triplet_waist_targets(arc1R)   # horizontal DS waist + vertical
+                                        # waist at the D-F-D last D,
+                                        # each only if its markers exist
     # alfx=alfy=0 at CtrS1 is a design preference (waist at the straight
     # centre), not a periodicity requirement -- alfx=alfy=0 at END already
     # closes the half-period. With it on, the problem is 8 hard targets at
@@ -256,7 +259,10 @@ def matchingBeta(betxS, betyS, cell_arc_opt, cell_arc,
     closure = [
         xt.TargetSet(dx=0, dpx=0, at=xt.END, tol=1e-9),
         xt.TargetSet(alfx=0, alfy=0, at=xt.END, tol=1e-9),
-    ] + _ds_waist_targets(arc1R)        # horizontal DS waist, if markers exist
+    ] + _ds_waist_targets(arc1R) \
+      + _triplet_waist_targets(arc1R)   # horizontal DS waist + vertical
+                                        # waist at the D-F-D last D,
+                                        # each only if its markers exist
     extra = []
     if match_end_betas:
         cell_tr_opt.targets[0].value = betxS
@@ -385,6 +391,57 @@ def _ds_waist_targets(arc1R, tol=1e-9):
     """alfx = 0 at the DS waist marker(s) of the matched sextant, if any."""
     return [xt.Target('alfx', 0, at=n, tol=tol)
             for n in arc1R.element_names if n.startswith(DS_WAIST_PREFIX)]
+
+
+TRIPLET_WAIST_PREFIX = 'TWY_'
+
+
+def insert_triplet_waist_markers(pdr, *lines):
+    """Insert a marker TWY_<sector> at the EXIT of QDDoub2 -- the last D of
+    the D-F-D entry triplet -- in every sector of the given lines. When
+    present, matchingBeta and matchingWP require a vertical waist there
+    (alfy = 0); see _triplet_waist_targets.
+
+    QDDoub2 is focusing in y, and the long DrTripl drift immediately after it
+    is where beta_y grows fastest. Putting the y-waist at the drift entrance
+    is what keeps that growth down, so the straight is entered at the minimum
+    rather than partway up the rise.
+
+    The marker sits at the quad's exit rather than its centre on purpose: a
+    marker inside the quad would slice it, renaming QDDoub2_<sector> into
+    thick slices and breaking every later lookup of that name (the corrector
+    placement in misalignments_corrections.py among them).
+
+    Only meaningful with dfd_entry=True -- with the plain doublet there is no
+    QDDoub2 and this inserts nothing. As with the DS waist, pass arc1R and
+    period, NOT the ring: the RF cavity goes into DrTripl afterwards and
+    needs it unsplit.
+    """
+    def insert_into_line(line, label):
+        names = list(line.element_names)
+        plan = []
+        for q in [n for n in names if n.startswith('QDDoub2_')]:
+            sector = q.split('_', 1)[1]
+            new = TRIPLET_WAIST_PREFIX + sector
+            if new in names:
+                continue
+            plan.append((new, q))
+        for new, q in plan:
+            line.insert(pdr.new(new, xt.Marker), at=0.0, from_=q,
+                        from_anchor='end')
+        print(f'insert_triplet_waist_markers [{label}]: inserted {len(plan)} '
+              f'markers')
+
+    for i, ln in enumerate(lines):
+        insert_into_line(ln, f'line[{i}]')
+    return pdr
+
+
+def _triplet_waist_targets(arc1R, tol=1e-9):
+    """alfy = 0 at the D-F-D entry-triplet waist marker(s), if any."""
+    return [xt.Target('alfy', 0, at=n, tol=tol)
+            for n in arc1R.element_names
+            if n.startswith(TRIPLET_WAIST_PREFIX)]
 
 
 def insert_DS_betay_quads(pdr, ring, period, *extra_lines,
@@ -1226,7 +1283,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 
 def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
                            match_WP=True, ds_waist_x=True, field_expansion_bends=True,
-                           dfd_entry=False):
+                           dfd_entry=False, dfd_waist_y=True):
     """Three-fold (D1) ring with F-D-F straights.
 
     Matching order (always): arc and straight cells, then the betas through
@@ -1244,6 +1301,9 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
         BendDS) as a soft-fringe BFieldExpansion magnet; False uses hard-edge
         xt.Bend. Use False for spin tracking or anything needing radiation:
         BFieldExpansion does not radiate and cannot be spin-tracked.
+    dfd_waist_y : with dfd_entry=True, require a vertical waist (alfy = 0)
+        at the exit of QDDoub2, the last D of the entry triplet. Ignored
+        when dfd_entry=False, since there is no QDDoub2 then.
     dfd_entry : how the straight is entered, the dispersion suppressor is
         unchanged either way.
         False (default) QDDoub - QFDoub - DrTripl, the original doublet.
@@ -1391,6 +1451,9 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     insert_DS_betay_quads(pdr, ring, period, arc1R)
     if ds_waist_x:
         insert_DS_waist_markers(pdr, arc1R, period)   # not ring: RF goes there
+    if dfd_entry and dfd_waist_y:
+        # vertical waist at QDDoub2, the last D of the entry triplet
+        insert_triplet_waist_markers(pdr, arc1R, period)
 
     _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
 

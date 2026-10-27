@@ -39,7 +39,7 @@ design = 1
 config = 9
 mode = 'perfect'        # 'perfect', 'misaligned' or 'corrected'
 phase = 90
-changes = 'FDF'         # variant tag in the file name, or None
+changes = 'DFD_FDF'         # variant tag in the file name, or None
 
 SEED = cfg.DEFAULT_SEED
 
@@ -51,7 +51,7 @@ if mode == 'perfect':
                                     triplet_seed=(1.8, -3.2),
                                     match_WP=False,               # betas always matched first; False = skip the WP match
                                     field_expansion_bends=False,
-                                    dfd_entry=False)   # False = hard-edge xt.Bend (needed for spin / radiation)
+                                    dfd_entry=True)   # False = hard-edge xt.Bend (needed for spin / radiation)
     sc.config_D1_C9(pdr)
 
     # Example for design 2:
