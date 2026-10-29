@@ -810,11 +810,31 @@ def config_D1_C8(pdr):
 
 def config_D1_C9(pdr):
     """
-    8 SF's and 8 SD's in each half-arc
+    One SF and one SD per arc cell, in two interleaved families each.
+
+    Cell numbers are DERIVED from N_cells_S, not hard-coded, so this works for
+    both the 214.8 m ring (N=8 -> 8 SF + 8 SD per half-arc, the original) and
+    the 345 m one (N=14 -> 14 + 14). Hard-coding '8' / '7' / ['1','3','5'] is
+    what made this raise "Could not resolve all placement positions" on the
+    scaled lattice: at N=14 the matching quads are QDA_M*14 / QFA_M*13, not
+    QDA_M*8 / QFA_M*7.
+
+    Layout, from makesextant: plain QDA_ exist for cells 1..N-1 with QDA_M at
+    cell N; plain QFA_ for cells 1..N-2 with QFA_M at cell N-1 (the last
+    regular QFA is replaced by the matching one).
     """
 
     ring=pdr.lines['ring']
     period=pdr.lines['period']
+
+    n = int(pdr['N_cells_S'])
+    d_odd  = [str(i) for i in range(1, n)     if i % 2 == 1]   # N=8 -> 1,3,5,7
+    d_even = [str(i) for i in range(1, n)     if i % 2 == 0]   # N=8 -> 2,4,6
+    f_odd  = [str(i) for i in range(1, n - 1) if i % 2 == 1]   # N=8 -> 1,3,5
+    f_even = [str(i) for i in range(1, n - 1) if i % 2 == 0]   # N=8 -> 2,4,6
+    m_d, m_f = str(n), str(n - 1)                              # N=8 -> '8','7'
+    print(f'config_D1_C9: N_cells_S={n} -> {len(f_odd)+len(f_even)+2} SF and '
+          f'{len(d_odd)+len(d_even)+1} SD per half-arc')
 
     pdr.vars( {'l_sext':0.1, 'k2XFarc': 0.00, 'k2XDarc': 0.00, 'k2XFarc_delta':0.0, 'k2XDarc_delta':0.0} )  # Sextupoles - 3 families defined here
     pdr.new('XF1arc',  xt.Sextupole, length='l_sext',    k2='k2XFarc+k2XFarc_delta' , edge_entry_active=True, edge_exit_active=True)
@@ -822,83 +842,46 @@ def config_D1_C9(pdr):
     pdr.new('XD1arc',  xt.Sextupole, length='l_sext',    k2='k2XDarc+k2XDarc_delta' , edge_entry_active=True, edge_exit_active=True)
     pdr.new('XD2arc',  xt.Sextupole, length='l_sext',    k2='k2XDarc-k2XDarc_delta' , edge_entry_active=True, edge_exit_active=True)
 
+    def place(line, sext, prefix, tags):
+        for name, sign in tags:
+            line.insert( pdr.new(sext+'_'+name, sext),
+                        at=sign + '(l_drift+l_quad)/2', from_=prefix + name )
 
-    
+    def rl(stem, cells):
+        """[(name, sign)] for the R and L side of one period stem."""
+        return ([[stem+'R'+c, '-'] for c in cells] +
+                [[stem+'L'+c, '+'] for c in cells])
+
     for per in ['1','2','3']:
-        
         # Defocusing (QDA)
-        for elem in ([ [per+'R'+el, '-'] for el in ['1','3','5','7'] ] +
-                     [ [per+'L'+el, '+'] for el in ['1','3','5','7'] ]):
-            ring.insert( pdr.new('XD1arc_'+elem[0], 'XD1arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
-        for elem in ([ [per+'R'+el, '-'] for el in ['2','4','6'] ] +
-                     [ [per+'L'+el, '+'] for el in ['2','4','6'] ]):
-            ring.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
-        for elem in ([[per+'R'+el, '-'] for el in ['8']]+
-                     [[per+'L'+el, '+'] for el in ['8']]):
-            ring.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] )
+        place(ring, 'XD1arc', 'QDA_',   rl(per, d_odd))
+        place(ring, 'XD2arc', 'QDA_',   rl(per, d_even))
+        place(ring, 'XD2arc', 'QDA_M',  rl(per, [m_d]))
 
         # Focusing (QFA)
-        for elem in ([ [per+'R'+el, '-'] for el in ['1','3','5'] ] +
-                     [ [per+'L'+el, '+'] for el in ['1','3','5'] ]):
-            ring.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
-        for elem in ([ [per+'R'+el, '-'] for el in ['2','4','6'] ] +
-                     [ [per+'L'+el, '+'] for el in ['2','4','6'] ]):
-            ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
-
+        place(ring, 'XF1arc', 'QFA_',   rl(per, f_odd))
+        place(ring, 'XF2arc', 'QFA_',   rl(per, f_even))
 
         # Matching quads
-        for elem in [[per+'R7','-'], [per+'L7','+']]:
-            ring.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_M' + elem[0] )
+        place(ring, 'XF1arc', 'QFA_M',  rl(per, [m_f]))
+        place(ring, 'XF2arc', 'QFDS_',  rl(per, ['']))
 
-        for elem in [[per+'R','-'], [per+'L','+']]:
-            ring.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QFDS_' + elem[0] )
-         
-    
     ##################
     # Defocusing
-    for elem in ([ ['PR'+el, '-'] for el in ['1','3','5','7'] ] +
-                 [ ['PL'+el, '+'] for el in ['1','3','5','7'] ]):
-        period.insert( pdr.new('XD1arc_'+elem[0], 'XD1arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
-    for elem in ([ ['PR'+el, '-'] for el in ['2','4','6'] ] +
-                 [ ['PL'+el, '+'] for el in ['2','4','6'] ]):
-        period.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_' + elem[0] )
-    for elem in ([[el, '-'] for el in ['PR8']]+
-                 [[el, '+'] for el in ['PL8']]):
-        period.insert( pdr.new('XD2arc_'+elem[0], 'XD2arc'), 
-                        at=elem[1] + '(l_drift+l_quad)/2', from_='QDA_M' + elem[0] )
+    place(period, 'XD1arc', 'QDA_',  rl('P', d_odd))
+    place(period, 'XD2arc', 'QDA_',  rl('P', d_even))
+    place(period, 'XD2arc', 'QDA_M', rl('P', [m_d]))
 
     # Focusing
-    for elem in ([ ['PR'+el, '-'] for el in ['1','3','5'] ] +
-                 [ ['PL'+el, '+'] for el in ['1','3','5'] ]):
-        period.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'), 
-                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
-    for elem in ([ ['PR'+el, '-'] for el in ['2','4','6'] ] +
-                 [ ['PL'+el, '+'] for el in ['2','4','6'] ]):
-        period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_' + elem[0] )
-    
+    place(period, 'XF1arc', 'QFA_',  rl('P', f_odd))
+    place(period, 'XF2arc', 'QFA_',  rl('P', f_even))
 
     # Matching
-    for elem in [['PR7','-'],['PL7','+']]:
-            period.insert( pdr.new('XF1arc_'+elem[0], 'XF1arc'), 
-                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFA_M' + elem[0] )
-    for elem in [['PR','-'],['PL','+']]:
-            period.insert( pdr.new('XF2arc_'+elem[0], 'XF2arc'), 
-                    at=elem[1] + '(l_drift+l_quad)/2', from_='QFDS_' + elem[0] )
-    
+    place(period, 'XF1arc', 'QFA_M', rl('P', [m_f]))
+    place(period, 'XF2arc', 'QFDS_', rl('P', ['']))
 
     ChromCorrect(ring, pdr, ['k2XFarc', 'k2XDarc'], MakePlot=False)
 
-    
     return pdr
 
 

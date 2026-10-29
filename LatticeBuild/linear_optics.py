@@ -1283,7 +1283,7 @@ def _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring):
 
 def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phase_advance=0.25,betay_DS_target=None,swap_DS=False,triplet_seed=(1.8,-3.2),
                            match_WP=True, ds_waist_x=True, field_expansion_bends=True,
-                           dfd_entry=False, dfd_waist_y=True):
+                           dfd_entry=False, dfd_waist_y=True, geometry=None):
     """Three-fold (D1) ring with F-D-F straights.
 
     Matching order (always): arc and straight cells, then the betas through
@@ -1301,6 +1301,11 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
         BendDS) as a soft-fringe BFieldExpansion magnet; False uses hard-edge
         xt.Bend. Use False for spin tracking or anything needing radiation:
         BFieldExpansion does not radiate and cannot be spin-tracked.
+    geometry : dict of lattice-length / cell-count vars applied on top of the
+        defaults, e.g. {'l_cell': 3.4867, 'N_cells_S': 14} for a 345 m ring.
+        Applied before hBarc, U0 and the elements are built, so everything
+        downstream follows. This is what three_fold_periodicity_long uses, so
+        that the scaled lattice is the same builder rather than a copy of it.
     dfd_waist_y : with dfd_entry=True, require a vertical waist (alfy = 0)
         at the exit of QDDoub2, the last D of the entry triplet. Ignored
         when dfd_entry=False, since there is no QDDoub2 then.
@@ -1348,6 +1353,12 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
         'kQFDoub': 3.9170,  'kQDDoub': -2.5190,
         'kQFtr':   4.4429,  'kQDtr':   -2.4723,
     })
+    if geometry:
+        # Applied after the defaults and before hBarc / U0 / the elements,
+        # so the bend angle, energy loss and every drift follow it.
+        pdr.vars(dict(geometry))
+        print(f'geometry override: {dict(geometry)}')
+
     if dfd_entry:
         # QDDoub2 and its DrDoub add l_quad + l_doub to every sextant;
         # take it back out of the long straight drift so the
@@ -1471,113 +1482,31 @@ def three_fold_periodicity(fringe_fields=True, matched=True,WP=config.WP_D1,phas
     return pdr
 
 
-def three_fold_periodicity_long(fringe_fields=True, matched=True,
-                                WP=config.WP_D1, phase_advance=0.25,
-                                betay_DS_target=None):
- 
-    pdr, quad_edge, bend_edge = _make_env(fringe_fields)
-    E0 = config.E0; VRF = config.VRF
- 
-    pdr.vars({
-        'l_cell':   3.6,    'l_bend':   0.40,   'l_bendDS': 0.40,
-        'dl_noben': 0.85,   'l_quad':   0.30,
-        'l_drift':  '(l_cell - 2*l_bend - 2*l_quad)/4.',
-        'dl_drift': -0.0,   'dl_trans': 0.20,
-        'l_doub':   0.25,   'l_tripl':  7,
-        'l_trips':  0.40,   'l_sext':   0.20,
-        'l_trans':  'l_drift+dl_trans',
-        'l_DSL':    '2*l_drift + l_bend + dl_noben',
-    })
- 
-    pdr.vars({
-        'N_cells_S': 12,
-        'hBarc': '6.283185307/(6*(2*N_cells_S*l_bend + l_bendDS))',
-        # placeholders -- overwritten by the seeding helpers below
-        'kQFarc':  2.9478,  'kQDarc':  -2.9231,
-        'kQFarcM': 2.8846,  'kQDarcM': -2.7567,
-        'kQFDS':   2.8042,  'kQDDS':   -2.2858,
-        'kQFDoub': 3.9170,  'kQDDoub': -2.5190,
-        'kQFtr':   4.4429,  'kQDtr':   -2.4723,
-    })
- 
-    U0 = (0.88463e-31)*E0**4*(2.*np.pi) / (
-        6*(2*pdr['N_cells_S']*pdr['l_bend'] + pdr['l_bendDS']))
- 
-    _make_base_elements(pdr, quad_edge, bend_edge)
- 
-    # cell_arc from the shared helper; cell_tr rebuilt as F-D-F
-    cell_arc, cell_tr = _make_reference_cells(pdr)
- 
-    # ---- seed knobs before anything is Twissed ----
-    _seed_arc_knobs(pdr, mu_cell=phase_advance)
-    _seed_transition_knobs(pdr)
-    _seed_triplet_knobs_FDF(pdr, cell_tr)     # F-D-F ratio convention
- 
-    def makesextant(name, fall):
-        comps = []
-        for ind in range(int(pdr['N_cells_S']) - 1):
-            comps += [pdr.place('Drarc'), pdr.new(f'Bend1_{name}{ind+1}', 'Bend'),
-                      pdr.place('Drarc'), pdr.new(f'QDA_{name}{ind+1}',   'QDarc'),
-                      pdr.place('Drarc'), pdr.new(f'Bend2_{name}{ind+1}', 'Bend'),
-                      pdr.place('Drarc'), pdr.new(f'QFA_{name}{ind+1}',   'QFarc')]
-        n = int(pdr['N_cells_S'])
-        comps[-1] = pdr.new(f'QFA_M{name}{n-1}', 'QFarcM')
-        comps += [pdr.place('Drarc'),  pdr.new(f'Bend1_{name}{n}', 'Bend'),
-                  pdr.place('Drarc'),  pdr.new(f'QDA_M{name}{n}',  'QDarcM'),
-                  pdr.place('Drarc'),  pdr.new(f'Bend2_{name}{n}', 'Bend'),
-                  pdr.place('DrarcS'), pdr.new(f'QFDS_{name}',     'QFDS'),
-                  pdr.place('DrDSL'),  pdr.new(f'QDDS_{name}',     'QDDS'),
-                  pdr.place('Drarc'),  pdr.new(f'BendDS_{name}',   'BendDS'),
-                  # ---- F-D-F straight: D outside, F either side of drift ----
-                  pdr.place('DrTrans'),pdr.new(f'QDDoub_{name}',   'QDDoub'),
-                  pdr.place('DrDoub'), pdr.new(f'QFDoub_{name}',   'QFDoub'),
-                  pdr.place('DrTripl'),pdr.new(f'QFTrip_{name}1',  'QFtr')]
-        if fall == 'symm':
-            comps = [pdr.new(f'QFA_{name}CH', 'QFarcH')] + comps + \
-                    [pdr.place('DrTrips'),
-                     pdr.new(f'QDTripC_{name}2H', 'QDtrH')]
-        elif fall == 'right':
-            comps = [pdr.new(f'QFA_{name}C', 'QFarc')] + comps + \
-                    [pdr.place('DrTrips')]
-        elif fall == 'left':
-            comps += [pdr.place('DrTrips'),
-                      pdr.new(f'QDTripC_{name}2', 'QDtr')]
-            comps = list(reversed(comps))
-        else:
-            raise ValueError(f'Unknown fall value: {fall!r}')
-        return pdr.new_line(components=comps)
- 
-    arc1R = makesextant('xR', 'symm')
-    # Marker at the centre of the long drift; anchor resolved from the lattice
-    # (QFDoub here, since this straight is F-D-F).
-    _ctr_anchor = _straight_anchor(arc1R)
-    _straight_drift_after(arc1R, _ctr_anchor)          # validates adjacency
-    arc1R.insert(pdr.new('CtrS1_xR1', xt.Marker),
-                 at='(l_tripl+l_quad)/2', from_=_ctr_anchor)
-    arc1R_sliced  = _sliced(arc1R)
-    period        = makesextant('PR', 'symm') + (-makesextant('PL', 'symm'))
-    period_sliced = _sliced(period)
-    ring = (makesextant('1R', 'right') + makesextant('2L', 'left') +
-            makesextant('2R', 'right') + makesextant('3L', 'left') +
-            makesextant('3R', 'right') + makesextant('1L', 'left'))
- 
-    insert_DS_betay_quads(pdr, ring, period, arc1R)
- 
-    print(f'\nthree_fold_periodicity_long (F-D-F): C = {ring.get_length():.3f} m '
-          f'(N_cells_S={int(pdr["N_cells_S"])}, l_tripl={pdr["l_tripl"]} m)')
- 
-    _export_lines(pdr, arc1R, cell_arc, cell_tr, period, ring)
- 
-    if not matched:
-        return pdr
- 
-    cell_arc_opt, cell_tr_opt = _match_cells_3fold(pdr, cell_arc, cell_tr,
-                                                    mu_cell=phase_advance)
-    _run_standard_matching(ring,cell_arc_opt, cell_arc, cell_tr_opt, cell_tr,
-                           arc1R, WP, betay_DS_target=betay_DS_target)
-    _make_rf_and_finalise(pdr, ring, arc1R, cell_arc, cell_tr,
-                          period, U0, VRF, bend_edge)
-    return pdr
+def three_fold_periodicity_long(WP=(24.18, 25.58), **kwargs):
+    """Scaled-up three-fold ring, C = 345.0 m.
+
+    Identical to three_fold_periodicity in every respect except geometry:
+    14 arc cells per sextant instead of 8, and l_cell 3.4 -> 3.4867 m to land
+    on 345 m. Keeping the cell length nearly unchanged (+2.6%) and adding
+    cells is what keeps the arc optics close to the 214.8 m design; scaling
+    l_cell instead would change the cell itself.
+
+    A thin wrapper on purpose, not a copy. The old copy silently fell behind
+    the main builder and was missing swap_DS, triplet_seed, match_WP,
+    ds_waist_x, field_expansion_bends, dfd_entry, dfd_waist_y and
+    _check_triplet_basin -- and it did not build at all (SVD did not
+    converge / Invalid n1, in its original form too).
+
+    dfd_entry defaults to True here because the plain doublet does not work
+    at this scale: MEASURED at C = 345 m, WP = (24.1, 22.6),
+        dfd_entry=False  stage 1 warn, no closure, bety <= 654 m
+        dfd_entry=True   stage 1 OK,   closure YES, betx <= 9.75, bety <= 10.23
+    The default WP is the natural tune of that solution, so match_WP=True is
+    close to a no-op; pass your own WP to move off it.
+    """
+    kwargs.setdefault('dfd_entry', True)
+    return three_fold_periodicity(
+        WP=WP, geometry={'l_cell': 3.4867, 'N_cells_S': 14}, **kwargs)
 
 
 
