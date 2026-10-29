@@ -1201,6 +1201,7 @@ if mode=='perfect':
         seed_line.discard_tracker()
         seed_line.build_tracker(_context=context_tracking)
         seed_line.configure_radiation(model='mean')
+        orbit = seed_orbit(seed_line, seed, apply_correction)
 
         # --- DA ---
         particles_DA, grid_DA = xutil.generate_particle_grid(seed_line, study_params_DA)
@@ -1220,7 +1221,36 @@ if mode=='perfect':
                                      grid_MA['x_normalized'], grid_MA['y_normalized'],
                                      grid_MA['delta_init'])
 
-        return da_result, ma_result
+        return da_result, ma_result, orbit
+
+    tw_perfect = ring.twiss(method='6d')
+    init_perfect = tw_perfect.get_twiss_init(0)
+ 
+    def seed_orbit(seed_line, seed, corrected):
+        """(s, x, y, kind) for the prepared line, or None.
+ 
+        A misaligned ring usually has NO closed orbit before correction --
+        measured on this lattice at 0.2 mm: 2 of 3 seeds fail. Tracking does
+        not need one, so DA/MA are unaffected, but a plain closed-orbit plot
+        would come out nearly empty. Fall back to the first-turn trajectory,
+        started from the perfect ring's orbit, which is always defined and is
+        the usual thing to show for an uncorrected machine. `kind` says which
+        one you got, so the two are never silently mixed in a legend.
+        """
+        try:
+            t = seed_line.twiss(method='6d')
+            return np.array(t.s), np.array(t.x), np.array(t.y), 'closed orbit'
+        except Exception:
+            pass
+        try:
+            t = seed_line.twiss(method='6d', start=xt.START, end=xt.END,
+                                init=init_perfect)
+            return np.array(t.s), np.array(t.x), np.array(t.y), 'first turn'
+        except Exception as e:
+            print(f'  [seed {seed}] no orbit at all '
+                  f'({type(e).__name__}: {str(e)[:40]}) -- not plotted')
+            return None
+
 
 
     # ---- run: misaligned seeds first, then corrected seeds ----
@@ -1260,27 +1290,84 @@ if mode=='perfect':
     fig_ma_mis, ax_ma_mis = plt.subplots(figsize=(8, 6))
     fig_ma_cor, ax_ma_cor = plt.subplots(figsize=(8, 6))
 
+    fig_ox_mis, ax_ox_mis = plt.subplots(figsize=(11, 4))
+    fig_oy_mis, ax_oy_mis = plt.subplots(figsize=(11, 4))
+    fig_ox_cor, ax_ox_cor = plt.subplots(figsize=(11, 4))
+    fig_oy_cor, ax_oy_cor = plt.subplots(figsize=(11, 4))
+ 
+
+
     # --- pass 1: misaligned ---
     for seed, c in zip(seeds, colors):
-        (x_DA, y_DA, min_DA), (x_MA, delta_MA, min_MA) = get_DA_and_MA_for_seed(
-            ring, seed, apply_correction=False,
-            study_params_DA=study_params_DA, study_params_MA=study_params_MA)
-
+        (x_DA, y_DA, min_DA), (x_MA, delta_MA, min_MA), orbit = \
+            get_DA_and_MA_for_seed(
+                ring, seed, apply_correction=False,
+                study_params_DA=study_params_DA,
+                study_params_MA=study_params_MA)
+ 
         ax_da_mis.plot(x_DA, y_DA, '-', color=c,
                     label=f'seed {seed} (DA$_{{min}}$={min_DA:.1f}$\\sigma$)')
         ax_ma_mis.plot(delta_MA * 100, x_MA, '-', color=c, label=f'seed {seed}')
+ 
+        if orbit is not None:
+            s_o, x_o, y_o, kind = orbit
+            tag = '' if kind == 'closed orbit' else ', first turn'
+            ax_ox_mis.plot(s_o, x_o * 1e3, '-', color=c, lw=0.9,
+                           label=f'seed {seed} (rms {np.std(x_o)*1e3:.3f} mm{tag})')
+            ax_oy_mis.plot(s_o, y_o * 1e3, '-', color=c, lw=0.9,
+                           label=f'seed {seed} (rms {np.std(y_o)*1e3:.3f} mm{tag})')
+
 
     # --- pass 2: corrected ---
     for seed, c in zip(seeds, colors):
-        (x_DA, y_DA, min_DA), (x_MA, delta_MA, min_MA) = get_DA_and_MA_for_seed(
-            ring, seed, apply_correction=True,
-            study_params_DA=study_params_DA, study_params_MA=study_params_MA)
+        (x_DA, y_DA, min_DA), (x_MA, delta_MA, min_MA), orbit = \
+            get_DA_and_MA_for_seed(
+                ring, seed, apply_correction=True,
+                study_params_DA=study_params_DA,
+                study_params_MA=study_params_MA)
 
         ax_da_cor.plot(x_DA, y_DA, '-', color=c,
                     label=f'seed {seed} (DA$_{{min}}$={min_DA:.1f}$\\sigma$)')
         ax_ma_cor.plot(delta_MA * 100, x_MA, '-', color=c, label=f'seed {seed}')
 
+        if orbit is not None:
+            s_o, x_o, y_o, kind = orbit
+            tag = '' if kind == 'closed orbit' else ', first turn'
+            ax_ox_cor.plot(s_o, x_o * 1e3, '-', color=c, lw=0.9,
+                           label=f'seed {seed} (rms {np.std(x_o)*1e3:.3f} mm{tag})')
+            ax_oy_cor.plot(s_o, y_o * 1e3, '-', color=c, lw=0.9,
+                           label=f'seed {seed} (rms {np.std(y_o)*1e3:.3f} mm{tag})')
+
     # ---- formatting + saving, one block per plot ----
+
+    for ax, plane, title in [
+            (ax_ox_mis, 'x', 'Horizontal orbit - misaligned seeds'),
+            (ax_oy_mis, 'y', 'Vertical orbit - misaligned seeds'),
+            (ax_ox_cor, 'x', 'Horizontal orbit - corrected seeds'),
+            (ax_oy_cor, 'y', 'Vertical orbit - corrected seeds')]:
+        ax.axhline(0, color='0.8', lw=0.8, zorder=0)
+        ax.set_xlabel('s [m]')
+        ax.set_ylabel(f'{plane} [mm]')
+        ax.set_xlim(0, ring.get_length())
+        ax.set_title(title)
+        ax.grid(alpha=0.25)
+        ax.legend(fontsize='x-small', loc='best', ncol=2)
+ 
+    # Per plane, give misaligned and corrected the SAME y-scale, so the
+    # correction shows up as a change of amplitude instead of being hidden
+    # by autoscaling (corrected orbits are ~20x smaller here).
+    for a_mis, a_cor in ((ax_ox_mis, ax_ox_cor), (ax_oy_mis, ax_oy_cor)):
+        lim = max(np.abs(a_mis.get_ylim()).max(), np.abs(a_cor.get_ylim()).max())
+        a_mis.set_ylim(-lim, lim)
+        a_cor.set_ylim(-lim, lim)
+ 
+    for fig, name in ((fig_ox_mis, 'orbit_x_overlay_misaligned'),
+                      (fig_oy_mis, 'orbit_y_overlay_misaligned'),
+                      (fig_ox_cor, 'orbit_x_overlay_corrected'),
+                      (fig_oy_cor, 'orbit_y_overlay_corrected')):
+        fig.tight_layout()
+        fig.savefig(f'{folder2}/{name}.png', dpi=150)
+
 
     for ax, title in [(ax_da_mis, 'DA — misaligned seeds'), (ax_da_cor, 'DA — corrected seeds')]:
         ax.set_xlabel(r'$\hat{x}$ [$\sqrt{\varepsilon_x}$]')

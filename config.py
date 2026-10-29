@@ -47,7 +47,7 @@ DEFAULT_SEED = 123456789            # Seed used to build pdr_misaligned / pdr_co
 # run_full_sims.py). Override with the DESIGN/CONFIG/MODE/PHASE/CHANGES
 # environment variables.
 # -----------------------------------------------------------------------------
-DEFAULT_STUDY = dict(design=1, config=9, mode='perfect', phase=90, changes='DFD_FDF')
+DEFAULT_STUDY = dict(design=1, config=9, mode='perfect', phase=90, changes='FDF')
 
 # -----------------------------------------------------------------------------
 # External input files (override with environment variables if needed)
