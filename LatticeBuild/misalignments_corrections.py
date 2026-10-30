@@ -942,7 +942,8 @@ def prepare_seed_line(base_line, seed, correct, *,
                       radiation='mean',
                       context=None,
                       copy=True,
-                      report_orbit=False):
+                      report_orbit=False,
+                      **correction_kwargs):
     """Return a line with one random error seed applied, optionally corrected.
 
     Steps:
@@ -983,7 +984,7 @@ def prepare_seed_line(base_line, seed, correct, *,
 
     if correct:
         misalignments_correctors(line, corrector_sigma, seed + 1)
-        correct_orbit_with_fallback(line, tw_ref, seed)
+        correct_orbit_with_fallback(line, tw_ref, seed,**correction_kwargs)
 
         if report_orbit:
             tw_after = line.twiss(method='6d' if radiation else '4d')

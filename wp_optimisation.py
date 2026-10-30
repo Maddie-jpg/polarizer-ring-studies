@@ -26,7 +26,7 @@ import xutil_DA_CC.xsuite_utilities as xutil
 study = paths.study_from_env()
 # Every figure and data file from this script goes here, e.g.
 # Results/D1/C9/90deg_FDF/WorkingPoint/
-WP_DIR = paths.results_dir(study['design'], study['config'], study['phase'],
+WP_DIR = paths.results_dir(5, study['config'], study['phase'],
                            study['changes'], metric='WorkingPoint')
 pdr = paths.load_lattice(study['design'], study['config'], 'perfect',
                          study['phase'], study['changes'])
