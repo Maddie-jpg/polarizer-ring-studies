@@ -510,7 +510,7 @@ if fp0 is not None:
 # was too small to show any resonance context (previous plot had only
 # one or two lines barely clipping the edge).
 Qx_range, Qy_range = integer_tune_ranges(ring_tw.qx, ring_tw.qy, half_width=0.25)
-#Qx_range, Qy_range =(18.5,19),(19,19.5)
+Qx_range, Qy_range =(14.75,15.25),(13.5,14)
 
 fig, ax = plt.subplots(figsize=(9, 9))
 

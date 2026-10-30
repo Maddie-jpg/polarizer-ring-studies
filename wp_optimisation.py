@@ -28,7 +28,7 @@ study = paths.study_from_env()
 # Results/D1/C9/90deg_FDF/WorkingPoint/
 WP_DIR = paths.results_dir(5, study['config'], study['phase'],
                            study['changes'], metric='WorkingPoint')
-pdr = paths.load_lattice(study['design'], study['config'], 'perfect',
+pdr = paths.load_lattice(5, study['config'], 'perfect',
                          study['phase'], study['changes'])
 ring = pdr.lines['ring']
 cell_arc = pdr.lines['cell_arc']
