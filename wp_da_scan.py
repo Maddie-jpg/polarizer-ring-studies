@@ -36,6 +36,7 @@ Workers are separate Python processes started with this file
 (`python wp_da_scan.py --worker ...`), which works the same from a script,
 VS Code interactive cells or Jupyter.
 """
+import collections
 import contextlib
 import io
 import json
@@ -370,6 +371,26 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
     if n_edge:
         print(f'[wp_da_scan] {n_edge} points lost nothing on the whole grid: their DA '
               f'is the grid edge (a lower bound). Enlarge the grid to resolve them.')
+
+    # Why the failures failed. Without this the scan reports only a count, so a
+    # run where every point raises the same exception looks exactly like a run
+    # where the whole window is genuinely unstable -- and costs hours either way.
+    if total - n_ok:
+        missing = total - len(records)
+        if missing:
+            print(f'[wp_da_scan] {missing} points produced no record at all '
+                  f'(worker died before reaching them; see {tmp}/log*.txt)')
+        errs = collections.Counter(r['error'] for r in records if r.get('error'))
+        if errs:
+            print(f'[wp_da_scan] {sum(errs.values())} points raised:')
+            for msg, n in errs.most_common(8):
+                eg = next(r for r in records if r.get('error') == msg)
+                print(f'    {n:4d} x  {msg}')
+                print(f'           e.g. at target ({eg["qx_t"]:.3f}, {eg["qy_t"]:.3f})'
+                      + (f' -> reached ({eg["qx"]:.4f}, {eg["qy"]:.4f}), '
+                         f'betx_max={eg.get("betx_max", float("nan")):.1f} m, '
+                         f'bety_max={eg.get("bety_max", float("nan")):.1f} m'
+                         if 'qx' in eg else ' -> no twiss'))
     return QX, QY, DA, records
 
 
