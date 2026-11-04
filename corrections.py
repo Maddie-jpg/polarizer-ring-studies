@@ -159,9 +159,12 @@ sketch_dir = paths.results_dir(design, config, phase, changes=changes,
 beam = ring_beam_sizes(pdr.lines['ring'],
                        paths.load_injected_beam(design, config, phase, changes))
 
-sketches = ls.sketch_all(pdr, sextant=sketch_sextant, outdir=sketch_dir,
+pdr_sketch = pdr.copy()
+mc.insert_bpms_and_correctors(pdr_sketch, design, config)
+
+sketches = ls.sketch_all(pdr_sketch, sextant=sketch_sextant, outdir=sketch_dir,
                          beam=beam if show_beam else None)
 sketches['period'] = ls.sketch_period_beam_size(
-    pdr, beam, sextants=('3R', '1L'), inject_s=injection_s(pdr.lines['ring']),
+    pdr_sketch, beam, sextants=('3R', '1L'), inject_s=injection_s(pdr.lines['ring']),
     outdir=sketch_dir)
 plt.show()
