@@ -241,6 +241,27 @@ def _worker(cfg_file, out_file):
                               n_periods=s['n_periods'],
                               betay_DS_target=s.get('betay_DS_target'))
             ring.configure_radiation(model=None)
+
+            # Second half of the production match (see _run_standard_matching).
+            # The sextant match alone only lands on the tune AT the lattice's
+            # own working point; 0.9 away it misses by up to ~0.4, which is
+            # 200x tune_tol -- so without this every off-centre point in a scan
+            # dies on 'tune match missed'. The trim closes it exactly in ~2 s
+            # for a ~1 % gradient change. row['trim_pct'] records how hard it
+            # had to pull: above a few per cent the sextant match did not
+            # converge and the trim is buying tune by spending beta.
+            trim = s.get('trim_knobs') or ()
+            if trim:
+                before = {k: ring.varval[k] for k in trim}
+                with quiet():
+                    ring.match(method='4d',
+                               vary=[xt.Vary(k, step=1e-5) for k in trim],
+                               targets=[xt.Target('qx', qx, tol=1e-6),
+                                        xt.Target('qy', qy, tol=1e-6)])
+                row['trim_pct'] = 100 * max(
+                    abs(ring.varval[k] - before[k]) / max(abs(before[k]), 1e-12)
+                    for k in trim)
+
             tw = ring.twiss(method='4d')
             row.update(qx=float(tw.qx), qy=float(tw.qy),
                        betx_max=float(tw.betx.max()), bety_max=float(tw.bety.max()))
@@ -291,6 +312,7 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                  n_workers=None, n_turns=1000, n_particles=200, radiation='mean',
                  sext_knobs=None, n_periods=6, mu_cell=None, betay_DS_target=None,
                  triplet_seed=(1.8, -3.2), tune_tol=2e-3, start_element=None,
+                 trim_knobs=('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM'),
                  progress_every=10, metrics=True):
     """Scan min DA over qx_vals x qy_vals using n_workers processes.
 
@@ -298,6 +320,10 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
     n_workers      default: number of CPU cores - 1. Each worker holds its own
                    lattice + tracker at ~0.17 GB, so cap this on a many-core
                    box rather than letting it default
+    trim_knobs     ring gradients trimmed to the exact tune after the sextant
+                   match, as _run_standard_matching does. None skips the trim,
+                   which makes every point off the lattice's own working point
+                   fail on 'tune match missed'
     mu_cell        arc cell phase advance the cells are re-matched to before
                    every point. None (default) reads it off the lattice, which
                    is what you want -- a value that disagrees with the lattice
@@ -358,6 +384,7 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                 sext_knobs=sext_knobs, n_periods=n_periods, mu_cell=mu_cell,
                 betay_DS_target=betay_DS_target, triplet_seed=triplet_seed,
                 tune_tol=tune_tol, start_element=start_element,
+                trim_knobs=list(trim_knobs) if trim_knobs else None,
                 metrics=(dict(rdts=list(DEFAULT_RDTS), detuning=True, nl_chroma=True)
                          if metrics is True else (metrics or None)))
     procs, outs = [], []
