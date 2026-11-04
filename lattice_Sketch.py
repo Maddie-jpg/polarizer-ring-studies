@@ -788,12 +788,62 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
 # Public: the three sketch families
 # =============================================================================
 
+def draw_beam_size(axb, beam, s_a, s_b, n_sigma=None, legend_loc='lower left'):
+    """
+    Plot the rms beam sizes of `beam` between s_a and s_b on `axb`, against
+    s - s_a (the convention draw_beamline uses with s_offset=s_a), so it lines
+    up with a layout drawn underneath on a shared x axis.
+
+    beam : dict with 's', 'sig_x', 'sig_y' (arrays over the ring, metres), as
+        returned by corrections.ring_beam_sizes.
+    n_sigma : also draw the n_sigma envelope (dashed), or None for rms only.
+    Returns the top of the y axis [mm].
+    """
+    s = np.asarray(beam['s'], dtype=float)
+    keep = (s >= s_a - 1e-9) & (s <= s_b + 1e-9)
+    s = s[keep] - s_a
+    sx = np.asarray(beam['sig_x'], dtype=float)[keep] * 1e3
+    sy = np.asarray(beam['sig_y'], dtype=float)[keep] * 1e3
+    if not len(s):
+        raise ValueError(f'draw_beam_size: no beam-size points between s = {s_a:.3f} '
+                         f'and {s_b:.3f} m')
+
+    axb.plot(s, sx, color=COL_H, lw=1.4, label=r'$\sigma_x$ (rms)')
+    axb.plot(s, sy, color=COL_V, lw=1.4, label=r'$\sigma_y$ (rms)')
+    if n_sigma:
+        axb.plot(s, n_sigma * sx, color=COL_H, lw=0.9, ls='--',
+                 label=rf'{n_sigma:g}$\sigma_x$')
+        axb.plot(s, n_sigma * sy, color=COL_V, lw=0.9, ls='--',
+                 label=rf'{n_sigma:g}$\sigma_y$')
+    y_max = (n_sigma or 1) * max(sx.max(), sy.max()) * 1.15
+    axb.set_ylim(0, y_max)
+    axb.set_ylabel('beam size  [mm]', fontsize=10)
+    axb.tick_params(axis='y', labelright=True, right=True)
+    axb.tick_params(axis='x', labelbottom=False)
+    axb.grid(color='0.92', lw=0.6)
+    axb.legend(loc=legend_loc, fontsize=9, framealpha=0.95)
+    for sig, col, lab in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
+        i = int(np.argmax(sig))
+        axb.plot(s[i], sig[i], 'o', color=col, mec='black', ms=6, zorder=5)
+        near_end = s[i] > 0.8 * (s_b - s_a)
+        axb.annotate(rf'max $\sigma_{lab}$ = {sig[i]:.2f} mm', xy=(s[i], sig[i]),
+                     xytext=(-8 if near_end else 8, 6), textcoords='offset points',
+                     ha='right' if near_end else 'left', fontsize=8.5,
+                     zorder=6, bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                                         edgecolor=col, linewidth=0.8))
+    return y_max
+
+
 def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
-                      outdir=None, dpi=200, width=15.0):
+                      outdir=None, dpi=200, width=15.0, beam=None, n_sigma=None):
     """
     One dimensioned figure per distinct cell type.
 
     spans : dict {label: (start_name, end_name)} to override auto-discovery.
+    beam : None (default) draws the layout only. A beam-size dict (as from
+        corrections.ring_beam_sizes) adds the rms beam sizes above each
+        layout on the same s axis, saved as cell_<label>_<sextant>_beam.png.
+    n_sigma : with beam, also draw the n_sigma envelope.
     Returns {label: Figure}.
     """
     line = pdr.lines[line_name]
@@ -810,16 +860,27 @@ def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
 
         n_mag = len([r for r in rows if not r['is_drift'] and r['length'] > 0])
         h = 5.4 if n_mag <= 12 else 6.0
-        fig, ax = plt.subplots(figsize=(width, h))
-        draw_beamline(ax, rows,
-                      title=f'{label}   —   sextant {sextant}')
+        title = f'{label}   —   sextant {sextant}'
+        if beam is None:
+            fig, ax = plt.subplots(figsize=(width, h))
+            draw_beamline(ax, rows, title=title)
+        else:
+            fig = plt.figure(figsize=(width, h + 2.8))
+            gs = fig.add_gridspec(2, 1, height_ratios=[2.6, h], hspace=0.05)
+            axb = fig.add_subplot(gs[0])
+            ax = fig.add_subplot(gs[1], sharex=axb)
+            draw_beamline(ax, rows)
+            draw_beam_size(axb, beam, rows[0]['s'],
+                           rows[-1]['s'] + rows[-1]['length'], n_sigma=n_sigma)
+            axb.set_title(title, fontsize=12, fontweight='bold', pad=10)
         _legend_for(rows, ax)
         fig.tight_layout()
 
         if outdir:
             os.makedirs(outdir, exist_ok=True)
             safe = re.sub(r'[^A-Za-z0-9]+', '_', label).strip('_').lower()
-            fig.savefig(os.path.join(outdir, f'cell_{safe}_{sextant}.png'),
+            tag = '_beam' if beam is not None else ''
+            fig.savefig(os.path.join(outdir, f'cell_{safe}_{sextant}{tag}.png'),
                         dpi=dpi, bbox_inches='tight')
         figs[label] = fig
 
@@ -827,7 +888,7 @@ def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
 
 
 def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
-               n_cells_shown=2, width=17.0):
+               n_cells_shown=2, width=17.0, beam=None, n_sigma=None):
     """
     One sextant, drawn as a block diagram.
 
@@ -837,6 +898,11 @@ def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
     dispersion suppressor and the straight are drawn individually. The
     first `n_cells_shown` cells are drawn in detail so the rhythm is
     visible.
+
+    beam : None (default) for the layout only. A beam-size dict (as from
+        corrections.ring_beam_sizes) adds the rms beam sizes above the
+        detailed cells, saved as arc_<sextant>_beam.png.
+    n_sigma : with beam, also draw the n_sigma envelope.
     """
     line = pdr.lines[line_name]
     rows_all = _element_rows(line)
@@ -876,15 +942,28 @@ def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
     s_arc_end = (next(r['s'] for r in rows_all if r['name'] == qfam[0])
                  if qfam else s_detail_end)
 
-    fig, (ax_top, ax_bot) = plt.subplots(
-        2, 1, figsize=(width, 10.5),
-        gridspec_kw=dict(height_ratios=[1.0, 1.25], hspace=0.45))
+    title_top = f'Arc (sextant {sextant}) — first {k} cells in detail'
+    detail_rows = [r for r in rows if r['s'] < s_detail_end]
+    if beam is None:
+        fig, (ax_top, ax_bot) = plt.subplots(
+            2, 1, figsize=(width, 10.5),
+            gridspec_kw=dict(height_ratios=[1.0, 1.25], hspace=0.45))
+    else:
+        fig = plt.figure(figsize=(width, 14.0))
+        outer = fig.add_gridspec(2, 1, height_ratios=[1.6, 1.25], hspace=0.30)
+        inner = outer[0].subgridspec(2, 1, height_ratios=[0.6, 1.0], hspace=0.05)
+        ax_beam = fig.add_subplot(inner[0])
+        ax_top = fig.add_subplot(inner[1], sharex=ax_beam)
+        ax_bot = fig.add_subplot(outer[1])
 
     # ================= top: schematic of the whole sextant ===========
-    detail_rows = [r for r in rows if r['s'] < s_detail_end]
     draw_beamline(ax_top, detail_rows,
-                  title=f'Arc (sextant {sextant}) — first {k} cells in detail',
-                  s_offset=s0)
+                  title=title_top if beam is None else None, s_offset=s0)
+    if beam is not None:
+        draw_beam_size(ax_beam, beam, s0,
+                       detail_rows[-1]['s'] + detail_rows[-1]['length'],
+                       n_sigma=n_sigma)
+        ax_beam.set_title(title_top, fontsize=12, fontweight='bold', pad=10)
 
     # ================= bottom: block diagram =========================
     ax = ax_bot
@@ -959,7 +1038,8 @@ def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
 
     if outdir:
         os.makedirs(outdir, exist_ok=True)
-        fig.savefig(os.path.join(outdir, f'arc_{sextant}.png'),
+        tag = '_beam' if beam is not None else ''
+        fig.savefig(os.path.join(outdir, f'arc_{sextant}{tag}.png'),
                     dpi=dpi, bbox_inches='tight')
     return fig
 
@@ -1288,11 +1368,6 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
     rows = [r for r in rows_all
             if r['s'] >= s_a - 1e-9 and r['s'] + r['length'] <= s_b + 1e-9]
 
-    s = np.asarray(beam['s'], dtype=float)
-    keep = (s >= s_a - 1e-9) & (s <= s_b + 1e-9)
-    s = s[keep] - s_a
-    sx = np.asarray(beam['sig_x'], dtype=float)[keep] * 1e3
-    sy = np.asarray(beam['sig_y'], dtype=float)[keep] * 1e3
     L = s_b - s_a
     if ref_span is None:
         ref_span = 15.0 / in_per_m
@@ -1313,27 +1388,7 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
     axl.set_xlabel('s along the ring  [m]', fontsize=9)
 
     # ---- beam sizes --------------------------------------------------
-    axb.plot(s, sx, color=COL_H, lw=1.4, label=r'$\sigma_x$ (rms)')
-    axb.plot(s, sy, color=COL_V, lw=1.4, label=r'$\sigma_y$ (rms)')
-    if n_sigma:
-        axb.plot(s, n_sigma * sx, color=COL_H, lw=0.9, ls='--',
-                 label=rf'{n_sigma:g}$\sigma_x$')
-        axb.plot(s, n_sigma * sy, color=COL_V, lw=0.9, ls='--',
-                 label=rf'{n_sigma:g}$\sigma_y$')
-    y_max = (n_sigma or 1) * max(sx.max(), sy.max()) * 1.15
-    axb.set_ylim(0, y_max)
-    axb.set_ylabel('beam size  [mm]', fontsize=10)
-    axb.tick_params(axis='y', labelright=True, right=True)
-    axb.tick_params(axis='x', labelbottom=False)
-    axb.grid(color='0.92', lw=0.6)
-    axb.legend(loc='lower left', fontsize=9, framealpha=0.95)
-    for sig, col, lab in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
-        i = int(np.argmax(sig))
-        axb.plot(s[i], sig[i], 'o', color=col, mec='black', ms=6, zorder=5)
-        axb.annotate(rf'max $\sigma_{lab}$ = {sig[i]:.2f} mm', xy=(s[i], sig[i]),
-                     xytext=(8, 6), textcoords='offset points', fontsize=8.5,
-                     zorder=6, bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
-                                         edgecolor=col, linewidth=0.8))
+    y_max = draw_beam_size(axb, beam, s_a, s_b, n_sigma=n_sigma)
     title = (f'One period (sextants {" + ".join(sextants)}) with the injected beam size'
              f'  —  the optics repeat every period')
     if 'eps_x' in beam and 'eps_y' in beam:
@@ -1388,15 +1443,18 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
 
 
 def sketch_all(pdr, sextant='1R', line_name='ring', outdir='sketches',
-               dpi=200, show=False):
+               dpi=200, show=False, beam=None, n_sigma=None):
     """
     Produce the complete set: every cell type, the arc, and the ring.
-    Saves to `outdir` and returns {name: Figure}.
+    beam=None draws the layouts only; a beam-size dict (as from
+    corrections.ring_beam_sizes) adds the beam sizes to the cell and arc
+    plots. Saves to `outdir` and returns {name: Figure}.
     """
     out = {}
     out.update(sketch_cell_types(pdr, sextant, line_name, outdir=outdir,
-                                 dpi=dpi))
-    out['arc'] = sketch_arc(pdr, sextant, line_name, outdir=outdir, dpi=dpi)
+                                 dpi=dpi, beam=beam, n_sigma=n_sigma))
+    out['arc'] = sketch_arc(pdr, sextant, line_name, outdir=outdir, dpi=dpi,
+                            beam=beam, n_sigma=n_sigma)
     out['ring'] = sketch_ring(pdr, line_name, outdir=outdir, dpi=dpi)
 
     print(f'\nsketch_all: {len(out)} figures written to {outdir}/')
