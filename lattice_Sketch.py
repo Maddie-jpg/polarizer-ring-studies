@@ -120,10 +120,10 @@ _DIAG_STYLES = [
     # Kickers / correctors -- in-line magnets. Mx / My are this lattice's
     # names; the rest are common alternatives kept as fallbacks.
     (r'^Mx|^MCBH|^CH[_0-9]|^CORH|'
-     r'^COR_H|^HKICK|^XCOR|^HCOR',   'corr_h', COL_H,   'Kicker (H)', 0.32, 0.0),
+     r'^COR_H|^HKICK|^XCOR|^HCOR',   'corr_h', COL_H,   'Corrector (H)', 0.32, 0.0),
     (r'^My|^MCBV|^CV[_0-9]|^CORV|'
-     r'^COR_V|^VKICK|^YCOR|^VCOR',   'corr_v', COL_V,   'Kicker (V)', 0.32, 0.0),
-    (r'^MCB|^COR|^KICK',             'corr',  '#9467bd','Kicker (H+V)',0.32, 0.0),
+     r'^COR_V|^VKICK|^YCOR|^VCOR',   'corr_v', COL_V,   'Corrector (V)', 0.32, 0.0),
+    (r'^MCB|^COR|^KICK',             'corr',  '#9467bd','Corrector (H+V)',0.32, 0.0),
 ]
 
 # Kinds NOT drawn as ordinary in-line magnets.
@@ -158,9 +158,9 @@ _KIND_LABEL = {
     'marker':      'Marker',
     'other':       'Other',
     'inj':         'Injection',
-    'corr_h':      'Kicker (H)',
-    'corr_v':      'Kicker (V)',
-    'corr':        'Kicker (H+V)',
+    'corr_h':      'Corrector (H)',
+    'corr_v':      'Corrector (V)',
+    'corr':        'Corrector (H+V)',
     'bpm':         'BPM',
     'bpm_h':       'BPM (H)',
     'bpm_v':       'BPM (V)',
