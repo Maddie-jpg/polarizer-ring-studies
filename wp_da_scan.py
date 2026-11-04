@@ -289,13 +289,19 @@ def _snake(qx_vals, qy_vals, rows):
 
 def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                  n_workers=None, n_turns=1000, n_particles=200, radiation='mean',
-                 sext_knobs=None, n_periods=6, mu_cell=0.25, betay_DS_target=None,
+                 sext_knobs=None, n_periods=6, mu_cell=None, betay_DS_target=None,
                  triplet_seed=(1.8, -3.2), tune_tol=2e-3, start_element=None,
                  progress_every=10, metrics=True):
     """Scan min DA over qx_vals x qy_vals using n_workers processes.
 
     lattice_json   saved Environment to scan (e.g. paths.lattice_json_path(...))
-    n_workers      default: number of CPU cores - 1
+    n_workers      default: number of CPU cores - 1. Each worker holds its own
+                   lattice + tracker at ~0.17 GB, so cap this on a many-core
+                   box rather than letting it default
+    mu_cell        arc cell phase advance the cells are re-matched to before
+                   every point. None (default) reads it off the lattice, which
+                   is what you want -- a value that disagrees with the lattice
+                   retunes the ring before matching and fails every point
     n_turns, n_particles, radiation
                    tracking settings; 'mean' as before, None is ~15 % faster
     sext_knobs     e.g. ['k2XFarc', 'k2XDarc'] to re-correct chromaticity to
@@ -310,6 +316,37 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
     list of per-point records (tunes reached, beta max, errors, time).
     """
     qx_vals, qy_vals = np.asarray(qx_vals, float), np.asarray(qy_vals, float)
+
+    # The arc cells set most of the ring tune, and the per-point prep calls
+    # _match_cells_3fold, which rewrites kQFarc/kQDarc/kQFarcM to whatever
+    # mu_cell says. A hardcoded mu_cell therefore silently RETUNES the lattice
+    # being scanned before any matching: forcing 0.25 on a 120 deg/cell ring
+    # drops Qx by ~6 units, and matchingWP only varies the DS/straight/triplet
+    # knobs, so it can never win that back -- every point then dies on
+    # 'tune match missed' having reached the same wrong tune. Read the cell
+    # phase advance off the lattice instead, and complain if a caller's value
+    # disagrees with it.
+    import xtrack as _xt
+    _env = _xt.Environment.from_json(str(lattice_json))
+    _ca = _env.lines['cell_arc']
+    try:
+        _ca.configure_radiation(model=None)
+    except Exception:
+        pass
+    mu_native = float(_ca.twiss(method='4d').qx)
+    del _env, _ca
+    if mu_cell is None:
+        mu_cell = mu_native
+        print(f'[wp_da_scan] arc cell phase advance read from the lattice: '
+              f'mu_cell={mu_cell:.6f} ({mu_cell * 360:.1f} deg/cell)')
+    elif abs(mu_cell - mu_native) > 1e-3:
+        print(f'[wp_da_scan] WARNING mu_cell={mu_cell:.6f} '
+              f'({mu_cell * 360:.1f} deg/cell) but this lattice has '
+              f'{mu_native:.6f} ({mu_native * 360:.1f} deg/cell). The cell '
+              f're-match will retune the ring by roughly '
+              f'{abs(mu_cell / mu_native - 1) * 100:.0f} % before every point; '
+              f'pass mu_cell=None to use the lattice value.')
+
     n_workers = n_workers or max(1, (os.cpu_count() or 2) - 1)
     n_workers = min(n_workers, len(qy_vals) * len(qx_vals))
     # contiguous row blocks per worker -> neighbours stay in the same worker
