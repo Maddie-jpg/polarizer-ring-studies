@@ -96,7 +96,7 @@ import lattice_Sketch as ls
 # Must match the lattice loaded at the top of this file.
 design, config, phase, changes = 1, 9, 90, 'FDF'
 show_beam = True      # beam sizes above the cell and arc plots; False = layouts only
-beam_n_sigma = 1      # beam size drawn, in rms units: 1, 3, ... or several, e.g. (1, 3, 5)
+beam_n_sigma = (1, 3, 5)   # beam size drawn, in rms units: 1, 3, ... or several
 sketch_sextant = '1R'
 
 
