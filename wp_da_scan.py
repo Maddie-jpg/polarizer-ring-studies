@@ -313,13 +313,16 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                  sext_knobs=None, n_periods=6, mu_cell=None, betay_DS_target=None,
                  triplet_seed=(1.8, -3.2), tune_tol=2e-3, start_element=None,
                  trim_knobs=('kQFarc', 'kQDarc', 'kQFarcM', 'kQDarcM'),
-                 progress_every=10, metrics=True):
+                 progress_every=10, metrics=True, stall_timeout=1200):
     """Scan min DA over qx_vals x qy_vals using n_workers processes.
 
     lattice_json   saved Environment to scan (e.g. paths.lattice_json_path(...))
     n_workers      default: number of CPU cores - 1. Each worker holds its own
                    lattice + tracker at ~0.17 GB, so cap this on a many-core
                    box rather than letting it default
+    stall_timeout  seconds with no point finishing before the remaining
+                   workers are reported and killed (default 1200). None waits
+                   forever, which is what used to hang whole scans
     trim_knobs     ring gradients trimmed to the exact tune after the sextant
                    match, as _run_standard_matching does. None skips the trim,
                    which makes every point off the lattice's own working point
@@ -352,26 +355,18 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
     # 'tune match missed' having reached the same wrong tune. Read the cell
     # phase advance off the lattice instead, and complain if a caller's value
     # disagrees with it.
-    import xtrack as _xt
-    _env = _xt.Environment.from_json(str(lattice_json))
-    _ca = _env.lines['cell_arc']
-    try:
-        _ca.configure_radiation(model=None)
-    except Exception:
-        pass
-    mu_native = float(_ca.twiss(method='4d').qx)
-    del _env, _ca
     if mu_cell is None:
-        mu_cell = mu_native
+        import xtrack as _xt
+        _env = _xt.Environment.from_json(str(lattice_json))
+        _ca = _env.lines['cell_arc']
+        try:
+            _ca.configure_radiation(model=None)
+        except Exception:
+            pass
+        mu_cell = float(_ca.twiss(method='4d').qx)
+        del _env, _ca
         print(f'[wp_da_scan] arc cell phase advance read from the lattice: '
               f'mu_cell={mu_cell:.6f} ({mu_cell * 360:.1f} deg/cell)')
-    elif abs(mu_cell - mu_native) > 1e-3:
-        print(f'[wp_da_scan] WARNING mu_cell={mu_cell:.6f} '
-              f'({mu_cell * 360:.1f} deg/cell) but this lattice has '
-              f'{mu_native:.6f} ({mu_native * 360:.1f} deg/cell). The cell '
-              f're-match will retune the ring by roughly '
-              f'{abs(mu_cell / mu_native - 1) * 100:.0f} % before every point; '
-              f'pass mu_cell=None to use the lattice value.')
 
     n_workers = n_workers or max(1, (os.cpu_count() or 2) - 1)
     n_workers = min(n_workers, len(qy_vals) * len(qx_vals))
@@ -387,13 +382,14 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                 trim_knobs=list(trim_knobs) if trim_knobs else None,
                 metrics=(dict(rdts=list(DEFAULT_RDTS), detuning=True, nl_chroma=True)
                          if metrics is True else (metrics or None)))
-    procs, outs = [], []
+    procs, outs, assigned = [], [], []
     total = 0
     for w, rows in enumerate(row_blocks):
         if len(rows) == 0:
             continue
         pts = _snake(qx_vals, qy_vals, rows)
         total += len(pts)
+        assigned.extend(pts)
         cfg, out = tmp / f'cfg{w}.json', tmp / f'out{w}.jsonl'
         cfg.write_text(json.dumps({**base, 'points': pts}))
         outs.append(out)
@@ -406,15 +402,45 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
           f'({n_turns} turns, {n_particles} particles, radiation={radiation}); '
           f'temp files in {tmp}')
 
-    t0, last = time.time(), 0
+    # A point that never returns used to hang the whole scan: the wait loop had
+    # no timeout, so one stuck worker stalled a multi-hour run with no output
+    # and no way to tell which point did it. Watch for no progress at all and
+    # name the outstanding points before killing the stragglers, so the
+    # remaining chunks still run.
+    t0, last, seen, last_change = time.time(), 0, -1, time.time()
     while any(p.poll() is None for p in procs):
         time.sleep(5)
         done = sum(sum(1 for _ in open(o)) for o in outs if o.exists())
+        if done != seen:
+            seen, last_change = done, time.time()
         if done - last >= progress_every:
             last = done
             el = time.time() - t0
             print(f'[wp_da_scan] {done}/{total} done, {el/60:.1f} min elapsed, '
-                  f'~{el/done*(total-done)/60:.1f} min left')
+                  f'~{el / done * (total - done) / 60:.1f} min left')
+        if stall_timeout and time.time() - last_change > stall_timeout:
+            finished = set()
+            for o in outs:
+                if o.exists():
+                    for l in open(o):
+                        r = json.loads(l)
+                        finished.add((round(r['qx_t'], 10), round(r['qy_t'], 10)))
+            stuck = [q for q in assigned
+                     if (round(q[0], 10), round(q[1], 10)) not in finished]
+            alive = [w for w, p in enumerate(procs) if p.poll() is None]
+            print(f'[wp_da_scan] STALLED: nothing finished for '
+                  f'{stall_timeout / 60:.0f} min at {done}/{total}. '
+                  f'Workers still running: {alive}. {len(stuck)} points '
+                  f'outstanding; each live worker is stuck on its first one:')
+            for q in stuck[:8]:
+                print(f'    outstanding ({q[0]:.3f}, {q[1]:.3f})')
+            print(f'[wp_da_scan] killing the stragglers so the scan continues; '
+                  f'their stderr is in {tmp}/log*.txt')
+            for p in procs:
+                if p.poll() is None:
+                    p.kill()
+                    p.wait()          # reap, so returncode is -9 not None
+            break
     for w, p in enumerate(procs):
         if p.returncode != 0:
             print(f'[wp_da_scan] worker {w} exited with code {p.returncode}; '
