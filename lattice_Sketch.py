@@ -788,17 +788,33 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
 # Public: the three sketch families
 # =============================================================================
 
-def draw_beam_size(axb, beam, s_a, s_b, n_sigma=None, legend_loc='lower left'):
+_SIGMA_STYLES = ['-', '--', ':', '-.']
+
+
+def _sigma_levels(n_sigma):
+    """n_sigma as a sorted tuple of levels: None -> (1,), 3 -> (3,), (1, 3) -> (1, 3)."""
+    if n_sigma is None:
+        return (1.0,)
+    levels = np.atleast_1d(np.asarray(n_sigma, dtype=float))
+    if np.any(levels <= 0):
+        raise ValueError(f'n_sigma must be positive, got {n_sigma!r}')
+    return tuple(sorted(set(levels.tolist())))
+
+
+def draw_beam_size(axb, beam, s_a, s_b, n_sigma=1, legend_loc='lower left'):
     """
-    Plot the rms beam sizes of `beam` between s_a and s_b on `axb`, against
+    Plot the beam sizes of `beam` between s_a and s_b on `axb`, against
     s - s_a (the convention draw_beamline uses with s_offset=s_a), so it lines
     up with a layout drawn underneath on a shared x axis.
 
-    beam : dict with 's', 'sig_x', 'sig_y' (arrays over the ring, metres), as
-        returned by corrections.ring_beam_sizes.
-    n_sigma : also draw the n_sigma envelope (dashed), or None for rms only.
+    beam : dict with 's', 'sig_x', 'sig_y' (rms, arrays over the ring,
+        metres), as returned by corrections.ring_beam_sizes.
+    n_sigma : which beam size to draw, in rms units: 1 (default) for the rms
+        size, 3 for 3 sigma, or several, e.g. (1, 3, 5), each in its own line
+        style. The maxima are labelled for the largest level.
     Returns the top of the y axis [mm].
     """
+    levels = _sigma_levels(n_sigma)
     s = np.asarray(beam['s'], dtype=float)
     keep = (s >= s_a - 1e-9) & (s <= s_b + 1e-9)
     s = s[keep] - s_a
@@ -808,25 +824,30 @@ def draw_beam_size(axb, beam, s_a, s_b, n_sigma=None, legend_loc='lower left'):
         raise ValueError(f'draw_beam_size: no beam-size points between s = {s_a:.3f} '
                          f'and {s_b:.3f} m')
 
-    axb.plot(s, sx, color=COL_H, lw=1.4, label=r'$\sigma_x$ (rms)')
-    axb.plot(s, sy, color=COL_V, lw=1.4, label=r'$\sigma_y$ (rms)')
-    if n_sigma:
-        axb.plot(s, n_sigma * sx, color=COL_H, lw=0.9, ls='--',
-                 label=rf'{n_sigma:g}$\sigma_x$')
-        axb.plot(s, n_sigma * sy, color=COL_V, lw=0.9, ls='--',
-                 label=rf'{n_sigma:g}$\sigma_y$')
-    y_max = (n_sigma or 1) * max(sx.max(), sy.max()) * 1.15
+    def lab(n, plane):
+        return (rf'$\sigma_{plane}$ (rms)' if n == 1
+                else rf'{n:g}$\sigma_{plane}$')
+
+    for j, n in enumerate(levels):
+        ls_ = _SIGMA_STYLES[j % len(_SIGMA_STYLES)]
+        axb.plot(s, n * sx, color=COL_H, lw=1.4, ls=ls_, label=lab(n, 'x'))
+        axb.plot(s, n * sy, color=COL_V, lw=1.4, ls=ls_, label=lab(n, 'y'))
+    n_top = levels[-1]
+    y_max = n_top * max(sx.max(), sy.max()) * 1.15
     axb.set_ylim(0, y_max)
     axb.set_ylabel('beam size  [mm]', fontsize=10)
     axb.tick_params(axis='y', labelright=True, right=True)
     axb.tick_params(axis='x', labelbottom=False)
     axb.grid(color='0.92', lw=0.6)
-    axb.legend(loc=legend_loc, fontsize=9, framealpha=0.95)
-    for sig, col, lab in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
+    axb.legend(loc=legend_loc, fontsize=9, framealpha=0.95,
+               ncol=1 if len(levels) == 1 else 2)
+    pre = '' if n_top == 1 else f'{n_top:g}'
+    for sig, col, plane in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
         i = int(np.argmax(sig))
-        axb.plot(s[i], sig[i], 'o', color=col, mec='black', ms=6, zorder=5)
+        val = n_top * sig[i]
+        axb.plot(s[i], val, 'o', color=col, mec='black', ms=6, zorder=5)
         near_end = s[i] > 0.8 * (s_b - s_a)
-        axb.annotate(rf'max $\sigma_{lab}$ = {sig[i]:.2f} mm', xy=(s[i], sig[i]),
+        axb.annotate(rf'max {pre}$\sigma_{plane}$ = {val:.2f} mm', xy=(s[i], val),
                      xytext=(-8 if near_end else 8, 6), textcoords='offset points',
                      ha='right' if near_end else 'left', fontsize=8.5,
                      zorder=6, bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
@@ -835,7 +856,7 @@ def draw_beam_size(axb, beam, s_a, s_b, n_sigma=None, legend_loc='lower left'):
 
 
 def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
-                      outdir=None, dpi=200, width=15.0, beam=None, n_sigma=None):
+                      outdir=None, dpi=200, width=15.0, beam=None, n_sigma=1):
     """
     One dimensioned figure per distinct cell type.
 
@@ -843,7 +864,8 @@ def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
     beam : None (default) draws the layout only. A beam-size dict (as from
         corrections.ring_beam_sizes) adds the rms beam sizes above each
         layout on the same s axis, saved as cell_<label>_<sextant>_beam.png.
-    n_sigma : with beam, also draw the n_sigma envelope.
+    n_sigma : with beam, which beam size to draw: 1 (rms, default), 3, or
+        several, e.g. (1, 3, 5). See draw_beam_size.
     Returns {label: Figure}.
     """
     line = pdr.lines[line_name]
@@ -888,7 +910,7 @@ def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
 
 
 def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
-               n_cells_shown=2, width=17.0, beam=None, n_sigma=None):
+               n_cells_shown=2, width=17.0, beam=None, n_sigma=1):
     """
     One sextant, drawn as a block diagram.
 
@@ -902,7 +924,8 @@ def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
     beam : None (default) for the layout only. A beam-size dict (as from
         corrections.ring_beam_sizes) adds the rms beam sizes above the
         detailed cells, saved as arc_<sextant>_beam.png.
-    n_sigma : with beam, also draw the n_sigma envelope.
+    n_sigma : with beam, which beam size to draw: 1 (rms, default), 3, or
+        several, e.g. (1, 3, 5). See draw_beam_size.
     """
     line = pdr.lines[line_name]
     rows_all = _element_rows(line)
@@ -1306,7 +1329,7 @@ CELL_PLOT_IN_PER_M = 15.0 / 3.7   # sketch_cell_types: 15 in for a ~3.7 m cell
 
 
 def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
-                            inject_s=None, n_sigma=None, outdir=None,
+                            inject_s=None, n_sigma=1, outdir=None,
                             in_per_m=0.5, ref_span=None, dpi=200):
     """
     One period of the ring (two neighbouring sextants: arc centre -> straight
@@ -1323,7 +1346,8 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
         is the period holding the injection straight; ('2L', '2R') is centred
         on a whole arc instead.
     inject_s : s of the injection point [m], drawn if it falls in the span.
-    n_sigma : also draw the n_sigma envelope (dashed), or None for rms only.
+    n_sigma : which beam size to draw: 1 (rms, default), 3, or several,
+        e.g. (1, 3, 5). See draw_beam_size.
     in_per_m : horizontal scale [in per m]. 0.5 gives a ~38 in wide figure;
         CELL_PLOT_IN_PER_M (~4) draws it at the scale of the cell plots.
     ref_span : the span [m] that label rotation, label spacing and symbol
@@ -1443,7 +1467,7 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
 
 
 def sketch_all(pdr, sextant='1R', line_name='ring', outdir='sketches',
-               dpi=200, show=False, beam=None, n_sigma=None):
+               dpi=200, show=False, beam=None, n_sigma=1):
     """
     Produce the complete set: every cell type, the arc, and the ring.
     beam=None draws the layouts only; a beam-size dict (as from

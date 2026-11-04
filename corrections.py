@@ -96,6 +96,7 @@ import lattice_Sketch as ls
 # Must match the lattice loaded at the top of this file.
 design, config, phase, changes = 1, 9, 90, 'FDF'
 show_beam = True      # beam sizes above the cell and arc plots; False = layouts only
+beam_n_sigma = 1      # beam size drawn, in rms units: 1, 3, ... or several, e.g. (1, 3, 5)
 sketch_sextant = '1R'
 
 
@@ -163,8 +164,8 @@ pdr_sketch = pdr.copy()
 mc.insert_bpms_and_correctors(pdr_sketch, design, config)
 
 sketches = ls.sketch_all(pdr_sketch, sextant=sketch_sextant, outdir=sketch_dir,
-                         beam=beam if show_beam else None)
+                         beam=beam if show_beam else None, n_sigma=beam_n_sigma)
 sketches['period'] = ls.sketch_period_beam_size(
     pdr_sketch, beam, sextants=('3R', '1L'), inject_s=injection_s(pdr.lines['ring']),
-    outdir=sketch_dir)
+    n_sigma=beam_n_sigma, outdir=sketch_dir)
 plt.show()
