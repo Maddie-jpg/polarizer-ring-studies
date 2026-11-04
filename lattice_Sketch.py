@@ -403,7 +403,7 @@ def _fmt_len(L):
 
 def draw_beamline(ax, rows, title=None, show_drifts=True,
                   label_every=1, min_label_gap=None, s_offset=None,
-                  dim_row_frac=0.55):
+                  dim_row_frac=0.55, ref_span=None):
     """
     Draw one span of beamline onto `ax`, fully dimensioned.
 
@@ -436,6 +436,10 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
         than this are dropped. None = derive from the span width.
     s_offset : float or None
         Value subtracted from s so the span starts at 0. None = auto.
+    ref_span : float or None
+        Span [m] that label rotation, symbol widths, label spacing and the
+        side margins are scaled to. None = the span drawn. Pass a cell length
+        to draw a long span (e.g. the whole ring) at cell-plot scale.
     """
     diags = [r for r in rows if r['kind'] in _DIAG_KINDS]
     mags = [r for r in rows if not r['is_drift'] and r['length'] > 0
@@ -460,6 +464,7 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
     span = s1 - s0
     if span <= 0:
         span = 1.0
+    ref = ref_span or span
 
     # ---- bands -------------------------------------------------------
     Y_AX = 0.0
@@ -494,10 +499,10 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
     if has_diag:
         ax.plot([0, span], [Y_DIAG, Y_DIAG], color='0.80', lw=0.8,
                 ls=(0, (4, 3)), zorder=1)
-        ax.text(-span * 0.012, Y_DIAG, 'BPMs',
+        ax.text(-ref * 0.012, Y_DIAG, 'BPMs',
                 ha='right', va='center', fontsize=6.5, color='0.45')
 
-        w_min = span * 0.006          # so a thin/zero-length element is seen
+        w_min = ref * 0.006           # so a thin/zero-length element is seen
         for r in diags:
             x = r['s'] - s0
             w = max(r['length'], w_min)
@@ -555,7 +560,7 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
 
     # ---- magnet names, staggered -------------------------------------
     if min_label_gap is None:
-        min_label_gap = span / 60.0
+        min_label_gap = ref / 60.0
 
     last_lab_x = -1e9
     lvl = 0
@@ -593,7 +598,7 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
         # Horizontal labels go above the arrow; when the magnet is too narrow
         # the label is rotated, and must then go BELOW the arrow or it runs
         # up into the magnet boxes that hang under the axis.
-        if L / span > 0.035:
+        if L / ref > 0.035:
             ax.text(x + L / 2.0, Y_DIM + 0.22, _fmt_len(L),
                     ha='center', va='bottom', fontsize=7, zorder=4)
         else:
@@ -615,7 +620,7 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
             for xe in (xa, xb):
                 ax.plot([xe, xe], [Y_DRIFT - 0.12, Y_DRIFT + 0.12],
                         color='0.45', lw=0.6, zorder=3)
-            rot = 0 if gap / span > 0.030 else 90
+            rot = 0 if gap / ref > 0.030 else 90
             ax.text((xa + xb) / 2.0, Y_DRIFT - 0.20, _fmt_len(gap),
                     ha='center', va='top', fontsize=6.5, color='0.35',
                     style='italic', rotation=rot, zorder=4)
@@ -636,7 +641,7 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
     y_top = Y_NAME_BASE + N_NAME_LEVELS * Y_NAME_STEP + 0.35
     if any(d['kind'] == 'inj' for d in diags):
         y_top += 0.45           # room for the injection flag label
-    ax.set_xlim(-span * 0.035, span * 1.035)
+    ax.set_xlim(-ref * 0.035, span + ref * 0.035)
     ax.set_ylim(Y_TOT - 1.0, y_top)
     ax.set_yticks([])
     ax.set_xlabel('s along the span  [m]', fontsize=9)
@@ -1217,12 +1222,18 @@ def sketch_ring(pdr, line_name='ring', outdir=None, dpi=200, width=13.0,
     return fig
 
 
+CELL_PLOT_IN_PER_M = 15.0 / 3.7   # sketch_cell_types: 15 in for a ~3.7 m cell
+
+
 def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
                           n_sigma=None, sextants=('1R', '2L', '2R', '3L', '3R', '1L'),
-                          outdir=None, dpi=200, width=30.0, height=10.0):
+                          outdir=None, in_per_m=CELL_PLOT_IN_PER_M, ref_span=3.7,
+                          dpi=200, png=True):
     """
-    The whole ring laid out along s as one magnet strip, with the injected
-    beam's rms sizes plotted above it on the same s axis.
+    The whole ring as one long layout drawing at the scale of the cell plots
+    (draw_beamline: names, BPMs, magnet and drift lengths), with the injected
+    beam's rms sizes plotted above it on the same s axis. Meant to be opened
+    full size and scrolled along.
 
     beam : dict with 's', 'sig_x', 'sig_y' (arrays, metres) and optionally
         'eps_x', 'eps_y' (m rad) and 'sigma_delta' for the title -- as
@@ -1230,9 +1241,13 @@ def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
         emittances.
     inject_s : s of the injection point [m], drawn as a red line, or None.
     n_sigma : also draw the n_sigma envelope (dashed), or None for rms only.
-    sextants : sextant tags in ring order; the boundaries between them are
-        drawn across both panels (R -> L is a straight centre, L -> R an arc
-        centre).
+    sextants : sextant tags in ring order; their boundaries are drawn across
+        both panels (R -> L is a straight centre, L -> R an arc centre).
+    in_per_m, ref_span : horizontal scale and the span text and symbols are
+        sized for. The defaults match sketch_cell_types.
+    outdir : saves ring_beam_size.svg (full size, vector, scroll it in a
+        browser) and, if png, ring_beam_size.png. A PNG cannot be wider than
+        65536 px, so its dpi is lowered to fit when needed.
     """
     line = pdr.lines[line_name]
     rows = _element_rows(line)
@@ -1241,10 +1256,18 @@ def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
     sx = np.asarray(beam['sig_x'], dtype=float) * 1e3
     sy = np.asarray(beam['sig_y'], dtype=float) * 1e3
 
-    fig = plt.figure(figsize=(width, height))
-    gs = fig.add_gridspec(2, 1, height_ratios=[2.3, 1.0], hspace=0.06)
+    width = in_per_m * (C + 2 * 0.035 * ref_span) + 2.0
+    fig = plt.figure(figsize=(width, 11.0))
+    gs = fig.add_gridspec(2, 1, height_ratios=[4.2, 6.0], hspace=0.04,
+                          left=1.0 / width, right=1.0 - 1.0 / width,
+                          top=0.94, bottom=0.12)
     axb = fig.add_subplot(gs[0])
     axl = fig.add_subplot(gs[1], sharex=axb)
+
+    # ---- layout, exactly as in the cell plots --------------------------
+    draw_beamline(axl, rows, s_offset=0.0, ref_span=ref_span)
+    axl.set_xlabel('s  [m]', fontsize=9)
+    axl.xaxis.set_major_locator(plt.MultipleLocator(1.0))
 
     # ---- beam sizes --------------------------------------------------
     axb.plot(s, sx, color=COL_H, lw=1.4, label=r'$\sigma_x$ (rms)')
@@ -1254,47 +1277,28 @@ def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
                  label=rf'{n_sigma:g}$\sigma_x$')
         axb.plot(s, n_sigma * sy, color=COL_V, lw=0.9, ls='--',
                  label=rf'{n_sigma:g}$\sigma_y$')
+    y_max = (n_sigma or 1) * max(sx.max(), sy.max()) * 1.15
+    axb.set_ylim(0, y_max)
+    axb.set_ylabel('beam size  [mm]', fontsize=10)
+    axb.tick_params(axis='y', labelright=True, right=True)
+    axb.tick_params(axis='x', labelbottom=False)
+    axb.grid(color='0.92', lw=0.6)
+    axb.legend(loc='upper left', fontsize=9, framealpha=0.95)
     for sig, col, lab in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
         i = int(np.argmax(sig))
         axb.plot(s[i], sig[i], 'o', color=col, mec='black', ms=6, zorder=5)
-        near_end = s[i] > 0.8 * C
-        axb.annotate(rf'max $\sigma_{lab}$ = {sig[i]:.2f} mm  (s = {s[i]:.1f} m)',
-                     xy=(s[i], sig[i]), xytext=(-8 if near_end else 8, 6),
-                     textcoords='offset points', ha='right' if near_end else 'left',
-                     fontsize=9, color='0.15', zorder=6,
-                     bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
-                               edgecolor=col, linewidth=0.8))
-    y_top = (n_sigma or 1) * max(sx.max(), sy.max())
-    axb.set_ylim(0, y_top * 1.18)
-    axb.set_ylabel('beam size  [mm]', fontsize=11)
-    axb.grid(color='0.92', lw=0.6)
-    axb.legend(loc='upper right', fontsize=10, framealpha=0.95)
-    axb.tick_params(axis='x', labelbottom=False)
+        axb.annotate(rf'max $\sigma_{lab}$ = {sig[i]:.2f} mm', xy=(s[i], sig[i]),
+                     xytext=(8, 6), textcoords='offset points', fontsize=8.5,
+                     zorder=6, bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                                         edgecolor=col, linewidth=0.8))
     title = 'Full ring with the injected beam size'
     if 'eps_x' in beam and 'eps_y' in beam:
         title += (rf'  —  $\epsilon_x$ = {beam["eps_x"]*1e6:.3f} $\mu$m, '
                   rf'$\epsilon_y$ = {beam["eps_y"]*1e6:.3f} $\mu$m')
     if 'sigma_delta' in beam:
         title += rf', $\sigma_\delta$ = {beam["sigma_delta"]*1e3:.2f}‰'
-    axb.set_title(title, fontsize=14, fontweight='bold', pad=12)
-
-    # ---- magnet strip ------------------------------------------------
-    axl.plot([0, C], [0, 0], color='0.35', lw=0.8, zorder=1)
-    drawn = {}
-    for r in rows:
-        if r['is_drift'] or r['length'] <= 0 or r['kind'] in _DIAG_KINDS:
-            continue
-        axl.add_patch(Rectangle((r['s'], r['y0'] - r['half_h']), r['length'],
-                                2 * r['half_h'], facecolor=r['colour'],
-                                edgecolor='black', linewidth=0.3,
-                                hatch=r.get('hatch', ''),
-                                zorder=4 if r['kind'] in _CORR_KINDS else 3))
-        drawn.setdefault(r['kind'], (r['colour'], r.get('hatch', '')))
-    for r in rows:
-        if r['kind'] in _BPM_KINDS:
-            xc = r['s'] + r['length'] / 2
-            axl.plot([xc, xc], [1.55, 1.75], color=r['colour'], lw=0.8, zorder=2)
-            drawn.setdefault(r['kind'], (r['colour'], ''))
+    axb.text(0.0, 1.03, title, transform=axb.transAxes, ha='left', va='bottom',
+             fontsize=12, fontweight='bold')
 
     # ---- sextants, straight and arc centres --------------------------
     spans = {}
@@ -1304,50 +1308,59 @@ def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
                 a, b = spans.get(tag, (np.inf, -np.inf))
                 spans[tag] = (min(a, r['s']), max(b, r['s'] + r['length']))
     present = [t for t in sextants if t in spans]
+    yticks = [t for t in axb.get_yticks() if 0 < t < y_max]
     for k, tag in enumerate(present):
         a, b = spans[tag]
-        axl.text((a + b) / 2, -1.55, f'sextant {tag}', ha='center', va='top',
-                 fontsize=10, fontweight='bold', color='0.25')
+        axb.text(a + 0.3, y_max * 0.97, f'sextant {tag}', ha='left', va='top',
+                 fontsize=11, fontweight='bold', color='0.3')
+        # repeat the beam-size scale at every sextant so it can be read anywhere
+        for t in (yticks if k else []):
+            axb.text(a + 0.05, t, f'{t:g} mm', ha='left', va='bottom',
+                     fontsize=7, color='0.55')
         if k + 1 < len(present):
             nxt = present[k + 1]
-            x = 0.5 * (b + spans[nxt][0])
             straight = tag.endswith('R') and nxt.endswith('L')
+            # the straight / arc centre is the middle of the centre quad that
+            # opens the next sextant (QDTripC_<L>2 or QFA_<R>C)
+            ctr = next((r for r in rows if re.match(
+                rf'^(?:Q[FD]TripC_{nxt}\d*|QFA_{nxt}C)$', r['name'])), None)
+            x = (ctr['s'] + ctr['length'] / 2 if ctr is not None
+                 else 0.5 * (b + spans[nxt][0]))
             for a_ in (axb, axl):
-                a_.axvline(x, color='0.55', lw=0.9,
-                           ls='--' if straight else ':', zorder=0)
-            axb.text(x, axb.get_ylim()[1], 'straight centre' if straight else 'arc centre',
-                     ha='center', va='bottom', fontsize=8, color='0.4')
+                a_.axvline(x, color='0.55', lw=0.9, ls='--' if straight else ':',
+                           zorder=0)
+            axb.text(x, y_max * 0.90, ' straight centre' if straight else ' arc centre',
+                     ha='left', va='top', fontsize=9, color='0.4')
 
     if inject_s is not None:
         for a_ in (axb, axl):
             a_.axvline(inject_s, color=COL_INJ, lw=1.6, ls=(0, (5, 2)), zorder=6)
-        axb.annotate('injection', xy=(inject_s, axb.get_ylim()[1] * 0.93),
-                     xytext=(6, 0), textcoords='offset points', ha='left',
-                     va='center', fontsize=10, fontweight='bold', color=COL_INJ)
+        axb.text(inject_s, y_max * 0.82, ' injection', ha='left', va='top',
+                 fontsize=11, fontweight='bold', color=COL_INJ)
 
-    axl.set_xlim(0, C)
-    axl.set_ylim(-2.1, 1.9)
-    axl.set_yticks([])
-    axl.set_xlabel('s  [m]', fontsize=11)
-    for side in ('left', 'right', 'top'):
-        axl.spines[side].set_visible(False)
-    axl.grid(axis='x', color='0.92', lw=0.6, zorder=0)
-
+    seen = {}
+    for r in rows:
+        if not r['is_drift'] and (r['length'] > 0 or r['kind'] in _DIAG_KINDS):
+            seen.setdefault(r['kind'], (r['colour'], r.get('hatch', '')))
     handles = [Rectangle((0, 0), 1, 1,
                          facecolor=('white' if k in _BPM_KINDS else c),
                          edgecolor=(c if k in _BPM_KINDS else 'black'),
                          hatch=h, linewidth=0.7, label=_KIND_LABEL.get(k, k))
-               for k, (c, h) in drawn.items()]
-    if inject_s is not None:
-        handles.append(Line2D([0], [0], color=COL_INJ, lw=1.6, ls=(0, (5, 2)),
-                              label='Injection'))
-    axl.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, -0.32),
-               ncol=min(len(handles), 9), frameon=False, fontsize=9.5)
+               for k, (c, h) in seen.items()]
+    if handles:
+        axl.legend(handles=handles, loc='upper left', bbox_to_anchor=(0.0, -0.14),
+                   ncol=len(handles), frameon=False, fontsize=8.5)
 
     if outdir:
         os.makedirs(outdir, exist_ok=True)
-        fig.savefig(os.path.join(outdir, 'ring_beam_size.png'), dpi=dpi,
-                    bbox_inches='tight')
+        fig.savefig(os.path.join(outdir, 'ring_beam_size.svg'), bbox_inches='tight')
+        if png:
+            dpi_png = min(dpi, int(65000 / (width + 1.0)))
+            if dpi_png < dpi:
+                print(f'sketch_ring_beam_size: PNG at {dpi_png} dpi to stay under '
+                      f'65536 px wide; use the SVG for full resolution')
+            fig.savefig(os.path.join(outdir, 'ring_beam_size.png'), dpi=dpi_png,
+                        bbox_inches='tight')
     return fig
 
 
