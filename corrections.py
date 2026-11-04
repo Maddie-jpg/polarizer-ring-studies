@@ -86,7 +86,7 @@ ax2.legend(loc='upper right', fontsize=9)
 fig2.tight_layout()
 fig2.savefig('corrector_strength_vs_eigenvectors.png', dpi=150)
 plt.show()
-# %% One-period sketch with the injected beam's sizes from macroparticles.py
+# %% Lattice sketches with the injected beam's sizes from macroparticles.py
 import re
 import pandas as pd
 import config as cfg
@@ -95,6 +95,8 @@ import lattice_Sketch as ls
 
 # Must match the lattice loaded at the top of this file.
 design, config, phase, changes = 1, 9, 90, 'FDF'
+show_beam = True      # beam sizes above the cell and arc plots; False = layouts only
+sketch_sextant = '1R'
 
 
 def main_bunch_sigma_delta(beam_file, t_col='t[mm/c]', mad_k=10):
@@ -152,10 +154,14 @@ def injection_s(ring, drift_name='DrTripl', occurrence=3):
     return float(0.5 * (tab.s[i] + tab.s[i + 1]))
 
 
+sketch_dir = paths.results_dir(design, config, phase, changes=changes,
+                               metric='LatticeSketch')
 beam = ring_beam_sizes(pdr.lines['ring'],
                        paths.load_injected_beam(design, config, phase, changes))
-fig_bs = ls.sketch_period_beam_size(
+
+sketches = ls.sketch_all(pdr, sextant=sketch_sextant, outdir=sketch_dir,
+                         beam=beam if show_beam else None)
+sketches['period'] = ls.sketch_period_beam_size(
     pdr, beam, sextants=('3R', '1L'), inject_s=injection_s(pdr.lines['ring']),
-    outdir=paths.results_dir(design, config, phase, changes=changes,
-                             metric='LatticeSketch'))
+    outdir=sketch_dir)
 plt.show()
