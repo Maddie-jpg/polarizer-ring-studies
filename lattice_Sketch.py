@@ -22,6 +22,7 @@ or one at a time:
     ls.sketch_cell_types(pdr, sextant='1R')
     ls.sketch_arc(pdr, sextant='1R')
     ls.sketch_ring(pdr)
+    ls.sketch_ring_beam_size(pdr, beam)   # beam from corrections.ring_beam_sizes
 
 The three entry points return matplotlib Figures (a dict of them for
 sketch_cell_types), so you can restyle or save them yourself.
@@ -1212,6 +1213,140 @@ def sketch_ring(pdr, line_name='ring', outdir=None, dpi=200, width=13.0,
     if outdir:
         os.makedirs(outdir, exist_ok=True)
         fig.savefig(os.path.join(outdir, 'ring.png'), dpi=dpi,
+                    bbox_inches='tight')
+    return fig
+
+
+def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
+                          n_sigma=None, sextants=('1R', '2L', '2R', '3L', '3R', '1L'),
+                          outdir=None, dpi=200, width=30.0, height=10.0):
+    """
+    The whole ring laid out along s as one magnet strip, with the injected
+    beam's rms sizes plotted above it on the same s axis.
+
+    beam : dict with 's', 'sig_x', 'sig_y' (arrays, metres) and optionally
+        'eps_x', 'eps_y' (m rad) and 'sigma_delta' for the title -- as
+        returned by corrections.ring_beam_sizes from the macroparticle
+        emittances.
+    inject_s : s of the injection point [m], drawn as a red line, or None.
+    n_sigma : also draw the n_sigma envelope (dashed), or None for rms only.
+    sextants : sextant tags in ring order; the boundaries between them are
+        drawn across both panels (R -> L is a straight centre, L -> R an arc
+        centre).
+    """
+    line = pdr.lines[line_name]
+    rows = _element_rows(line)
+    C = line.get_length()
+    s = np.asarray(beam['s'], dtype=float)
+    sx = np.asarray(beam['sig_x'], dtype=float) * 1e3
+    sy = np.asarray(beam['sig_y'], dtype=float) * 1e3
+
+    fig = plt.figure(figsize=(width, height))
+    gs = fig.add_gridspec(2, 1, height_ratios=[2.3, 1.0], hspace=0.06)
+    axb = fig.add_subplot(gs[0])
+    axl = fig.add_subplot(gs[1], sharex=axb)
+
+    # ---- beam sizes --------------------------------------------------
+    axb.plot(s, sx, color=COL_H, lw=1.4, label=r'$\sigma_x$ (rms)')
+    axb.plot(s, sy, color=COL_V, lw=1.4, label=r'$\sigma_y$ (rms)')
+    if n_sigma:
+        axb.plot(s, n_sigma * sx, color=COL_H, lw=0.9, ls='--',
+                 label=rf'{n_sigma:g}$\sigma_x$')
+        axb.plot(s, n_sigma * sy, color=COL_V, lw=0.9, ls='--',
+                 label=rf'{n_sigma:g}$\sigma_y$')
+    for sig, col, lab in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
+        i = int(np.argmax(sig))
+        axb.plot(s[i], sig[i], 'o', color=col, mec='black', ms=6, zorder=5)
+        near_end = s[i] > 0.8 * C
+        axb.annotate(rf'max $\sigma_{lab}$ = {sig[i]:.2f} mm  (s = {s[i]:.1f} m)',
+                     xy=(s[i], sig[i]), xytext=(-8 if near_end else 8, 6),
+                     textcoords='offset points', ha='right' if near_end else 'left',
+                     fontsize=9, color='0.15', zorder=6,
+                     bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                               edgecolor=col, linewidth=0.8))
+    y_top = (n_sigma or 1) * max(sx.max(), sy.max())
+    axb.set_ylim(0, y_top * 1.18)
+    axb.set_ylabel('beam size  [mm]', fontsize=11)
+    axb.grid(color='0.92', lw=0.6)
+    axb.legend(loc='upper right', fontsize=10, framealpha=0.95)
+    axb.tick_params(axis='x', labelbottom=False)
+    title = 'Full ring with the injected beam size'
+    if 'eps_x' in beam and 'eps_y' in beam:
+        title += (rf'  —  $\epsilon_x$ = {beam["eps_x"]*1e6:.3f} $\mu$m, '
+                  rf'$\epsilon_y$ = {beam["eps_y"]*1e6:.3f} $\mu$m')
+    if 'sigma_delta' in beam:
+        title += rf', $\sigma_\delta$ = {beam["sigma_delta"]*1e3:.2f}‰'
+    axb.set_title(title, fontsize=14, fontweight='bold', pad=12)
+
+    # ---- magnet strip ------------------------------------------------
+    axl.plot([0, C], [0, 0], color='0.35', lw=0.8, zorder=1)
+    drawn = {}
+    for r in rows:
+        if r['is_drift'] or r['length'] <= 0 or r['kind'] in _DIAG_KINDS:
+            continue
+        axl.add_patch(Rectangle((r['s'], r['y0'] - r['half_h']), r['length'],
+                                2 * r['half_h'], facecolor=r['colour'],
+                                edgecolor='black', linewidth=0.3,
+                                hatch=r.get('hatch', ''),
+                                zorder=4 if r['kind'] in _CORR_KINDS else 3))
+        drawn.setdefault(r['kind'], (r['colour'], r.get('hatch', '')))
+    for r in rows:
+        if r['kind'] in _BPM_KINDS:
+            xc = r['s'] + r['length'] / 2
+            axl.plot([xc, xc], [1.55, 1.75], color=r['colour'], lw=0.8, zorder=2)
+            drawn.setdefault(r['kind'], (r['colour'], ''))
+
+    # ---- sextants, straight and arc centres --------------------------
+    spans = {}
+    for r in rows:
+        for tag in sextants:
+            if re.search(rf'_{tag}(?:C|CH|\d+H?)?$', r['name']):
+                a, b = spans.get(tag, (np.inf, -np.inf))
+                spans[tag] = (min(a, r['s']), max(b, r['s'] + r['length']))
+    present = [t for t in sextants if t in spans]
+    for k, tag in enumerate(present):
+        a, b = spans[tag]
+        axl.text((a + b) / 2, -1.55, f'sextant {tag}', ha='center', va='top',
+                 fontsize=10, fontweight='bold', color='0.25')
+        if k + 1 < len(present):
+            nxt = present[k + 1]
+            x = 0.5 * (b + spans[nxt][0])
+            straight = tag.endswith('R') and nxt.endswith('L')
+            for a_ in (axb, axl):
+                a_.axvline(x, color='0.55', lw=0.9,
+                           ls='--' if straight else ':', zorder=0)
+            axb.text(x, axb.get_ylim()[1], 'straight centre' if straight else 'arc centre',
+                     ha='center', va='bottom', fontsize=8, color='0.4')
+
+    if inject_s is not None:
+        for a_ in (axb, axl):
+            a_.axvline(inject_s, color=COL_INJ, lw=1.6, ls=(0, (5, 2)), zorder=6)
+        axb.annotate('injection', xy=(inject_s, axb.get_ylim()[1] * 0.93),
+                     xytext=(6, 0), textcoords='offset points', ha='left',
+                     va='center', fontsize=10, fontweight='bold', color=COL_INJ)
+
+    axl.set_xlim(0, C)
+    axl.set_ylim(-2.1, 1.9)
+    axl.set_yticks([])
+    axl.set_xlabel('s  [m]', fontsize=11)
+    for side in ('left', 'right', 'top'):
+        axl.spines[side].set_visible(False)
+    axl.grid(axis='x', color='0.92', lw=0.6, zorder=0)
+
+    handles = [Rectangle((0, 0), 1, 1,
+                         facecolor=('white' if k in _BPM_KINDS else c),
+                         edgecolor=(c if k in _BPM_KINDS else 'black'),
+                         hatch=h, linewidth=0.7, label=_KIND_LABEL.get(k, k))
+               for k, (c, h) in drawn.items()]
+    if inject_s is not None:
+        handles.append(Line2D([0], [0], color=COL_INJ, lw=1.6, ls=(0, (5, 2)),
+                              label='Injection'))
+    axl.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, -0.32),
+               ncol=min(len(handles), 9), frameon=False, fontsize=9.5)
+
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
+        fig.savefig(os.path.join(outdir, 'ring_beam_size.png'), dpi=dpi,
                     bbox_inches='tight')
     return fig
 

@@ -778,6 +778,9 @@ plot_twiss_with_particles(df_clean, 'y[mm]', 'yp[mrad]', ay, by, emittance_y)
 
 # %%
 
+_main_bunch = select_main_bunch(df)
+sigma_delta_main_bunch = float(np.std(_main_bunch['p[MeV/c]']) / np.mean(_main_bunch['p[MeV/c]']))
+
 p_core_mean_mev = float(df_clean['p[MeV/c]'].mean())
 bg_core = p_core_mean_mev / 0.51099895000
 nemittance_x = emittance_x * 1e-6 * bg_core
@@ -804,7 +807,8 @@ beam_results = {
         "emittance_norm": float(nemittance_y)
     },
     "longitudinal": {
-        "delta_rms": float(relative_spread / 100)
+        "delta_rms": float(relative_spread / 100),
+        "delta_rms_main_bunch": sigma_delta_main_bunch
     },
     "metadata": {
         "particle_type": "positron",
