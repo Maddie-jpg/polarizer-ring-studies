@@ -1227,7 +1227,7 @@ CELL_PLOT_IN_PER_M = 15.0 / 3.7   # sketch_cell_types: 15 in for a ~3.7 m cell
 
 def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
                             inject_s=None, n_sigma=None, outdir=None,
-                            in_per_m=CELL_PLOT_IN_PER_M, ref_span=3.7, dpi=200):
+                            in_per_m=0.5, ref_span=None, dpi=200):
     """
     One period of the ring (two neighbouring sextants: arc centre -> straight
     -> arc centre) as a layout drawing at the scale of the cell plots
@@ -1244,8 +1244,12 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
         on a whole arc instead.
     inject_s : s of the injection point [m], drawn if it falls in the span.
     n_sigma : also draw the n_sigma envelope (dashed), or None for rms only.
-    in_per_m, ref_span : horizontal scale and the span text and symbols are
-        sized for. The defaults match sketch_cell_types.
+    in_per_m : horizontal scale [in per m]. 0.5 gives a ~38 in wide figure;
+        CELL_PLOT_IN_PER_M (~4) draws it at the scale of the cell plots.
+    ref_span : the span [m] that label rotation, label spacing and symbol
+        sizes are scaled to. None = the span that 15 in covers at in_per_m,
+        i.e. the width a cell plot gives one cell, so the style matches the
+        cell plots at any scale.
     outdir : saves period_beam_size_<sextants>.png. A PNG cannot be wider than
         65536 px, so dpi is lowered to fit if needed.
     """
@@ -1290,6 +1294,8 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
     sx = np.asarray(beam['sig_x'], dtype=float)[keep] * 1e3
     sy = np.asarray(beam['sig_y'], dtype=float)[keep] * 1e3
     L = s_b - s_a
+    if ref_span is None:
+        ref_span = 15.0 / in_per_m
 
     width = in_per_m * (L + 2 * 0.035 * ref_span) + 2.0
     fig = plt.figure(figsize=(width, 11.0))
@@ -1320,7 +1326,7 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
     axb.tick_params(axis='y', labelright=True, right=True)
     axb.tick_params(axis='x', labelbottom=False)
     axb.grid(color='0.92', lw=0.6)
-    axb.legend(loc='upper left', fontsize=9, framealpha=0.95)
+    axb.legend(loc='lower left', fontsize=9, framealpha=0.95)
     for sig, col, lab in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
         i = int(np.argmax(sig))
         axb.plot(s[i], sig[i], 'o', color=col, mec='black', ms=6, zorder=5)
@@ -1339,14 +1345,10 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
              fontsize=12, fontweight='bold')
 
     # ---- sextant labels, straight / arc centres ------------------------
-    yticks = [t for t in axb.get_yticks() if 0 < t < y_max]
     for k, tag in enumerate(sextants):
         x0 = max(spans[tag][0], s_a) - s_a
         axb.text(x0 + 0.3, y_max * 0.97, f'sextant {tag}', ha='left', va='top',
                  fontsize=11, fontweight='bold', color='0.3')
-        for t in (yticks if k else []):
-            axb.text(x0 + 0.05, t, f'{t:g} mm', ha='left', va='bottom',
-                     fontsize=7, color='0.55')
         if k + 1 < len(sextants):
             nxt = sextants[k + 1]
             straight = tag.endswith('R') and nxt.endswith('L')
