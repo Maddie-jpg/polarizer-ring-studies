@@ -22,7 +22,7 @@ or one at a time:
     ls.sketch_cell_types(pdr, sextant='1R')
     ls.sketch_arc(pdr, sextant='1R')
     ls.sketch_ring(pdr)
-    ls.sketch_ring_beam_size(pdr, beam)   # beam from corrections.ring_beam_sizes
+    ls.sketch_period_beam_size(pdr, beam)   # beam from corrections.ring_beam_sizes
 
 The three entry points return matplotlib Figures (a dict of them for
 sketch_cell_types), so you can restyle or save them yourself.
@@ -1225,38 +1225,73 @@ def sketch_ring(pdr, line_name='ring', outdir=None, dpi=200, width=13.0,
 CELL_PLOT_IN_PER_M = 15.0 / 3.7   # sketch_cell_types: 15 in for a ~3.7 m cell
 
 
-def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
-                          n_sigma=None, sextants=('1R', '2L', '2R', '3L', '3R', '1L'),
-                          outdir=None, in_per_m=CELL_PLOT_IN_PER_M, ref_span=3.7,
-                          dpi=200, png=True):
+def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
+                            inject_s=None, n_sigma=None, outdir=None,
+                            in_per_m=CELL_PLOT_IN_PER_M, ref_span=3.7, dpi=200):
     """
-    The whole ring as one long layout drawing at the scale of the cell plots
+    One period of the ring (two neighbouring sextants: arc centre -> straight
+    -> arc centre) as a layout drawing at the scale of the cell plots
     (draw_beamline: names, BPMs, magnet and drift lengths), with the injected
-    beam's rms sizes plotted above it on the same s axis. Meant to be opened
-    full size and scrolled along.
+    beam's rms sizes plotted above it on the same s axis. The optics repeat
+    every period, so this covers the whole ring.
 
-    beam : dict with 's', 'sig_x', 'sig_y' (arrays, metres) and optionally
-        'eps_x', 'eps_y' (m rad) and 'sigma_delta' for the title -- as
-        returned by corrections.ring_beam_sizes from the macroparticle
+    beam : dict with 's', 'sig_x', 'sig_y' (arrays over the ring, metres) and
+        optionally 'eps_x', 'eps_y' (m rad) and 'sigma_delta' for the title --
+        as returned by corrections.ring_beam_sizes from the macroparticle
         emittances.
-    inject_s : s of the injection point [m], drawn as a red line, or None.
+    sextants : the sextants to draw, in ring order. The default ('3R', '1L')
+        is the period holding the injection straight; ('2L', '2R') is centred
+        on a whole arc instead.
+    inject_s : s of the injection point [m], drawn if it falls in the span.
     n_sigma : also draw the n_sigma envelope (dashed), or None for rms only.
-    sextants : sextant tags in ring order; their boundaries are drawn across
-        both panels (R -> L is a straight centre, L -> R an arc centre).
     in_per_m, ref_span : horizontal scale and the span text and symbols are
         sized for. The defaults match sketch_cell_types.
-    outdir : saves ring_beam_size.svg (full size, vector, scroll it in a
-        browser) and, if png, ring_beam_size.png. A PNG cannot be wider than
-        65536 px, so its dpi is lowered to fit when needed.
+    outdir : saves period_beam_size_<sextants>.png. A PNG cannot be wider than
+        65536 px, so dpi is lowered to fit if needed.
     """
     line = pdr.lines[line_name]
-    rows = _element_rows(line)
-    C = line.get_length()
-    s = np.asarray(beam['s'], dtype=float)
-    sx = np.asarray(beam['sig_x'], dtype=float) * 1e3
-    sy = np.asarray(beam['sig_y'], dtype=float) * 1e3
+    rows_all = _element_rows(line)
 
-    width = in_per_m * (C + 2 * 0.035 * ref_span) + 2.0
+    # ---- span of the chosen sextants --------------------------------------
+    spans = {}
+    for r in rows_all:
+        for tag in sextants:
+            if re.search(rf'_{tag}(?:C|CH|\d+H?)?$', r['name']):
+                lo, hi = spans.get(tag, (np.inf, -np.inf))
+                spans[tag] = (min(lo, r['s']), max(hi, r['s'] + r['length']))
+    missing = [t for t in sextants if t not in spans]
+    if missing:
+        raise KeyError(f'sketch_period_beam_size: no elements found for sextant(s) '
+                       f'{missing}')
+
+    def centre_quad(tag):
+        return next((r for r in rows_all if re.match(
+            rf'^(?:Q[FD]TripC_{tag}\d*|QFA_{tag}C)$', r['name'])), None)
+
+    # From the arc-centre quad that opens the first R sextant (QFA_<R>C) to
+    # the one that opens the next, so the span is exactly one period; fall
+    # back to the sextant extents.
+    s_a = min(lo for lo, _ in spans.values())
+    s_b = max(hi for _, hi in spans.values())
+    first, last = sextants[0], sextants[-1]
+    q = centre_quad(first)
+    if q is not None and first.endswith('R'):
+        s_a = q['s']
+    if last.endswith('L'):
+        q = centre_quad('R'.join(last.rsplit('L', 1)))     # 1L -> 1R
+        if q is not None:
+            s_b = q['s'] if q['s'] > s_a else line.get_length()
+    rows = [r for r in rows_all
+            if r['s'] >= s_a - 1e-9 and r['s'] + r['length'] <= s_b + 1e-9]
+
+    s = np.asarray(beam['s'], dtype=float)
+    keep = (s >= s_a - 1e-9) & (s <= s_b + 1e-9)
+    s = s[keep] - s_a
+    sx = np.asarray(beam['sig_x'], dtype=float)[keep] * 1e3
+    sy = np.asarray(beam['sig_y'], dtype=float)[keep] * 1e3
+    L = s_b - s_a
+
+    width = in_per_m * (L + 2 * 0.035 * ref_span) + 2.0
     fig = plt.figure(figsize=(width, 11.0))
     gs = fig.add_gridspec(2, 1, height_ratios=[4.2, 6.0], hspace=0.04,
                           left=1.0 / width, right=1.0 - 1.0 / width,
@@ -1265,9 +1300,11 @@ def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
     axl = fig.add_subplot(gs[1], sharex=axb)
 
     # ---- layout, exactly as in the cell plots --------------------------
-    draw_beamline(axl, rows, s_offset=0.0, ref_span=ref_span)
-    axl.set_xlabel('s  [m]', fontsize=9)
-    axl.xaxis.set_major_locator(plt.MultipleLocator(1.0))
+    draw_beamline(axl, rows, s_offset=s_a, ref_span=ref_span)
+    ticks = np.arange(np.ceil(s_a), s_b + 1e-9, 1.0)
+    axl.xaxis.set_major_locator(plt.FixedLocator(ticks - s_a))
+    axl.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v + s_a:.0f}'))
+    axl.set_xlabel('s along the ring  [m]', fontsize=9)
 
     # ---- beam sizes --------------------------------------------------
     axb.plot(s, sx, color=COL_H, lw=1.4, label=r'$\sigma_x$ (rms)')
@@ -1291,51 +1328,40 @@ def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
                      xytext=(8, 6), textcoords='offset points', fontsize=8.5,
                      zorder=6, bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
                                          edgecolor=col, linewidth=0.8))
-    title = 'Full ring with the injected beam size'
+    title = (f'One period (sextants {" + ".join(sextants)}) with the injected beam size'
+             f'  —  the optics repeat every period')
     if 'eps_x' in beam and 'eps_y' in beam:
-        title += (rf'  —  $\epsilon_x$ = {beam["eps_x"]*1e6:.3f} $\mu$m, '
+        title += (rf';  $\epsilon_x$ = {beam["eps_x"]*1e6:.3f} $\mu$m, '
                   rf'$\epsilon_y$ = {beam["eps_y"]*1e6:.3f} $\mu$m')
     if 'sigma_delta' in beam:
         title += rf', $\sigma_\delta$ = {beam["sigma_delta"]*1e3:.2f}‰'
     axb.text(0.0, 1.03, title, transform=axb.transAxes, ha='left', va='bottom',
              fontsize=12, fontweight='bold')
 
-    # ---- sextants, straight and arc centres --------------------------
-    spans = {}
-    for r in rows:
-        for tag in sextants:
-            if re.search(rf'_{tag}(?:C|CH|\d+H?)?$', r['name']):
-                a, b = spans.get(tag, (np.inf, -np.inf))
-                spans[tag] = (min(a, r['s']), max(b, r['s'] + r['length']))
-    present = [t for t in sextants if t in spans]
+    # ---- sextant labels, straight / arc centres ------------------------
     yticks = [t for t in axb.get_yticks() if 0 < t < y_max]
-    for k, tag in enumerate(present):
-        a, b = spans[tag]
-        axb.text(a + 0.3, y_max * 0.97, f'sextant {tag}', ha='left', va='top',
+    for k, tag in enumerate(sextants):
+        x0 = max(spans[tag][0], s_a) - s_a
+        axb.text(x0 + 0.3, y_max * 0.97, f'sextant {tag}', ha='left', va='top',
                  fontsize=11, fontweight='bold', color='0.3')
-        # repeat the beam-size scale at every sextant so it can be read anywhere
         for t in (yticks if k else []):
-            axb.text(a + 0.05, t, f'{t:g} mm', ha='left', va='bottom',
+            axb.text(x0 + 0.05, t, f'{t:g} mm', ha='left', va='bottom',
                      fontsize=7, color='0.55')
-        if k + 1 < len(present):
-            nxt = present[k + 1]
+        if k + 1 < len(sextants):
+            nxt = sextants[k + 1]
             straight = tag.endswith('R') and nxt.endswith('L')
-            # the straight / arc centre is the middle of the centre quad that
-            # opens the next sextant (QDTripC_<L>2 or QFA_<R>C)
-            ctr = next((r for r in rows if re.match(
-                rf'^(?:Q[FD]TripC_{nxt}\d*|QFA_{nxt}C)$', r['name'])), None)
-            x = (ctr['s'] + ctr['length'] / 2 if ctr is not None
-                 else 0.5 * (b + spans[nxt][0]))
+            q = centre_quad(nxt)
+            x = (q['s'] + q['length'] / 2 if q is not None else spans[nxt][0]) - s_a
             for a_ in (axb, axl):
                 a_.axvline(x, color='0.55', lw=0.9, ls='--' if straight else ':',
                            zorder=0)
             axb.text(x, y_max * 0.90, ' straight centre' if straight else ' arc centre',
                      ha='left', va='top', fontsize=9, color='0.4')
 
-    if inject_s is not None:
+    if inject_s is not None and s_a <= inject_s <= s_b:
         for a_ in (axb, axl):
-            a_.axvline(inject_s, color=COL_INJ, lw=1.6, ls=(0, (5, 2)), zorder=6)
-        axb.text(inject_s, y_max * 0.82, ' injection', ha='left', va='top',
+            a_.axvline(inject_s - s_a, color=COL_INJ, lw=1.6, ls=(0, (5, 2)), zorder=6)
+        axb.text(inject_s - s_a, y_max * 0.82, ' injection', ha='left', va='top',
                  fontsize=11, fontweight='bold', color=COL_INJ)
 
     seen = {}
@@ -1353,14 +1379,9 @@ def sketch_ring_beam_size(pdr, beam, line_name='ring', inject_s=None,
 
     if outdir:
         os.makedirs(outdir, exist_ok=True)
-        fig.savefig(os.path.join(outdir, 'ring_beam_size.svg'), bbox_inches='tight')
-        if png:
-            dpi_png = min(dpi, int(65000 / (width + 1.0)))
-            if dpi_png < dpi:
-                print(f'sketch_ring_beam_size: PNG at {dpi_png} dpi to stay under '
-                      f'65536 px wide; use the SVG for full resolution')
-            fig.savefig(os.path.join(outdir, 'ring_beam_size.png'), dpi=dpi_png,
-                        bbox_inches='tight')
+        dpi_png = min(dpi, int(65000 / (width + 1.0)))
+        fig.savefig(os.path.join(outdir, f'period_beam_size_{"_".join(sextants)}.png'),
+                    dpi=dpi_png, bbox_inches='tight')
     return fig
 
 

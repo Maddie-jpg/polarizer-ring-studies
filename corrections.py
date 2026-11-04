@@ -86,7 +86,7 @@ ax2.legend(loc='upper right', fontsize=9)
 fig2.tight_layout()
 fig2.savefig('corrector_strength_vs_eigenvectors.png', dpi=150)
 plt.show()
-# %% Whole-ring sketch with the injected beam's sizes from macroparticles.py
+# %% One-period sketch with the injected beam's sizes from macroparticles.py
 import re
 import pandas as pd
 import config as cfg
@@ -154,8 +154,8 @@ def injection_s(ring, drift_name='DrTripl', occurrence=3):
 
 beam = ring_beam_sizes(pdr.lines['ring'],
                        paths.load_injected_beam(design, config, phase, changes))
-fig_bs = ls.sketch_ring_beam_size(
-    pdr, beam, inject_s=injection_s(pdr.lines['ring']),
+fig_bs = ls.sketch_period_beam_size(
+    pdr, beam, sextants=('3R', '1L'), inject_s=injection_s(pdr.lines['ring']),
     outdir=paths.results_dir(design, config, phase, changes=changes,
                              metric='LatticeSketch'))
 plt.show()
