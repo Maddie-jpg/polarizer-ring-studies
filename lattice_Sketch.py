@@ -801,58 +801,66 @@ def _sigma_levels(n_sigma):
     return tuple(sorted(set(levels.tolist())))
 
 
-def draw_beam_size(axb, beam, s_a, s_b, n_sigma=1, legend_loc='lower left'):
+def draw_beam_size(axs, beam, s_a, s_b, n_sigma=1):
     """
-    Plot the beam sizes of `beam` between s_a and s_b on `axb`, against
-    s - s_a (the convention draw_beamline uses with s_offset=s_a), so it lines
-    up with a layout drawn underneath on a shared x axis.
+    Plot the beam sizes of `beam` between s_a and s_b, horizontal on axs[0]
+    and vertical on axs[1], against s - s_a (the convention draw_beamline
+    uses with s_offset=s_a), so they line up with a layout drawn underneath
+    on a shared x axis.
 
     beam : dict with 's', 'sig_x', 'sig_y' (rms, arrays over the ring,
         metres), as returned by corrections.ring_beam_sizes.
     n_sigma : which beam size to draw, in rms units: 1 (default) for the rms
-        size, 3 for 3 sigma, or several, e.g. (1, 3, 5), each in its own line
-        style. The maxima are labelled for the largest level.
-    Returns the top of the y axis [mm].
+        size, 3 for 3 sigma, or several, e.g. (1, 3, 5). Each level is drawn
+        in its own line style with the band below it shaded, its maximum
+        marked with a triangle up and its minimum with a triangle down, and
+        both values given in the legend.
+    Returns (top_x, top_y), the top of each panel's y axis [mm].
     """
     levels = _sigma_levels(n_sigma)
     s = np.asarray(beam['s'], dtype=float)
     keep = (s >= s_a - 1e-9) & (s <= s_b + 1e-9)
     s = s[keep] - s_a
-    sx = np.asarray(beam['sig_x'], dtype=float)[keep] * 1e3
-    sy = np.asarray(beam['sig_y'], dtype=float)[keep] * 1e3
     if not len(s):
         raise ValueError(f'draw_beam_size: no beam-size points between s = {s_a:.3f} '
                          f'and {s_b:.3f} m')
+    alphas = np.linspace(0.30, 0.08, len(levels)) if len(levels) > 1 else [0.18]
 
-    def lab(n, plane):
-        return (rf'$\sigma_{plane}$ (rms)' if n == 1
-                else rf'{n:g}$\sigma_{plane}$')
-
-    for j, n in enumerate(levels):
-        ls_ = _SIGMA_STYLES[j % len(_SIGMA_STYLES)]
-        axb.plot(s, n * sx, color=COL_H, lw=1.4, ls=ls_, label=lab(n, 'x'))
-        axb.plot(s, n * sy, color=COL_V, lw=1.4, ls=ls_, label=lab(n, 'y'))
-    n_top = levels[-1]
-    y_max = n_top * max(sx.max(), sy.max()) * 1.15
-    axb.set_ylim(0, y_max)
-    axb.set_ylabel('beam size  [mm]', fontsize=10)
-    axb.tick_params(axis='y', labelright=True, right=True)
-    axb.tick_params(axis='x', labelbottom=False)
-    axb.grid(color='0.92', lw=0.6)
-    axb.legend(loc=legend_loc, fontsize=9, framealpha=0.95,
-               ncol=1 if len(levels) == 1 else 2)
-    pre = '' if n_top == 1 else f'{n_top:g}'
-    for sig, col, plane in ((sx, COL_H, 'x'), (sy, COL_V, 'y')):
-        i = int(np.argmax(sig))
-        val = n_top * sig[i]
-        axb.plot(s[i], val, 'o', color=col, mec='black', ms=6, zorder=5)
-        near_end = s[i] > 0.8 * (s_b - s_a)
-        axb.annotate(rf'max {pre}$\sigma_{plane}$ = {val:.2f} mm', xy=(s[i], val),
-                     xytext=(-8 if near_end else 8, 6), textcoords='offset points',
-                     ha='right' if near_end else 'left', fontsize=8.5,
-                     zorder=6, bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
-                                         edgecolor=col, linewidth=0.8))
-    return y_max
+    tops = []
+    for ax, key, col, plane in ((axs[0], 'sig_x', COL_H, 'x'),
+                                (axs[1], 'sig_y', COL_V, 'y')):
+        sig = np.asarray(beam[key], dtype=float)[keep] * 1e3
+        i_max, i_min = int(np.argmax(sig)), int(np.argmin(sig))
+        prev = np.zeros_like(sig)
+        handles = []
+        for j, n in enumerate(levels):
+            curve = n * sig
+            ax.fill_between(s, prev, curve, color=col, alpha=alphas[j], lw=0, zorder=1)
+            name = rf'$\sigma_{plane}$ (rms)' if n == 1 else rf'{n:g}$\sigma_{plane}$'
+            ln, = ax.plot(s, curve, color=col, lw=1.4,
+                          ls=_SIGMA_STYLES[j % len(_SIGMA_STYLES)], zorder=3,
+                          label=f'{name}: min {curve[i_min]:.2f}, max {curve[i_max]:.2f} mm')
+            handles.append(ln)
+            ax.plot(s[i_max], curve[i_max], marker='^', ls='none', color=col,
+                    mec='black', ms=7, zorder=5)
+            ax.plot(s[i_min], curve[i_min], marker='v', ls='none', color=col,
+                    mec='black', ms=7, zorder=5)
+            prev = curve
+        handles += [Line2D([0], [0], marker='^', ls='none', color='0.6', mec='black',
+                           ms=7, label='max'),
+                    Line2D([0], [0], marker='v', ls='none', color='0.6', mec='black',
+                           ms=7, label='min')]
+        top = levels[-1] * sig.max() * 1.45          # headroom for the legend row
+        ax.set_ylim(0, top)
+        ax.set_ylabel(rf'$\sigma_{plane}$  [mm]', fontsize=10)
+        ax.tick_params(axis='y', labelright=True, right=True)
+        ax.tick_params(axis='x', labelbottom=False)
+        ax.grid(color='0.92', lw=0.6)
+        ax.legend(handles=handles, loc='upper left', ncol=len(handles),
+                  fontsize=8.5, framealpha=0.95, handlelength=2.2,
+                  columnspacing=1.2)
+        tops.append(top)
+    return tuple(tops)
 
 
 def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
@@ -887,14 +895,15 @@ def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
             fig, ax = plt.subplots(figsize=(width, h))
             draw_beamline(ax, rows, title=title)
         else:
-            fig = plt.figure(figsize=(width, h + 2.8))
-            gs = fig.add_gridspec(2, 1, height_ratios=[2.6, h], hspace=0.05)
-            axb = fig.add_subplot(gs[0])
-            ax = fig.add_subplot(gs[1], sharex=axb)
+            fig = plt.figure(figsize=(width, h + 4.4))
+            gs = fig.add_gridspec(3, 1, height_ratios=[2.0, 2.0, h], hspace=0.06)
+            axx = fig.add_subplot(gs[0])
+            axy = fig.add_subplot(gs[1], sharex=axx)
+            ax = fig.add_subplot(gs[2], sharex=axx)
             draw_beamline(ax, rows)
-            draw_beam_size(axb, beam, rows[0]['s'],
+            draw_beam_size((axx, axy), beam, rows[0]['s'],
                            rows[-1]['s'] + rows[-1]['length'], n_sigma=n_sigma)
-            axb.set_title(title, fontsize=12, fontweight='bold', pad=10)
+            axx.set_title(title, fontsize=12, fontweight='bold', pad=10)
         _legend_for(rows, ax)
         fig.tight_layout()
 
@@ -972,18 +981,20 @@ def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
             2, 1, figsize=(width, 10.5),
             gridspec_kw=dict(height_ratios=[1.0, 1.25], hspace=0.45))
     else:
-        fig = plt.figure(figsize=(width, 14.0))
-        outer = fig.add_gridspec(2, 1, height_ratios=[1.6, 1.25], hspace=0.30)
-        inner = outer[0].subgridspec(2, 1, height_ratios=[0.6, 1.0], hspace=0.05)
+        fig = plt.figure(figsize=(width, 16.5))
+        outer = fig.add_gridspec(2, 1, height_ratios=[2.1, 1.25], hspace=0.25)
+        inner = outer[0].subgridspec(3, 1, height_ratios=[0.55, 0.55, 1.0],
+                                     hspace=0.06)
         ax_beam = fig.add_subplot(inner[0])
-        ax_top = fig.add_subplot(inner[1], sharex=ax_beam)
+        ax_beam_y = fig.add_subplot(inner[1], sharex=ax_beam)
+        ax_top = fig.add_subplot(inner[2], sharex=ax_beam)
         ax_bot = fig.add_subplot(outer[1])
 
     # ================= top: schematic of the whole sextant ===========
     draw_beamline(ax_top, detail_rows,
                   title=title_top if beam is None else None, s_offset=s0)
     if beam is not None:
-        draw_beam_size(ax_beam, beam, s0,
+        draw_beam_size((ax_beam, ax_beam_y), beam, s0,
                        detail_rows[-1]['s'] + detail_rows[-1]['length'],
                        n_sigma=n_sigma)
         ax_beam.set_title(title_top, fontsize=12, fontweight='bold', pad=10)
@@ -1397,12 +1408,13 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
         ref_span = 15.0 / in_per_m
 
     width = in_per_m * (L + 2 * 0.035 * ref_span) + 2.0
-    fig = plt.figure(figsize=(width, 11.0))
-    gs = fig.add_gridspec(2, 1, height_ratios=[4.2, 6.0], hspace=0.04,
+    fig = plt.figure(figsize=(width, 14.0))
+    gs = fig.add_gridspec(3, 1, height_ratios=[3.2, 3.2, 6.0], hspace=0.05,
                           left=1.0 / width, right=1.0 - 1.0 / width,
-                          top=0.94, bottom=0.12)
+                          top=0.93, bottom=0.10)
     axb = fig.add_subplot(gs[0])
-    axl = fig.add_subplot(gs[1], sharex=axb)
+    axby = fig.add_subplot(gs[1], sharex=axb)
+    axl = fig.add_subplot(gs[2], sharex=axb)
 
     # ---- layout, exactly as in the cell plots --------------------------
     draw_beamline(axl, rows, s_offset=s_a, ref_span=ref_span)
@@ -1412,7 +1424,7 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
     axl.set_xlabel('s along the ring  [m]', fontsize=9)
 
     # ---- beam sizes --------------------------------------------------
-    y_max = draw_beam_size(axb, beam, s_a, s_b, n_sigma=n_sigma)
+    y_max, y_max_y = draw_beam_size((axb, axby), beam, s_a, s_b, n_sigma=n_sigma)
     title = (f'One period (sextants {" + ".join(sextants)}) with the injected beam size'
              f'  —  the optics repeat every period')
     if 'eps_x' in beam and 'eps_y' in beam:
@@ -1420,27 +1432,28 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
                   rf'$\epsilon_y$ = {beam["eps_y"]*1e6:.3f} $\mu$m')
     if 'sigma_delta' in beam:
         title += rf', $\sigma_\delta$ = {beam["sigma_delta"]*1e3:.2f}‰'
-    axb.text(0.0, 1.03, title, transform=axb.transAxes, ha='left', va='bottom',
+    axb.text(0.0, 1.10, title, transform=axb.transAxes, ha='left', va='bottom',
              fontsize=12, fontweight='bold')
 
     # ---- sextant labels, straight / arc centres ------------------------
     for k, tag in enumerate(sextants):
         x0 = max(spans[tag][0], s_a) - s_a
-        axb.text(x0 + 0.3, y_max * 0.97, f'sextant {tag}', ha='left', va='top',
+        axb.text(x0 + 0.3, 1.01, f'sextant {tag}', ha='left', va='bottom',
+                 transform=axb.get_xaxis_transform(),
                  fontsize=11, fontweight='bold', color='0.3')
         if k + 1 < len(sextants):
             nxt = sextants[k + 1]
             straight = tag.endswith('R') and nxt.endswith('L')
             q = centre_quad(nxt)
             x = (q['s'] + q['length'] / 2 if q is not None else spans[nxt][0]) - s_a
-            for a_ in (axb, axl):
+            for a_ in (axb, axby, axl):
                 a_.axvline(x, color='0.55', lw=0.9, ls='--' if straight else ':',
                            zorder=0)
             axb.text(x, y_max * 0.90, ' straight centre' if straight else ' arc centre',
                      ha='left', va='top', fontsize=9, color='0.4')
 
     if inject_s is not None and s_a <= inject_s <= s_b:
-        for a_ in (axb, axl):
+        for a_ in (axb, axby, axl):
             a_.axvline(inject_s - s_a, color=COL_INJ, lw=1.6, ls=(0, (5, 2)), zorder=6)
         axb.text(inject_s - s_a, y_max * 0.82, ' injection', ha='left', va='top',
                  fontsize=11, fontweight='bold', color=COL_INJ)
