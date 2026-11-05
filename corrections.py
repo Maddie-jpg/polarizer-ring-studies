@@ -8,6 +8,18 @@ pdr_copy = pdr.copy()
 mc.insert_bpms_and_correctors(pdr_copy, 5, 9)
 
 ring = pdr_copy.lines['ring']          # BPMs + correctors already inserted
+
+# ---- Twiss of the ring with BPMs and correctors, as a MAD-X style TFS file ----
+import paths
+twiss_dir = paths.results_dir(1, 9, 90, changes='FDF', metric='Twiss')
+tw_ring = ring.twiss(method='6d')
+tw_ring['keyword'] = np.array(ring.get_table().element_type, dtype=object)
+twiss_file = f'{twiss_dir}/twiss_ring_bpms_correctors.tfs'
+tw_ring.to_tfs(twiss_file, missing='ignore', include=[
+    'name', 'keyword', 's', 'betx', 'alfx', 'mux', 'dx', 'dpx', 'x', 'px',
+    'bety', 'alfy', 'muy', 'dy', 'dpy', 'y', 'py',
+    'circumference', 'qx', 'qy', 'dqx', 'dqy', 'qs', 'momentum_compaction_factor'])
+print(f'Twiss written to {twiss_file}')
 brho = float(ring.particle_ref.p0c[0]) / 299792458.0
 fractions = [1.0, 0.75, 0.50, 0.25, 0.10]
 seeds = range(20)
