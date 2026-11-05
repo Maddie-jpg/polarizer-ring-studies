@@ -1350,7 +1350,7 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
     every period, so this covers the whole ring.
 
     beam : dict with 's', 'sig_x', 'sig_y' (arrays over the ring, metres) and
-        optionally 'eps_x', 'eps_y' (m rad) and 'sigma_delta' for the title --
+        optionally 'eps_x', 'eps_y' (m rad) for the title --
         as returned by corrections.ring_beam_sizes from the macroparticle
         emittances.
     sextants : the sextants to draw, in ring order. The default ('3R', '1L')
@@ -1430,8 +1430,6 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
     if 'eps_x' in beam and 'eps_y' in beam:
         title += (rf';  $\epsilon_x$ = {beam["eps_x"]*1e6:.3f} $\mu$m, '
                   rf'$\epsilon_y$ = {beam["eps_y"]*1e6:.3f} $\mu$m')
-    if 'sigma_delta' in beam:
-        title += rf', $\sigma_\delta$ = {beam["sigma_delta"]*1e3:.2f}‰'
     axb.text(0.0, 1.10, title, transform=axb.transAxes, ha='left', va='bottom',
              fontsize=12, fontweight='bold')
 
