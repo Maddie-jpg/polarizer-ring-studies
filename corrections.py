@@ -20,6 +20,7 @@ tw_ring.to_tfs(twiss_file, missing='ignore', include=[
     'bety', 'alfy', 'muy', 'dy', 'dpy', 'y', 'py',
     'circumference', 'qx', 'qy', 'dqx', 'dqy', 'qs', 'momentum_compaction_factor'])
 print(f'Twiss written to {twiss_file}')
+
 brho = float(ring.particle_ref.p0c[0]) / 299792458.0
 fractions = [1.0, 0.75, 0.50, 0.25, 0.10]
 seeds = range(20)
