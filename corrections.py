@@ -100,7 +100,6 @@ fig2.tight_layout()
 fig2.savefig('corrector_strength_vs_eigenvectors.png', dpi=150)
 plt.show()
 # %% Lattice sketches with the injected beam's sizes from macroparticles.py
-import re
 import pandas as pd
 import config as cfg
 import paths
@@ -157,17 +156,6 @@ def ring_beam_sizes(ring, beam, ds=0.02):
                 eps_x=eps_x, eps_y=eps_y, sigma_delta=sigma_delta)
 
 
-def injection_s(ring, drift_name='DrTripl', occurrence=3):
-    """s of the injection point used by macroparticles.py: the centre of the
-    `occurrence`-th (0-indexed) plain `drift_name` drift, as in
-    macroparticles.insert_marker_in_drift."""
-    tab = ring.get_table()
-    pattern = re.compile(rf'^{re.escape(drift_name)}(::\d+)?$')
-    hits = [i for i, n in enumerate(tab.name) if pattern.match(n)]
-    i = hits[occurrence]
-    return float(0.5 * (tab.s[i] + tab.s[i + 1]))
-
-
 sketch_dir = paths.results_dir(design, config, phase, changes=changes,
                                metric='LatticeSketch')
 beam = ring_beam_sizes(pdr.lines['ring'],
@@ -179,6 +167,5 @@ mc.insert_bpms_and_correctors(pdr_sketch, design, config)
 sketches = ls.sketch_all(pdr_sketch, sextant=sketch_sextant, outdir=sketch_dir,
                          beam=beam if show_beam else None, n_sigma=beam_n_sigma)
 sketches['period'] = ls.sketch_period_beam_size(
-    pdr_sketch, beam, sextants=('3R', '1L'), inject_s=injection_s(pdr.lines['ring']),
-    n_sigma=beam_n_sigma, outdir=sketch_dir)
+    pdr_sketch, beam, sextants=('3R', '1L'), n_sigma=beam_n_sigma, outdir=sketch_dir)
 plt.show()
