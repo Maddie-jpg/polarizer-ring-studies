@@ -1,3 +1,4 @@
+#%%
 import numpy as np
 import LatticeBuild.misalignments_corrections as mc
 import xtrack as xt
