@@ -1176,6 +1176,161 @@ def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
     return fig
 
 
+def _survey_sections(line):
+    """Sections of `line` found from its magnet names, as a list of
+    (label, s_start, s_end) in s order. For every sextant tag T (taken from
+    the dispersion-suppressor quad QFDS_T) the sections are
+
+        FODO cells             QFA_T*/QDA_T* (not the matching quads)
+        matching cell          QFA_MT*/QDA_MT*
+        dispersion suppressor  QFDS_T .. BendDS_T
+        doublet                QDDoub_T / QFDoub_T
+        triplet                QFTrip_T* .. QDTripC_T*
+
+    ordered arc -> straight for an R sextant and mirrored for an L one.
+    Neighbouring sections with the same label (the two triplet halves at a
+    straight centre, the FODO cells either side of an arc centre) are merged.
+    """
+    tab = line.get_table()
+    names = [str(n).split('::')[0] for n in tab.name]
+    s = np.asarray(tab.s, dtype=float)
+    s_end = np.append(s[1:], s[-1])
+
+    def where(pattern):
+        rx = re.compile(pattern)
+        idx = [i for i, n in enumerate(names) if rx.match(n)]
+        return (min(s[i] for i in idx), max(s_end[i] for i in idx)) if idx else None
+
+    tags = sorted({n[len('QFDS_'):] for n in names if n.startswith('QFDS_')})
+    sections = []
+    for T in tags:
+        t = re.escape(T)
+        fodo = where(rf'^Q[FD]A_{t}(\d+|CH?)$')
+        match = where(rf'^Q[FD]A_M{t}\d*$')
+        ds_q, ds_b = where(rf'^QFDS_{t}$'), where(rf'^BendDS_{t}$')
+        dbl = where(rf'^Q[FD]Doub_{t}$')
+        trip = where(rf'^Q[FD]Trip(C)?_{t}\d*H?$')
+        if ds_q is None:
+            continue
+        arc = fodo or match
+        r_like = arc is None or arc[0] < ds_q[0]
+        if r_like:
+            if fodo:
+                sections.append(('FODO cells', fodo[0], (match or ds_q)[0]))
+            if match:
+                sections.append(('matching cell', match[0], ds_q[0]))
+            if ds_b:
+                sections.append(('dispersion suppressor', ds_q[0], ds_b[1]))
+        else:
+            if ds_b:
+                sections.append(('dispersion suppressor', ds_b[0], ds_q[1]))
+            if match:
+                sections.append(('matching cell', ds_q[1], match[1]))
+            if fodo:
+                sections.append(('FODO cells', (match or ds_q)[1], fodo[1]))
+        if dbl:
+            sections.append(('doublet', dbl[0], dbl[1]))
+        if trip:
+            sections.append(('triplet', trip[0], trip[1]))
+
+    sections.sort(key=lambda x: x[1])
+    merged = []
+    for lab, a, b in sections:
+        if merged and merged[-1][0] == lab and a - merged[-1][2] < 2.0:
+            merged[-1] = (lab, merged[-1][1], max(b, merged[-1][2]))
+        else:
+            merged.append((lab, a, b))
+    return merged
+
+
+def survey_sections(line, ax=None, figsize=None, element_width=None,
+                    matching_cell=True, outdir=None, fname='survey_sections.png',
+                    dpi=200):
+    """
+    xtrack's floor plot of `line` (line.survey().plot()) with the FODO cells,
+    matching cell, dispersion suppressor, doublet and triplet labelled on it.
+
+    Each section gets a bracket running parallel to the beamline, with its
+    name written along it. Brackets alternate between the outside and the
+    inside of the bend so that short neighbouring sections (doublet, triplet)
+    don't overlap. Works on a sextant line (e.g. 'arc1R'), a period or the
+    ring. matching_cell=False leaves the matching cell unlabelled.
+    figsize=None scales the figure with the size of the line (about 3 m of
+    floor per inch, at least 9 x 7 in), so labels on a period or the whole
+    ring stay as readable as on one sextant.
+    Returns the Figure.
+    """
+    import xplt
+    sv = line.survey()
+    sz = np.asarray(sv.Z, dtype=float)
+    sxx = np.asarray(sv.X, dtype=float)
+    ss = np.asarray(sv.s, dtype=float)
+    extent = max(np.ptp(sz), np.ptp(sxx), 1.0)
+    if element_width is None:
+        element_width = 0.03 * extent
+
+    if ax is None:
+        if figsize is None:
+            w = max(9.0, extent / 3.0)
+            figsize = (w, 0.78 * w)
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+    plt.sca(ax)
+    sv.plot(element_width=element_width, legend=True, ax=ax)
+
+    def point(sq):
+        return np.interp(sq, ss, sz), np.interp(sq, ss, sxx)
+
+    # Which side is outside the bend: the curve turns clockwise in the
+    # (Z, X) plot when the total turn is negative.
+    th = np.unwrap(np.arctan2(np.gradient(sxx), np.gradient(sz) + 1e-30))
+    turn = th[-1] - th[0]
+    out_sign = 1.0 if turn <= 0 else -1.0
+
+    d = 0.045 * extent              # bracket distance from the beamline
+    tick = 0.012 * extent
+    sections = [x for x in _survey_sections(line)
+                if matching_cell or x[0] != 'matching cell']
+    pts = [np.column_stack([sz, sxx])]
+    for k, (lab, a, b) in enumerate(sections):
+        side = out_sign * (1.0 if k % 2 == 0 else -1.0)
+        sq = np.linspace(a, b, 60)
+        z, x = point(sq)
+        dz, dx = np.gradient(z), np.gradient(x)
+        nrm = np.hypot(dz, dx) + 1e-30
+        nz, nx = -dx / nrm * side, dz / nrm * side       # normal on this side
+        bz, bx = z + d * nz, x + d * nx
+        ax.plot(bz, bx, color='0.25', lw=1.1, zorder=6)
+        for i in (0, -1):
+            ax.plot([bz[i] - tick * nz[i], bz[i] + tick * nz[i]],
+                    [bx[i] - tick * nx[i], bx[i] + tick * nx[i]],
+                    color='0.25', lw=1.1, zorder=6)
+        m = len(sq) // 2
+        ang = np.degrees(np.arctan2(dx[m], dz[m]))
+        if ang > 90:
+            ang -= 180
+        elif ang < -90:
+            ang += 180
+        tz, tx = bz[m] + 0.9 * d * nz[m], bx[m] + 0.9 * d * nx[m]
+        ax.text(tz, tx, lab, rotation=ang, rotation_mode='anchor',
+                ha='center', va='center', fontsize=9, color='0.15', zorder=7,
+                bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none',
+                          alpha=0.85))
+        pts.append(np.column_stack([tz + 0 * bz, tx + 0 * bx]))
+
+    allp = np.vstack(pts)
+    pad = 2.5 * d
+    ax.set_xlim(allp[:, 0].min() - pad, allp[:, 0].max() + pad)
+    ax.set_ylim(allp[:, 1].min() - pad, allp[:, 1].max() + pad)
+    ax.set_aspect('equal', adjustable='datalim')
+    fig.tight_layout()
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
+        fig.savefig(os.path.join(outdir, fname), dpi=dpi, bbox_inches='tight')
+    return fig
+
+
 def sketch_ring(pdr, line_name='ring', outdir=None, dpi=200, width=13.0,
                 annotate_sextants=True, bpm_offset=3.0):
     """

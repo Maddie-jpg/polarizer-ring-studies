@@ -169,6 +169,14 @@ sketches = ls.sketch_all(pdr_sketch, sextant=sketch_sextant, outdir=sketch_dir,
                          beam=beam if show_beam else None, n_sigma=beam_n_sigma)
 sketches['period'] = ls.sketch_period_beam_size(
     pdr_sketch, beam, sextants=('3R', '1L'), n_sigma=beam_n_sigma, outdir=sketch_dir)
+
+# Floor plots with the FODO cells, matching cell, dispersion suppressor, doublet
+# and triplet labelled: one sextant, one period and the whole ring.
+for survey_line in ('arc1R', 'period', 'ring'):
+    if survey_line in pdr.lines:
+        sketches[f'survey_{survey_line}'] = ls.survey_sections(
+            pdr.lines[survey_line], outdir=sketch_dir,
+            fname=f'survey_sections_{survey_line}.png')
 plt.show()
 
 
