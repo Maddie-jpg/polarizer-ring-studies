@@ -35,7 +35,7 @@ xo.context_cpu.allow_no_prebuilt_kernel = True
 
 
 #%% Study settings
-design = 5
+design = 1
 config = 9
 mode = 'perfect'        # 'perfect', 'misaligned' or 'corrected'
 phase = 90
@@ -50,7 +50,7 @@ if mode == 'perfect':
                                     phase_advance=0.25, betay_DS_target=7.0,
                                     triplet_seed=(1.8, -3.2),
                                     match_WP=False,               # betas always matched first; False = skip the WP match
-                                    field_expansion_bends=False,
+                                    field_expansion_bends=True,
                                     dfd_entry=False)   # False = hard-edge xt.Bend (needed for spin / radiation)
     sc.config_D1_C9(pdr)
 
