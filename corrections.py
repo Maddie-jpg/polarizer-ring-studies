@@ -176,7 +176,8 @@ for survey_line in ('arc1R', 'period', 'ring'):
     if survey_line in pdr.lines:
         sketches[f'survey_{survey_line}'] = ls.survey_sections(
             pdr.lines[survey_line], outdir=sketch_dir,
-            fname=f'survey_sections_{survey_line}.png')
+            fname=f'survey_sections_{survey_line}.png',
+            a4=(survey_line == 'arc1R'))     # arc: A4 text width, PNG + PDF
 plt.show()
 
 

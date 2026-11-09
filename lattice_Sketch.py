@@ -1243,9 +1243,12 @@ def _survey_sections(line):
     return merged
 
 
+A4_TEXT_WIDTH_IN = 6.3      # 16 cm: the text width of an A4 page with 2.5 cm margins
+
+
 def survey_sections(line, ax=None, figsize=None, element_width=None,
                     matching_cell=True, outdir=None, fname='survey_sections.png',
-                    dpi=200):
+                    dpi=200, a4=False):
     """
     xtrack's floor plot of `line` (line.survey().plot()) with the FODO cells,
     matching cell, dispersion suppressor, doublet and triplet labelled on it.
@@ -1258,6 +1261,10 @@ def survey_sections(line, ax=None, figsize=None, element_width=None,
     figsize=None scales the figure with the size of the line (about 3 m of
     floor per inch, at least 9 x 7 in), so labels on a period or the whole
     ring stay as readable as on one sextant.
+    a4=True draws the figure at the A4 text width (16 cm) with 9-10 pt text,
+    so it goes into a dissertation at 100 % scale (width = the text width)
+    without the text shrinking, and also saves a vector PDF next
+    to the PNG (300 dpi).
     Returns the Figure.
     """
     import xplt
@@ -1269,15 +1276,22 @@ def survey_sections(line, ax=None, figsize=None, element_width=None,
     if element_width is None:
         element_width = 0.03 * extent
 
+    fs_label, fs_tick, fs_axis, fs_leg, lw = 9, 10, 11, 10, 1.1
+    if a4:
+        fs_label, fs_tick, fs_axis, fs_leg, lw = 9, 9, 10, 8, 0.9
+        dpi = max(dpi, 300)
     if ax is None:
         if figsize is None:
-            w = max(9.0, extent / 3.0)
-            figsize = (w, 0.78 * w)
+            if a4:
+                figsize = (A4_TEXT_WIDTH_IN, 0.8 * A4_TEXT_WIDTH_IN)
+            else:
+                w = max(9.0, extent / 3.0)
+                figsize = (w, 0.78 * w)
         fig, ax = plt.subplots(figsize=figsize)
     else:
         fig = ax.figure
     plt.sca(ax)
-    sv.plot(element_width=element_width, legend=True, ax=ax)
+    sv.plot(element_width=element_width, legend=False, ax=ax)
 
     def point(sq):
         return np.interp(sq, ss, sz), np.interp(sq, ss, sxx)
@@ -1301,20 +1315,24 @@ def survey_sections(line, ax=None, figsize=None, element_width=None,
         nrm = np.hypot(dz, dx) + 1e-30
         nz, nx = -dx / nrm * side, dz / nrm * side       # normal on this side
         bz, bx = z + d * nz, x + d * nx
-        ax.plot(bz, bx, color='0.25', lw=1.1, zorder=6)
+        ax.plot(bz, bx, color='0.25', lw=lw, zorder=6)
         for i in (0, -1):
             ax.plot([bz[i] - tick * nz[i], bz[i] + tick * nz[i]],
                     [bx[i] - tick * nx[i], bx[i] + tick * nx[i]],
-                    color='0.25', lw=1.1, zorder=6)
+                    color='0.25', lw=lw, zorder=6)
         m = len(sq) // 2
         ang = np.degrees(np.arctan2(dx[m], dz[m]))
         if ang > 90:
             ang -= 180
         elif ang < -90:
             ang += 180
-        tz, tx = bz[m] + 0.9 * d * nz[m], bx[m] + 0.9 * d * nx[m]
-        ax.text(tz, tx, lab, rotation=ang, rotation_mode='anchor',
-                ha='center', va='center', fontsize=9, color='0.15', zorder=7,
+        text = lab.replace('dispersion suppressor', 'dispersion\nsuppressor') \
+            if a4 else lab
+        off = (1.25 if '\n' in text else 0.9) * d
+        tz, tx = bz[m] + off * nz[m], bx[m] + off * nx[m]
+        ax.text(tz, tx, text, rotation=ang, rotation_mode='anchor',
+                ha='center', va='center', fontsize=fs_label, color='0.15',
+                zorder=7, linespacing=1.0,
                 bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none',
                           alpha=0.85))
         pts.append(np.column_stack([tz + 0 * bz, tx + 0 * bx]))
@@ -1324,10 +1342,20 @@ def survey_sections(line, ax=None, figsize=None, element_width=None,
     ax.set_xlim(allp[:, 0].min() - pad, allp[:, 0].max() + pad)
     ax.set_ylim(allp[:, 1].min() - pad, allp[:, 1].max() + pad)
     ax.set_aspect('equal', adjustable='datalim')
+    ax.tick_params(labelsize=fs_tick)
+    ax.set_xlabel(ax.get_xlabel(), fontsize=fs_axis)
+    ax.set_ylabel(ax.get_ylabel(), fontsize=fs_axis)
+    # Legend where the floor plot is empty: away from the start of the line
+    # and the side it bends towards.
+    ax.legend(fontsize=fs_leg, framealpha=0.95,
+              loc='lower left' if out_sign > 0 else 'upper left')
     fig.tight_layout()
     if outdir:
         os.makedirs(outdir, exist_ok=True)
         fig.savefig(os.path.join(outdir, fname), dpi=dpi, bbox_inches='tight')
+        if a4:
+            fig.savefig(os.path.join(outdir, os.path.splitext(fname)[0] + '.pdf'),
+                        bbox_inches='tight')
     return fig
 
 
