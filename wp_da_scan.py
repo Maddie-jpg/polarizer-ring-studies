@@ -139,12 +139,22 @@ def amplitude_detuning(ring, gemitt_x, gemitt_y, amps=(1, 2, 3, 4),
 
 
 def optics_metrics(ring, rdts=DEFAULT_RDTS, detuning=True, nl_chroma=True,
-                   nemitt_x=1e-6, nemitt_y=1e-6, detuning_turns=1024):
-    """RDTs, amplitude detuning and Q'' of `ring` as it is now.
+                   nemitt_x=1e-6, nemitt_y=1e-6, detuning_turns=1024,
+                   eq_emittance=True):
+    """RDTs, amplitude detuning, Q'' and equilibrium emittance of `ring` as
+    it is now.
 
-    Radiation must be off. Returns a flat dict of floats; anything that fails
-    is reported under 'metrics_error' instead of raising, so a failed
-    metric never costs the DA of that point.
+    Radiation must be off on entry, and is off again on return. Returns a
+    flat dict of floats; anything that fails is reported under
+    'metrics_error' instead of raising, so a failed metric never costs the DA
+    of that point.
+
+    eq_emittance : also record the synchrotron-radiation equilibrium
+        emittances 'eq_gemitt_x', 'eq_gemitt_y', 'eq_gemitt_zeta' [m rad] and
+        the energy loss per turn 'eneloss_turn' [eV]. This is the one metric
+        here that needs radiation ON, so it is switched on for that twiss
+        only and switched back off afterwards. eq_gemitt_y is ~0 for a flat
+        lattice with no coupling, so the horizontal one is the useful map.
     """
     import xtrack as xt
     out = {}
@@ -167,6 +177,28 @@ def optics_metrics(ring, rdts=DEFAULT_RDTS, detuning=True, nl_chroma=True,
             nlc = ring.get_non_linear_chromaticity()
             out['ddqx'] = float(nlc.dnqx[2])
             out['ddqy'] = float(nlc.dnqy[2])
+        if eq_emittance:
+            # The only metric here that needs radiation on. Put it back off in
+            # the finally, so the contract of this function is unchanged and a
+            # failure here cannot leave radiation on for the next caller.
+            try:
+                ring.configure_radiation(model='mean')
+                try:
+                    tw6 = ring.twiss(method='6d', radiation_analysis=True)
+                except TypeError:   # xtrack < 0.118 spells it differently
+                    tw6 = ring.twiss(method='6d', eneloss_and_damping=True)
+                for k in ('eq_gemitt_x', 'eq_gemitt_y', 'eq_gemitt_zeta'):
+                    if hasattr(tw6, k):
+                        out[k] = float(np.asarray(getattr(tw6, k)).ravel()[0])
+                # 'eneloss_turn' was renamed 'energy_loss'; prefer the new
+                # name so newer xtrack does not warn, keep the old key.
+                for k in ('energy_loss', 'eneloss_turn'):
+                    if hasattr(tw6, k):
+                        out['eneloss_turn'] = float(
+                            np.asarray(getattr(tw6, k)).ravel()[0])
+                        break
+            finally:
+                ring.configure_radiation(model=None)
     except Exception as e:
         out['metrics_error'] = f'{type(e).__name__}: {str(e)[:150]}'
     return out
@@ -277,6 +309,7 @@ def _worker(cfg_file, out_file):
                         ring, rdts=s['metrics'].get('rdts', DEFAULT_RDTS),
                         detuning=s['metrics'].get('detuning', True),
                         nl_chroma=s['metrics'].get('nl_chroma', True),
+                        eq_emittance=s['metrics'].get('eq_emittance', True),
                         nemitt_x=s['nemitt_x'], nemitt_y=s['nemitt_y']))
             ring.configure_radiation(model=s['radiation'])
             with quiet():
@@ -380,7 +413,8 @@ def run_parallel(lattice_json, qx_vals, qy_vals, *, nemitt_x, nemitt_y,
                 betay_DS_target=betay_DS_target, triplet_seed=triplet_seed,
                 tune_tol=tune_tol, start_element=start_element,
                 trim_knobs=list(trim_knobs) if trim_knobs else None,
-                metrics=(dict(rdts=list(DEFAULT_RDTS), detuning=True, nl_chroma=True)
+                metrics=(dict(rdts=list(DEFAULT_RDTS), detuning=True,
+                              nl_chroma=True, eq_emittance=True)
                          if metrics is True else (metrics or None)))
     procs, outs, assigned = [], [], []
     total = 0

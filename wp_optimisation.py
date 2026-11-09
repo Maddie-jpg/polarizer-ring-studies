@@ -1075,6 +1075,35 @@ def plot_tune_scan(QX, QY, DA_map, current_qx=None, current_qy=None):
     return fig
 
 
+def plot_emittance_scan(QX, QY, EX_map, current_qx=None, current_qy=None,
+                        plane='x'):
+    """Qx-Qy heatmap of the equilibrium emittance from each point's optics.
+
+    Failed points are left blank rather than set to 0 as in the DA map: zero
+    emittance would read as the best point on the map instead of a missing
+    one. EX_map is in m rad (the 'eq_gemitt_x' metric); it is drawn in nm rad.
+    """
+    ex_nm = np.asarray(EX_map, dtype=float) * 1e9
+    masked = np.ma.masked_invalid(ex_nm)
+    cmap = plt.get_cmap('magma').copy()
+    cmap.set_bad('lightgrey')
+
+    fig, ax = plt.subplots(figsize=(8, 7))
+    im = ax.pcolormesh(QX, QY, masked, shading='auto', cmap=cmap)
+    fig.colorbar(im, ax=ax, label=rf'Equilibrium $\varepsilon_{plane}$ '
+                                  rf'[nm rad]  (grey = failed/unreachable)')
+    if current_qx is not None:
+        ax.plot(current_qx, current_qy, 'o', color='red', ms=10, mec='black',
+                label='Current working point')
+        ax.legend()
+    ax.set_xlabel('$Q_x$')
+    ax.set_ylabel('$Q_y$')
+    ax.set_title('Performance Tune Scan (realistic matching): '
+                 rf'Equilibrium $\varepsilon_{plane}$')
+    plt.tight_layout()
+    return fig
+
+
 def best_from_map(QX, QY, DA_map):
     n_valid = np.sum(~np.isnan(DA_map))
     if n_valid == 0:
@@ -1156,6 +1185,24 @@ QX_p, QY_p, DA_p, metric_p = trim_failed_edges(QX, QY, DA_map, metric)
 fig_m = plot_metric_maps(QX_p, QY_p, metric_p, DA_p, current_qx=current_qx, current_qy=current_qy)
 fig_m.savefig(f'{WP_DIR}/tune_scan_metric_maps.png', dpi=300, bbox_inches='tight')
 plt.show()
+
+# Equilibrium emittance on the same Qx-Qy grid, as its own heatmap. eq_gemitt_y
+# is ~0 for this flat lattice (no coupling), so only the horizontal one is
+# worth a map; eq_gemitt_zeta and eneloss_turn are in the records and the npz.
+if 'eq_gemitt_x' in metric_p:
+    fig_e = plot_emittance_scan(QX_p, QY_p, metric_p['eq_gemitt_x'],
+                                current_qx=current_qx, current_qy=current_qy)
+    fig_e.savefig(f'{WP_DIR}/tune_scan_eq_emittance.png', dpi=300,
+                  bbox_inches='tight')
+    plt.show()
+    _ex = np.asarray(metric_p['eq_gemitt_x'], float) * 1e9
+    if np.isfinite(_ex).any():
+        print(f'Equilibrium emittance over the window: '
+              f'{np.nanmin(_ex):.2f} - {np.nanmax(_ex):.2f} nm rad')
+else:
+    print("No 'eq_gemitt_x' in the scan records -- rerun the scan with "
+          "metrics=True (or metrics={'eq_emittance': True}) to get the "
+          "equilibrium emittance map.")
 
 # Correlation table: printed as before, and also saved as text
 import contextlib, io, json
