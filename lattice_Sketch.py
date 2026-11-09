@@ -130,6 +130,13 @@ _DIAG_STYLES = [
 #   BPMs  -> floated in their own band / outside the ring
 #   inj   -> drawn separately as a full-height flag plus an on-axis box
 # Correctors are deliberately absent: they are magnets and are drawn in line.
+# Module-level default for the element-name band. draw_beamline follows it
+# whenever its own show_names is left as None, so a caller can turn names off
+# for a whole set of figures -- sketch_all(..., show_names=False) -- and read
+# the shapes off the legend instead, without threading a flag through every
+# sketch_* function.
+SHOW_NAMES = True
+
 _DIAG_KINDS = {'inj', 'bpm', 'bpm_h', 'bpm_v'}
 # Kinds drawn as floating indicators rather than in-line hardware.
 _BPM_KINDS = {'bpm', 'bpm_h', 'bpm_v'}
@@ -167,19 +174,60 @@ _KIND_LABEL = {
 }
 
 
-def _classify(name):
-    """Return (kind, colour, half_height, y_offset, hatch) for an element."""
+# Does the NAME of this kind claim focusing? Used to check the claim against
+# the gradient the magnet actually has -- see _classify.
+_FD_SENSE = {
+    'quad_f': True,       'quad_d': False,
+    'quad_f_m': True,     'quad_d_m': False,
+    'quad_f_ds': True,    'quad_d_ds': False,
+    'quad_f_doub': True,  'quad_d_doub': False,
+    'quad_f_tr': True,    'quad_d_tr': False,
+}
+
+
+def _quad_k1(el):
+    """k1 of a quadrupole-like element, or None if it has no gradient.
+
+    Thin and thick slices keep k1 on their parent, so look there too.
+    """
+    for obj in (el, getattr(el, '_parent', None)):
+        if obj is None:
+            continue
+        k1 = getattr(obj, 'k1', None)
+        if k1 is not None:
+            try:
+                return float(np.asarray(k1).ravel()[0])
+            except Exception:
+                pass
+    return None
+
+
+def _classify(name, k1=None):
+    """Return (kind, colour, half_height, y_offset, hatch, flipped).
+
+    Up/down in this sketch means focusing/defocusing, so a quadrupole is
+    placed by the gradient it actually has rather than by the letter in its
+    name. A dispersion-suppressor quad called QDDS... with k1 > 0 focuses,
+    and is drawn above the axis with flipped=True so the legend can say so.
+    It keeps its own colour and hatch, so it is still identifiable as that
+    magnet rather than being silently relabelled as the other family.
+
+    k1=None (the default) keeps the pure name-based placement.
+    """
     # Correction / diagnostics / injection first, matched on their own
     # prefixes. Correctors carry real geometry here because they are drawn
     # in line with the magnets; for BPMs and injection the geometry is
     # unused, since draw_beamline gives those their own treatment.
     for pat, kind, colour, _lab, h, y0 in _DIAG_STYLES:
         if re.match(pat, name):
-            return kind, colour, h, y0, ''
+            return kind, colour, h, y0, '', False
     for pat, kind, colour, h, y0, hatch in _STYLES:
         if re.match(pat, name):
-            return kind, colour, h, y0, hatch
-    return 'other', '#bbbbbb', 0.30, 0.0, ''
+            flipped = False
+            if k1 and kind in _FD_SENSE and (k1 > 0) != _FD_SENSE[kind]:
+                y0, flipped = -y0, True
+            return kind, colour, h, y0, hatch, flipped
+    return 'other', '#bbbbbb', 0.30, 0.0, '', False
 
 
 # ---------------------------------------------------------------------------
@@ -252,12 +300,17 @@ def _merge_slices(rows):
         if len(grp) == 1 and grp[0]['name'] == base:
             out.append(grp[0])                       # untouched element
         else:
-            kind, colour, h, y0, hatch = _classify(base)
+            # Carry the gradient over from the pieces: the slices know k1,
+            # the merged parent name on its own does not, and without it the
+            # merged magnet would fall back to name-based placement.
+            k1 = next((r['k1'] for r in grp if r.get('k1') is not None), None)
+            kind, colour, h, y0, hatch, flipped = _classify(base, k1)
             out.append(dict(name=base,
                             s=min(r['s'] for r in grp),
                             length=sum(r['length'] for r in grp),
                             kind=kind, colour=colour, half_h=h, y0=y0,
-                            hatch=hatch, is_drift=_is_drift(base, None)))
+                            hatch=hatch, is_drift=_is_drift(base, None),
+                            k1=k1, flipped=flipped))
         out.extend(inside)
         i = j + 1
     return out
@@ -330,7 +383,8 @@ def _element_rows(line, merge_slices=True):
             L = float(getattr(el, 'length', 0.0) or 0.0)
 
         drift = _is_drift(nm, el)
-        kind, colour, h, y0, hatch = _classify(nm)
+        k1 = _quad_k1(el)
+        kind, colour, h, y0, hatch, flipped = _classify(nm, k1)
         s_start = float(svals[i])
         thin = (L == 0)
         if kind in _CORR_KINDS and L == 0:
@@ -341,7 +395,7 @@ def _element_rows(line, merge_slices=True):
             s_start -= L / 2.0
         rows.append(dict(name=nm, s=s_start, length=L, thin=thin,
                          kind=kind, colour=colour, half_h=h, y0=y0,
-                         hatch=hatch, is_drift=drift))
+                         hatch=hatch, is_drift=drift, k1=k1, flipped=flipped))
     if merge_slices:
         rows = _merge_slices(rows)
     return rows
@@ -403,7 +457,7 @@ def _fmt_len(L):
 
 def draw_beamline(ax, rows, title=None, show_drifts=True,
                   label_every=1, min_label_gap=None, s_offset=None,
-                  dim_row_frac=0.55, ref_span=None):
+                  dim_row_frac=0.55, ref_span=None, show_names=None):
     """
     Draw one span of beamline onto `ax`, fully dimensioned.
 
@@ -431,6 +485,12 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
         Annotate the gaps between magnets with their length.
     label_every : int
         Label every n-th magnet (use >1 only for very dense spans).
+    show_names : bool or None
+        Draw the element-name band. None (default) follows the module-level
+        SHOW_NAMES, so a caller can turn names off for a whole figure set
+        with sketch_all(..., show_names=False) and read the shapes off the
+        legend instead. With names off the band is removed, not just left
+        empty, so the axes do not keep its blank space.
     min_label_gap : float or None
         Minimum s separation between name labels, in metres. Labels closer
         than this are dropped. None = derive from the span width.
@@ -475,6 +535,7 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
     Y_NAME_BASE = (Y_DIAG + DIAG_H + 0.55) if has_diag else 1.75
     Y_NAME_STEP = 0.52           # stagger step between name levels
     N_NAME_LEVELS = 3
+    names_on = SHOW_NAMES if show_names is None else bool(show_names)
     Y_DIM = -2.10                # magnet dimension row (clears the QD boxes,
                                  # whose bottom edge sits at -1.45)
     Y_DRIFT = -3.30              # drift dimension row (clears rotated labels)
@@ -564,7 +625,7 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
 
     last_lab_x = -1e9
     lvl = 0
-    for i, r in enumerate(mags):
+    for i, r in enumerate(mags if names_on else []):
         if i % label_every:
             continue
         xc = r['s'] - s0 + r['length'] / 2.0
@@ -638,7 +699,9 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
             ha='center', va='top', fontsize=8.5, fontweight='bold')
 
     # ---- axes cosmetics ----------------------------------------------
-    y_top = Y_NAME_BASE + N_NAME_LEVELS * Y_NAME_STEP + 0.35
+    # With names off, drop the band instead of leaving its space blank.
+    y_top = (Y_NAME_BASE + N_NAME_LEVELS * Y_NAME_STEP + 0.35 if names_on
+             else Y_NAME_BASE + 0.25)
     if any(d['kind'] == 'inj' for d in diags):
         y_top += 0.45           # room for the injection flag label
     ax.set_xlim(-ref * 0.035, span + ref * 0.035)
@@ -663,7 +726,16 @@ def _legend_for(rows, ax, ncol=5):
             continue
         if r['is_drift']:
             continue
-        seen.setdefault(r['kind'], (r['colour'], r.get('hatch', '')))
+        seen.setdefault(r['kind'], (r['colour'], r.get('hatch', ''),
+                                    bool(r.get('flipped'))))
+
+    def _label(k, flipped):
+        """Say what it really does when the name disagrees with the gradient."""
+        lab = _KIND_LABEL.get(k, k)
+        if flipped:
+            lab += ' (focusing)' if _FD_SENSE.get(k) is False else ' (defocusing)'
+        return lab
+
     # BPMs are drawn as open squares on the figure, so their legend key must
     # be open too -- otherwise a BPM and a kicker of the same plane show as
     # two identical filled boxes.
@@ -672,8 +744,8 @@ def _legend_for(rows, ax, ncol=5):
                          edgecolor=(c if k in _BPM_KINDS else 'black'),
                          hatch=h,
                          linewidth=(1.4 if k in _BPM_KINDS else 0.7),
-                         label=_KIND_LABEL.get(k, k))
-               for k, (c, h) in seen.items()]
+                         label=_label(k, fl))
+               for k, (c, h, fl) in seen.items()]
     if handles:
         ax.legend(handles=handles, loc='upper center',
                   bbox_to_anchor=(0.5, -0.30), ncol=ncol, frameon=False,
@@ -1478,13 +1550,27 @@ def sketch_period_beam_size(pdr, beam, sextants=('3R', '1L'), line_name='ring',
 
 
 def sketch_all(pdr, sextant='1R', line_name='ring', outdir='sketches',
-               dpi=200, show=False, beam=None, n_sigma=1):
+               dpi=200, show=False, beam=None, n_sigma=1, show_names=None):
     """
     Produce the complete set: every cell type, the arc, and the ring.
     beam=None draws the layouts only; a beam-size dict (as from
     corrections.ring_beam_sizes) adds the beam sizes to the cell and arc
     plots. Saves to `outdir` and returns {name: Figure}.
+
+    show_names=False drops the element-name band from every figure in the
+    set, leaving the shapes and the legend. None keeps the module default.
     """
+    global SHOW_NAMES
+    _prev, SHOW_NAMES = SHOW_NAMES, (SHOW_NAMES if show_names is None
+                                     else bool(show_names))
+    try:
+        return _sketch_all(pdr, sextant, line_name, outdir, dpi, show,
+                           beam, n_sigma)
+    finally:
+        SHOW_NAMES = _prev
+
+
+def _sketch_all(pdr, sextant, line_name, outdir, dpi, show, beam, n_sigma):
     out = {}
     out.update(sketch_cell_types(pdr, sextant, line_name, outdir=outdir,
                                  dpi=dpi, beam=beam, n_sigma=n_sigma))
