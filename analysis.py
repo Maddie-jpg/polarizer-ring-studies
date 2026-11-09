@@ -641,7 +641,7 @@ marker_name = insert_marker_in_drift(pdr, ring, occurrence=3)
 
 pdr_copy = pdr.copy()
 mc.insert_bpms_and_correctors(pdr_copy, design, config)
-ls.sketch_all(pdr_copy, sextant='1R', outdir=folder)
+ls.sketch_all(pdr_copy, sextant='1R', outdir=folder, show_names=False)
 
 if mode=='perfect':
     line=ring
