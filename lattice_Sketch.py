@@ -437,12 +437,23 @@ def _index_of(rows, name):
     raise KeyError(f"element '{name}' not found in this line")
 
 
-def _slice_rows(rows, start_name, end_name):
-    """Inclusive slice of rows between two element names."""
+def _slice_rows(rows, start_name, end_name, exclusive_end=False):
+    """Slice of rows between two element names, inclusive by default.
+
+    exclusive_end drops the end element and any zero-length markers sitting
+    on the boundary with it. A span is given by NAMES, and the drifts
+    between magnets all share one name (Drarc), so a boundary like "the
+    drift before the next quad" cannot be named -- it has to be expressed
+    as the quad, excluded.
+    """
     i0 = _index_of(rows, start_name)
     i1 = _index_of(rows, end_name)
     if i1 < i0:
         i0, i1 = i1, i0
+    if exclusive_end:
+        i1 -= 1
+        while i1 > i0 and rows[i1]['length'] == 0:
+            i1 -= 1
     return rows[i0:i1 + 1]
 
 
@@ -589,9 +600,12 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
                                        edgecolor='black',
                                        linewidth=0.7, zorder=4))
 
-            ax.text(xc, Y_DIAG + DIAG_H + 0.08, r['name'], rotation=90,
-                    ha='center', va='bottom', fontsize=6.0,
-                    color=r['colour'], zorder=5)
+            # Diagnostics names follow show_names like the magnet names do,
+            # so turning names off leaves no element text anywhere.
+            if names_on:
+                ax.text(xc, Y_DIAG + DIAG_H + 0.08, r['name'], rotation=90,
+                        ha='center', va='bottom', fontsize=6.0,
+                        color=r['colour'], zorder=5)
 
     # ---- injection point: a full-height flag --------------------------
     for r in [d for d in diags if d['kind'] == 'inj']:
@@ -761,7 +775,8 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
     Work out, from the element names actually present, where each distinct
     cell type starts and ends in one sextant.
 
-    Returns an ordered dict  {label: (start_name, end_name)}.
+    Returns an ordered dict  {label: (start_name, end_name)} or
+    {label: (start_name, end_name, exclusive_end)}.
 
     The naming convention assumed is the one used throughout
     linear_optics.py:
@@ -803,7 +818,10 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
         for a, b in zip(qfa[:-1], qfa[1:]):
             ia, ib = _index_of(rows, a), _index_of(rows, b)
             if any(r['kind'] in ('sext_f', 'sext_d') for r in rows[ia:ib + 1]):
-                spans['Arc cell with sextupoles'] = (a, b)
+                # Exclusive end: the cell runs up to, but not including, the
+                # next QFA. Ending on it drew the first quad of the
+                # following cell as if it belonged to this one.
+                spans['Arc cell with sextupoles'] = (a, b, True)
                 break
 
     # --- matching cell ----------------------------------------------
@@ -833,6 +851,12 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
             break
     if head and tail:
         spans['Straight section (insertion)'] = (head, tail)
+
+    # --- dispersion suppressor and triplet as one span ---------------
+    # They are matched as a unit, so the write-up wants them in one figure;
+    # the separate 'Dispersion suppressor' above is kept for the detail.
+    if have(f'QFDS_{sextant}') and tail:
+        spans['Dispersion suppressor and triplet'] = (f'QFDS_{sextant}', tail)
 
     # --- wiggler period, if wigglers were inserted -------------------
     wig = sorted([n for n in present if re.match(r'^WigPos_.*_p0$', n)])
@@ -953,9 +977,11 @@ def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
     spans = spans or discover_cells(pdr, sextant, line_name)
 
     figs = {}
-    for label, (a, b) in spans.items():
+    for label, span in spans.items():
+        a, b, *rest = span
+        excl = bool(rest[0]) if rest else False
         try:
-            rows = _slice_rows(rows_all, a, b)
+            rows = _slice_rows(rows_all, a, b, exclusive_end=excl)
         except KeyError as e:
             print(f'sketch_cell_types: skipping {label!r} -- {e}')
             continue
