@@ -16,6 +16,8 @@ Errors           misalignments (magnets), misalignments_correctors, bpm_reading_
 Correction       orbit_correction, report_eigenvector_counts
 Workflow         prepare_seed_line  - misalign + (optionally) correct one seed
                  setup_spin_reference - set g-2 and energy for spin tracking
+Injection        install_apertures  - chamber apertures on every magnet
+                 install_injection  - septum blade, injection point, kicker (injection.py)
 
 All error sigmas are in m (shifts) and rad (rolls). Defaults live in config.py.
 """
@@ -992,3 +994,114 @@ def prepare_seed_line(base_line, seed, correct, *,
                   f"y: {np.std(tw_after.y):.3e}")
 
     return line
+
+
+# ===========================================================================
+# Apertures and injection hardware (used by injection.py)
+# ===========================================================================
+
+def install_apertures(pdr, a_x=0.0312, a_y=0.0312, per_element=None, per_type=None,
+                      line_name='ring',
+                      element_types=('Bend', 'Quadrupole', 'Sextupole'),
+                      both_ends=True):
+    """Install elliptical chamber apertures (xt.LimitEllipse) at the entry
+    (and exit, if both_ends) of every element of `element_types`.
+
+    Half-axes [m] are taken, in order of priority, from
+        per_element : {element name: (a, b)}, e.g. from macroparticles.py's
+                      chamber_per_magnet_{mode}.csv (chamber_x, chamber_y)
+        per_type    : {element type: (a, b)}, e.g. {'Quadrupole': (0.038, 0.038)}
+        a_x, a_y    : uniform default
+
+    Without apertures a particle is only flagged lost when its motion blows
+    up, so survival would only reflect the dynamic aperture. Apertures are
+    named 'ap_<element>_in' / 'ap_<element>_out' and are not shifted with
+    misaligned magnets (a perfectly aligned chamber). A second call does
+    nothing.
+    """
+    ring = pdr.lines[line_name]
+    tab = ring.get_table()
+    if any(nn.startswith('ap_') for nn in tab.name):
+        print('install_apertures: apertures already present, skipping.')
+        return ring
+
+    per_element = per_element or {}
+    per_type = per_type or {}
+    mask = np.isin(tab.element_type, element_types)
+    names = list(dict.fromkeys(tab.name[mask]))
+    types = dict(zip(tab.name[mask], tab.element_type[mask]))
+
+    places, n_from = [], {'element': 0, 'type': 0, 'default': 0}
+    for nn in names:
+        if nn in per_element:
+            ab, src = per_element[nn], 'element'
+        elif types[nn] in per_type:
+            ab, src = per_type[types[nn]], 'type'
+        else:
+            ab, src = (a_x, a_y), 'default'
+        n_from[src] += 1
+        ends = [('in', 'start'), ('out', 'end')] if both_ends else [('in', 'start')]
+        for tag, anchor in ends:
+            ap_name = f'ap_{nn}_{tag}'
+            pdr.new(ap_name, xt.LimitEllipse, a=float(ab[0]), b=float(ab[1]))
+            places.append(pdr.place(ap_name, at=0.0, from_=nn, from_anchor=anchor))
+
+    ring.insert(places, with_progress=False)
+    print(f'install_apertures: {len(places)} apertures on {len(names)} magnets '
+          f'(sizes per element: {n_from["element"]}, per type: {n_from["type"]}, '
+          f'default {a_x*1e3:.1f} x {a_y*1e3:.1f} mm: {n_from["default"]})')
+    return ring
+
+
+def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
+                      septum_offset=0.05, septum_length=0.8, kicker_offset=2.2,
+                      x_blade=0.010, a_x=0.0312, a_y=0.0312, side=+1,
+                      line_name='ring'):
+    """Install a single-turn, off-axis injection system:
+
+      inj_septum_entry / inj_septum_exit : xt.LimitRect at the two ends of the
+            septum, the blade as seen by the CIRCULATING beam: anything beyond
+            x_blade on the injection side is lost.
+      inj_point  : xt.Marker just downstream of the septum exit, where the
+            injected bunch is created. The septum field only acts on the
+            injected beam, so it is not part of the ring.
+      inj_kicker : thin xt.Multipole with knl[0] on the env knob 'k_inj'
+            (xtrack: dpx = -knl[0]), set to 0 here; injection.py sets it.
+
+    Positions are offsets [m] from the start of the drifts `septum_at` and
+    `kicker_at`. The defaults put the septum at the start of the first triplet
+    drift of the RF-free straight and the kicker near the end of the second,
+    which gives dmu_x ~ 0.24 on D1 C9 90deg_FDF. side=+1 injects from +x.
+    """
+    ring = pdr.lines[line_name]
+    tab = ring.get_table()
+    if 'inj_point' in tab.name:
+        print('install_injection: injection elements already present, skipping.')
+        return ring
+
+    s_sep0 = tab['s', septum_at] + septum_offset
+    s_sep1 = s_sep0 + septum_length
+    s_kick = tab['s', kicker_at] + kicker_offset
+    for nn, ss in [(septum_at, s_sep1), (kicker_at, s_kick)]:
+        idx = list(tab.name).index(nn)
+        if ss > tab.s[idx + 1]:
+            raise ValueError(f'install_injection: element does not fit inside {nn}')
+
+    lims = (dict(min_x=-a_x, max_x=x_blade, min_y=-a_y, max_y=a_y) if side > 0 else
+            dict(min_x=-x_blade, max_x=a_x, min_y=-a_y, max_y=a_y))
+
+    pdr['k_inj'] = 0.0
+    pdr.new('inj_septum_entry', xt.LimitRect, **lims)
+    pdr.new('inj_septum_exit', xt.LimitRect, **lims)
+    pdr.new('inj_point', xt.Marker)
+    pdr.new('inj_kicker', xt.Multipole, knl=['k_inj'])
+    ring.insert([
+        pdr.place('inj_septum_entry', at=s_sep0),
+        pdr.place('inj_septum_exit', at=s_sep1),
+        pdr.place('inj_point', at=s_sep1 + 1e-4),   # just downstream of the blade
+        pdr.place('inj_kicker', at=s_kick),
+    ], with_progress=False)
+
+    print(f'install_injection: septum {s_sep0:.2f}-{s_sep1:.2f} m, injection point '
+          f'{s_sep1 + 1e-4:.2f} m, kicker {s_kick:.2f} m, blade at x = {side*x_blade*1e3:.1f} mm')
+    return ring
