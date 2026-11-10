@@ -21,7 +21,7 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
          env: N_PARTICLES, N_TURNS, X_INJ, KICK_ERROR, MATCH_TWISS=1,
-              ENERGY_COMPRESSOR=1, RUN_SCANS=1, SCAN_TURNS, APERTURE_R
+              ENERGY_COMPRESSOR=1, RUN_SCANS=1, SCAN_TURNS, APERTURE_R, N_SIGMA
 Outputs  Results/.../Injection/{mode}/
 
 Run:     python injection.py   (or via run_full_sims.py)
@@ -68,7 +68,8 @@ INJ = dict(septum_at='DrTripl::1', kicker_at='DrTripl::2',
            septum_offset=0.05, septum_length=0.8, kicker_offset=2.2,
            x_blade=0.010, side=+1)
 BLADE_THICKNESS = 0.002           # [m]
-X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = blade + thickness + 3 sigma_x
+N_SIGMA = float(os.environ.get('N_SIGMA', 5))   # beam half-width in sigma: injection clearance and envelopes
+X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = blade + thickness + N_SIGMA sigma_x
 KICK_ERROR = float(os.environ.get('KICK_ERROR', 0.0))   # relative kicker strength error
 
 # --- tracking ---
@@ -231,7 +232,7 @@ if MATCH_TWISS:
 # ============================================================
 side = INJ['side']
 sig_x_inj = np.sqrt(ex_inj * (bx0 if MATCH_TWISS else bbx))
-x_inj = (INJ['x_blade'] + BLADE_THICKNESS + 3 * sig_x_inj) if X_INJ == 'auto' else float(X_INJ)
+x_inj = (INJ['x_blade'] + BLADE_THICKNESS + N_SIGMA * sig_x_inj) if X_INJ == 'auto' else float(X_INJ)
 
 i_k = list(tw.name).index('inj_kicker')
 dmu = 2 * np.pi * (tw.mux[i_k] - tw.mux[0])
@@ -349,7 +350,7 @@ survived = int(np.sum(particles.state > 0))
 summary = dict(
     beam_source=beam['source'], n_particles=n0, n_turns=int(turns[-1] + 1),
     efficiency_percent=100 * survived / n0, lost_on_septum=int(lost_on_septum.sum()),
-    x_inj_m=float(side * x_inj), px_inj_rad=float(side * px_inj), dmu_septum_kicker=float(dmu / 2 / np.pi),
+    n_sigma=N_SIGMA, x_inj_m=float(side * x_inj), px_inj_rad=float(side * px_inj), dmu_septum_kicker=float(dmu / 2 / np.pi),
     k_inj_rad=float(k_nominal), kick_error=KICK_ERROR, kicker_intBdl_Tm=float(abs(k_nominal) * Brho),
     mismatch_x=float(Bmag_x), mismatch_y=float(Bmag_y), matched_twiss=MATCH_TWISS,
     eps_x_inj=float(ex_inj), eps_y_inj=float(ey_inj), eq_gemitt_x=float(tw.eq_gemitt_x),
@@ -405,11 +406,11 @@ for tag, xlim in [('injection_region', (s_sep[0] - 1, s_kick + 6)), ('full_ring'
     idx = order_tw if tag == 'injection_region' else slice(None)
     for ax_, c, s_, lab, a, sig_e in [(axs[0], cx, sx, 'x', A_X, sigma_eq('x')),
                                       (axs[1], cy, sy, 'y', A_Y, sigma_eq('y'))]:
-        ax_.fill_between(s_ebe, 1e3 * (c - 3 * s_), 1e3 * (c + 3 * s_), color='C0', alpha=0.3,
-                         label='injected bunch, $\\pm3\\sigma$ (turn 0)')
+        ax_.fill_between(s_ebe, 1e3 * (c - N_SIGMA * s_), 1e3 * (c + N_SIGMA * s_), color='C0', alpha=0.3,
+                         label=f'injected bunch, $\\pm{N_SIGMA:g}\\sigma$ (turn 0)')
         ax_.plot(s_ebe, 1e3 * c, 'C0', lw=1.5, label='injected centroid')
-        ax_.fill_between(s_st, 1e3 * (tw[lab][idx] - 3 * sig_e[idx]), 1e3 * (tw[lab][idx] + 3 * sig_e[idx]),
-                         color='C1', alpha=0.5, label='stored beam at equilibrium, $\\pm3\\sigma$')
+        ax_.fill_between(s_st, 1e3 * (tw[lab][idx] - N_SIGMA * sig_e[idx]), 1e3 * (tw[lab][idx] + N_SIGMA * sig_e[idx]),
+                         color='C1', alpha=0.5, label=f'stored beam at equilibrium, $\\pm{N_SIGMA:g}\\sigma$')
         cols = (2, 3) if lab == 'x' else (4, 5)
         s0, s1 = ap_seg[:, 0].copy(), ap_seg[:, 1].copy()
         if tag == 'injection_region':
@@ -435,9 +436,9 @@ ok = ~lost_on_septum
 axs[0].scatter(x0[ok], px0[ok], s=2, label='injected')
 axs[0].scatter(x0[~ok], px0[~ok], s=2, color='C3', label='hits blade')
 th = np.linspace(0, 2 * np.pi, 200)
-xe = 3 * np.sqrt(tw.eq_gemitt_x * bx0) * np.cos(th)
-axs[0].plot(1e3 * xe, 1e3 * 3 * np.sqrt(tw.eq_gemitt_x / bx0) * (-ax0 * np.cos(th) - np.sin(th)),
-            'C1', label='stored beam $3\\sigma$')
+xe = N_SIGMA * np.sqrt(tw.eq_gemitt_x * bx0) * np.cos(th)
+axs[0].plot(1e3 * xe, 1e3 * N_SIGMA * np.sqrt(tw.eq_gemitt_x / bx0) * (-ax0 * np.cos(th) - np.sin(th)),
+            'C1', label=f'stored beam ${N_SIGMA:g}\\sigma$')
 axs[0].axvline(side * 1e3 * INJ['x_blade'], color='C2', lw=3, label='blade')
 axs[0].axvline(side * 1e3 * (INJ['x_blade'] + BLADE_THICKNESS), color='C2', lw=3)
 axs[0].set_xlabel('x - x$_{co}$ [mm]'); axs[0].set_ylabel("x' - x'$_{co}$ [mrad]")
