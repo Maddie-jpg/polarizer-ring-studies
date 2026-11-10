@@ -20,7 +20,7 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          cylindrical chamber: radius = widest point of the macroparticles.py
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
-         env: N_PARTICLES, N_TURNS, X_INJ, KICK_ERROR, MATCH_TWISS=1,
+         env: N_PARTICLES, N_TURNS, X_INJ, X_BLADE, KICK_ERROR, MATCH_TWISS=0,
               RUN_SCANS=1, SCAN_TURNS, APERTURE_R, N_SIGMA
 Outputs  Results/.../Injection/{mode}/
 
@@ -53,7 +53,9 @@ BEAM_FILE = cfg.INJECTED_BEAM_FILE
 N_PARTICLES = int(os.environ.get('N_PARTICLES', 500))
 SEED = 74
 MAHALANOBIS_R = None     # optional 6-D core cut (as filter_beam_core in macroparticles.py); None = keep main bunch
-MATCH_TWISS = _on(os.environ.get('MATCH_TWISS', '0'))         # rematch beam to ring Twiss at inj_point
+# Match the beam to the ring Twiss at inj_point (the transfer line delivers a matched beam),
+# as match_coordinates in macroparticles.py does. MATCH_TWISS=0 injects the beam file's optics as-is.
+MATCH_TWISS = _on(os.environ.get('MATCH_TWISS', '1'))
 DELTA_OFFSET = 0.0       # mean momentum offset of the injected bunch w.r.t. the ring
 
 # Gaussian stand-in, ONLY used if BEAM_FILE is missing
@@ -65,7 +67,7 @@ APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
 INJ = dict(septum_at='DrTripl::1', kicker_at='DrDoub::3',
            septum_length=0.8, kicker_offset=None,      # None = kicker in the centre of its drift
            target_dmu=0.25, septum_exit_offset=None,   # septum placed for exactly 90 deg to the kicker
-           x_blade=0.010, side=+1)
+           x_blade=float(os.environ.get('X_BLADE', 0.010)), side=+1)   # septum blade [m] (placeholder)
 BLADE_THICKNESS = 0.002           # [m]
 N_SIGMA = float(os.environ.get('N_SIGMA', 5))   # beam half-width in sigma: injection clearance and envelopes
 X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = blade + thickness + N_SIGMA sigma_x
@@ -211,7 +213,8 @@ print(f'  beam Twiss: betx = {bbx:.2f}, alfx = {abx:.2f} | ring: betx = {bx0:.2f
 def mismatch(b1, a1, b2, a2):
     return 0.5 * (b1 * (1 + a2**2) / b2 - 2 * a1 * a2 + b2 * (1 + a1**2) / b1)
 Bmag_x, Bmag_y = mismatch(bx0, ax0, bbx, abx), mismatch(by0, ay0, bby, aby)
-print(f'  mismatch factor B: x {Bmag_x:.2f}, y {Bmag_y:.2f} (emittance grows by B after filamentation)')
+print(f'  mismatch factor B of the beam file: x {Bmag_x:.2f}, y {Bmag_y:.2f}'
+      f'{" (removed by matching)" if MATCH_TWISS else " (emittance grows by B after filamentation)"}')
 
 if MATCH_TWISS:
     beam['x'], beam['px'] = rematch(beam['x'], beam['px'], bbx, abx, bx0, ax0)
@@ -306,17 +309,36 @@ def take_snap(turn, p_or_mon, j=None):
 take_snap(0, particles)
 mom = [moments(*[getattr(particles, a)[:, None] for a in ['state', 'x', 'px', 'y', 'py', 'zeta', 'delta']])]
 
+EBE_KEYS = ['x', 'px', 'y', 'py', 'zeta', 'delta', 'state', 's']
+def track_ebe_turn():
+    """Track one turn recording every element (for the envelope plots)."""
+    ring.track(particles, num_turns=1, turn_by_turn_monitor='ONE_TURN_EBE')
+    m_ = ring.record_last_track
+    return {a: getattr(m_, a).copy() for a in EBE_KEYS}
+
+def moments_from_ebe(e):
+    """Moments at the start of an element-by-element turn (= at inj_point)."""
+    return moments(*[e[a][:, :1] for a in ['state', 'x', 'px', 'y', 'py', 'zeta', 'delta']])
+
+# turn 0: injection, kicker ON
 t_start = time.time()
-ring.track(particles, num_turns=1, turn_by_turn_monitor='ONE_TURN_EBE')
-ebe = ring.record_last_track
-ebe = {a: getattr(ebe, a).copy() for a in ['x', 'px', 'y', 'py', 'delta', 'state', 's']}
+ebe = track_ebe_turn()
 pdr['k_inj'] = 0.0                                   # kicker off from turn 1 on
 print(f'Turn 0 done in {time.time()-t_start:.1f}s; tracking {N_TURNS} turns '
       f'(estimated {(time.time()-t_start)*N_TURNS/60:.0f} min)...')
 
-turn = 1
-while turn < N_TURNS and np.any(particles.state > 0):
-    nt = min(CHUNK, N_TURNS - turn)
+# turn 1: first turn as a stored beam, element by element
+ebe_stored = {}
+if N_TURNS > 1 and np.any(particles.state > 0):
+    ebe_stored[1] = track_ebe_turn()
+    mom.append(moments_from_ebe(ebe_stored[1]))
+    if 1 in SNAP_TURNS:
+        snap[1] = {a: ebe_stored[1][a][:, 0].copy() for a in ['x', 'px', 'y', 'py', 'zeta', 'delta', 'state']}
+
+# turns 2 .. N_TURNS-2 in chunks
+turn = 2
+while turn < N_TURNS - 1 and np.any(particles.state > 0):
+    nt = min(CHUNK, N_TURNS - 1 - turn)
     # explicit monitor: the default one always starts recording at turn 0
     m = xt.ParticlesMonitor(start_at_turn=turn, stop_at_turn=turn + nt, num_particles=n0)
     ring.track(particles, num_turns=nt, turn_by_turn_monitor=m)
@@ -326,6 +348,12 @@ while turn < N_TURNS and np.any(particles.state > 0):
             take_snap(ts, m, ts - turn)
     turn += nt
     print(f'  turn {turn}/{N_TURNS}: {np.sum(particles.state > 0)} alive', end='\r')
+
+# last turn: stored beam after N_TURNS, element by element
+if N_TURNS > 2 and np.any(particles.state > 0):
+    ebe_stored[turn] = track_ebe_turn()
+    mom.append(moments_from_ebe(ebe_stored[turn]))
+    turn += 1
 take_snap(turn, particles)
 print(f'\nTracking finished in {(time.time()-t_start)/60:.1f} min')
 
@@ -386,27 +414,54 @@ def sigma_eq(plane):
         return np.sqrt(tw.eq_gemitt_x * tw.betx + (tw.dx * sig_delta_eq)**2)
     return np.sqrt(max(tw.eq_gemitt_y, 1e-13) * tw.bety)
 
-# ---- 1 & 2: first-turn envelope (injection region zoom and full ring) ----
+# ---- 1 & 2: beam envelope at injection (injection region zoom and full ring) ----
+import warnings; warnings.simplefilter('ignore', RuntimeWarning)
+
+def envelope(e):
+    """Centroid and rms size per element of an element-by-element turn."""
+    al = e['state'] > 0
+    if al.sum() == 0:
+        return None
+    with np.errstate(invalid='ignore'):
+        out = {k: f(np.where(al, e[k], np.nan), 0) for k, f in [('x', np.nanmean), ('y', np.nanmean)]}
+        out.update({f's{k}': np.nanstd(np.where(al, e[k], np.nan), 0) for k in ['x', 'y']})
+    out['s'] = e['s'][np.argmax(al.sum(1))]           # s of a surviving particle at each element
+    return out
+
+env0 = envelope(ebe)
 alive0 = ebe['state'] > 0
-with np.errstate(invalid='ignore'):
-    import warnings; warnings.simplefilter('ignore', RuntimeWarning)
-    cx = np.nanmean(np.where(alive0, ebe['x'], np.nan), 0)
-    sx = np.nanstd(np.where(alive0, ebe['x'], np.nan), 0)
-    cy = np.nanmean(np.where(alive0, ebe['y'], np.nan), 0)
-    sy = np.nanstd(np.where(alive0, ebe['y'], np.nan), 0)
-s_ebe = ebe['s'][np.argmax(alive0.sum(1))]           # s of a surviving particle at each element
+cx, sx, cy, sy, s_ebe = env0['x'], env0['sx'], env0['y'], env0['sy'], env0['s']
+env_stored = {t: envelope(e) for t, e in ebe_stored.items()}
+stored_style = {0: ('C4', '--'), 1: ('C5', '-.')}
 
 for tag, xlim in [('injection_region', (s_sep[0] - 1, s_kick + 6)), ('full_ring', (0, C))]:
-    fig, axs = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(11, 7.5), sharex=True)
     s_st = s_tw_wrapped[order_tw] if tag == 'injection_region' else s_tw
     idx = order_tw if tag == 'injection_region' else slice(None)
-    for ax_, c, s_, lab, a, sig_e in [(axs[0], cx, sx, 'x', A_X, sigma_eq('x')),
-                                      (axs[1], cy, sy, 'y', A_Y, sigma_eq('y'))]:
+    for ax_, c, s_, lab, sig_e in [(axs[0], cx, sx, 'x', sigma_eq('x')),
+                                   (axs[1], cy, sy, 'y', sigma_eq('y'))]:
         ax_.fill_between(s_ebe, 1e3 * (c - N_SIGMA * s_), 1e3 * (c + N_SIGMA * s_), color='C0', alpha=0.3,
                          label=f'injected bunch, $\\pm{N_SIGMA:g}\\sigma$ (turn 0)')
         ax_.plot(s_ebe, 1e3 * c, 'C0', lw=1.5, label='injected centroid')
         ax_.fill_between(s_st, 1e3 * (tw[lab][idx] - N_SIGMA * sig_e[idx]), 1e3 * (tw[lab][idx] + N_SIGMA * sig_e[idx]),
                          color='C1', alpha=0.5, label=f'stored beam at equilibrium, $\\pm{N_SIGMA:g}\\sigma$')
+        # the injected bunch once it is stored: turn 1 and the last tracked turn.
+        # In the zoom, the end of each turn (beam coming back to the septum) is drawn at s < 0.
+        for k_, (t_, en) in enumerate(env_stored.items()):
+            if en is None:
+                continue
+            ss = en['s'].copy()
+            col, ls = stored_style.get(k_, ('C6', ':'))
+            # zoom: start of the turn at s >= 0, end of the same turn (back at the septum)
+            # at s < 0, drawn as separate pieces
+            pieces = ([ss <= C - 10, ss > C - 10] if tag == 'injection_region' else [np.ones_like(ss, bool)])
+            for j_, pc in enumerate(pieces):
+                sp = ss[pc] - (C if (tag == 'injection_region' and j_ == 1) else 0)
+                cc, sg = en[lab][pc], en['s' + lab][pc]
+                for sign in (+1, -1):
+                    ax_.plot(sp, 1e3 * (cc + sign * N_SIGMA * sg), color=col, ls=ls, lw=1.3,
+                             label=(f'stored beam, turn {t_}, $\\pm{N_SIGMA:g}\\sigma$'
+                                    if (j_ == 0 and sign > 0) else None))
         cols = (2, 3) if lab == 'x' else (4, 5)
         s0, s1 = ap_seg[:, 0].copy(), ap_seg[:, 1].copy()
         if tag == 'injection_region':
@@ -419,9 +474,9 @@ for tag, xlim in [('injection_region', (s_sep[0] - 1, s_kick + 6)), ('full_ring'
         ax_.set_ylabel(f'{lab} [mm]'); ax_.grid(alpha=0.3)
     axs[0].plot(s_sep, [side * 1e3 * INJ['x_blade']] * 2, color='C2', lw=4, label='septum blade')
     axs[0].plot(s_sep, [side * 1e3 * (INJ['x_blade'] + BLADE_THICKNESS)] * 2, color='C2', lw=4)
-    axs[0].legend(fontsize=8, loc='lower right', ncol=2)
+    axs[0].legend(fontsize=7.5, loc='lower right', ncol=2)
     axs[1].set_xlabel('s from injection point [m]'); axs[1].set_xlim(*xlim)
-    axs[0].set_title(f'First-turn beam envelope (D{design} C{config} {phase}deg{"_" + changes if changes else ""}, {mode})')
+    axs[0].set_title(f'Beam envelope at injection (D{design} C{config} {phase}deg{"_" + changes if changes else ""}, {mode})')
     plt.tight_layout(); plt.savefig(f'{folder}/envelope_{tag}.png', dpi=150); plt.close()
 
 # ---- 3: phase space at the septum exit + normalised phase space at the kicker ----
