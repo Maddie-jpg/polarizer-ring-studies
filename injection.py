@@ -20,7 +20,7 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          cylindrical chamber: radius = widest point of the macroparticles.py
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
-         env: N_PARTICLES, N_TURNS, X_INJ, KICK_ERROR, MATCH_TWISS=1,
+         env: N_PARTICLES, N_TURNS, X_INJ, X_BLADE, KICK_ERROR, MATCH_TWISS=0,
               RUN_SCANS=1, SCAN_TURNS, APERTURE_R, N_SIGMA
 Outputs  Results/.../Injection/{mode}/
 
@@ -53,7 +53,9 @@ BEAM_FILE = cfg.INJECTED_BEAM_FILE
 N_PARTICLES = int(os.environ.get('N_PARTICLES', 500))
 SEED = 74
 MAHALANOBIS_R = None     # optional 6-D core cut (as filter_beam_core in macroparticles.py); None = keep main bunch
-MATCH_TWISS = _on(os.environ.get('MATCH_TWISS', '0'))         # rematch beam to ring Twiss at inj_point
+# Match the beam to the ring Twiss at inj_point (the transfer line delivers a matched beam),
+# as match_coordinates in macroparticles.py does. MATCH_TWISS=0 injects the beam file's optics as-is.
+MATCH_TWISS = _on(os.environ.get('MATCH_TWISS', '1'))
 DELTA_OFFSET = 0.0       # mean momentum offset of the injected bunch w.r.t. the ring
 
 # Gaussian stand-in, ONLY used if BEAM_FILE is missing
@@ -65,7 +67,7 @@ APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
 INJ = dict(septum_at='DrTripl::1', kicker_at='DrDoub::3',
            septum_length=0.8, kicker_offset=None,      # None = kicker in the centre of its drift
            target_dmu=0.25, septum_exit_offset=None,   # septum placed for exactly 90 deg to the kicker
-           x_blade=0.010, side=+1)
+           x_blade=float(os.environ.get('X_BLADE', 0.010)), side=+1)   # septum blade [m] (placeholder)
 BLADE_THICKNESS = 0.002           # [m]
 N_SIGMA = float(os.environ.get('N_SIGMA', 5))   # beam half-width in sigma: injection clearance and envelopes
 X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = blade + thickness + N_SIGMA sigma_x
@@ -211,7 +213,8 @@ print(f'  beam Twiss: betx = {bbx:.2f}, alfx = {abx:.2f} | ring: betx = {bx0:.2f
 def mismatch(b1, a1, b2, a2):
     return 0.5 * (b1 * (1 + a2**2) / b2 - 2 * a1 * a2 + b2 * (1 + a1**2) / b1)
 Bmag_x, Bmag_y = mismatch(bx0, ax0, bbx, abx), mismatch(by0, ay0, bby, aby)
-print(f'  mismatch factor B: x {Bmag_x:.2f}, y {Bmag_y:.2f} (emittance grows by B after filamentation)')
+print(f'  mismatch factor B of the beam file: x {Bmag_x:.2f}, y {Bmag_y:.2f}'
+      f'{" (removed by matching)" if MATCH_TWISS else " (emittance grows by B after filamentation)"}')
 
 if MATCH_TWISS:
     beam['x'], beam['px'] = rematch(beam['x'], beam['px'], bbx, abx, bx0, ax0)
