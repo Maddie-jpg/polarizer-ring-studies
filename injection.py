@@ -17,10 +17,11 @@ then cycled so s = 0 is the injection point: all turn-by-turn data are
 recorded there.
 
 Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
-         chamber sizes from macroparticles.py (PhysicalAperture/{mode}/
-         chamber_per_magnet_{mode}.csv) if present, else uniform A_X x A_Y
+         cylindrical chamber: radius = widest point of the macroparticles.py
+         chamber design, max(chamber_r) in PhysicalAperture/{mode}/
+         chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
          env: N_PARTICLES, N_TURNS, X_INJ, KICK_ERROR, MATCH_TWISS=1,
-              ENERGY_COMPRESSOR=1, RUN_SCANS=1, SCAN_TURNS, APERTURES=uniform
+              ENERGY_COMPRESSOR=1, RUN_SCANS=1, SCAN_TURNS, APERTURE_R
 Outputs  Results/.../Injection/{mode}/
 
 Run:     python injection.py   (or via run_full_sims.py)
@@ -61,8 +62,8 @@ DELTA_OFFSET = 0.0       # mean momentum offset of the injected bunch w.r.t. the
 FALLBACK_BEAM = dict(nemitt_x=13000e-6, nemitt_y=12000e-6, sigma_z=4.8e-3, sigma_delta=2e-3)
 
 # --- apertures and injection hardware ---
-APERTURES = os.environ.get('APERTURES', 'chamber')   # 'chamber' (macroparticles.py design) or 'uniform'
-A_X, A_Y = 0.0312, 0.0312        # uniform / fallback half apertures [m]
+APERTURE_R = os.environ.get('APERTURE_R', 'chamber')   # pipe radius [m], or 'chamber' = widest point of the design
+APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
 INJ = dict(septum_at='DrTripl::1', kicker_at='DrTripl::2',
            septum_offset=0.05, septum_length=0.8, kicker_offset=2.2,
            x_blade=0.010, side=+1)
@@ -88,20 +89,25 @@ rng = np.random.default_rng(SEED)
 pdr = paths.load_lattice(design, config, mode, phase, changes)
 ring = pdr.lines['ring']
 
-per_element = None
-if APERTURES == 'chamber':
+if APERTURE_R == 'chamber':
+    R_PIPE = APERTURE_R_FALLBACK
     ap_dir = paths.results_dir(design, config, phase, changes, metric='PhysicalAperture')
     for m_ in (mode, 'perfect'):
         f_ = os.path.join(ap_dir, m_, f'chamber_per_magnet_{m_}.csv')
         if os.path.exists(f_):
             ch = pd.read_csv(f_)
-            per_element = dict(zip(ch['name'], zip(ch['chamber_x'], ch['chamber_y'])))
-            print(f'Chamber apertures from {f_}')
+            R_PIPE = float(ch['chamber_r'].max())
+            print(f'Pipe radius = widest chamber point, {ch["name"][ch["chamber_r"].idxmax()]} '
+                  f'({R_PIPE*1e3:.2f} mm), from {f_}')
             break
     else:
-        print('No chamber_per_magnet csv (run macroparticles.py first): using uniform apertures')
-mc.install_apertures(pdr, a_x=A_X, a_y=A_Y, per_element=per_element)
-mc.install_injection(pdr, a_x=A_X, a_y=A_Y, **INJ)
+        print(f'No chamber_per_magnet csv (run macroparticles.py first): '
+              f'pipe radius {R_PIPE*1e3:.1f} mm')
+else:
+    R_PIPE = float(APERTURE_R)
+A_X = A_Y = R_PIPE
+mc.install_apertures(pdr, radius=R_PIPE)
+mc.install_injection(pdr, radius=R_PIPE, **INJ)
 ring.cycle(name_first_element='inj_point', inplace=True)   # s = 0 at the injection point
 
 ring.configure_radiation(model='mean')
@@ -347,7 +353,7 @@ summary = dict(
     k_inj_rad=float(k_nominal), kick_error=KICK_ERROR, kicker_intBdl_Tm=float(abs(k_nominal) * Brho),
     mismatch_x=float(Bmag_x), mismatch_y=float(Bmag_y), matched_twiss=MATCH_TWISS,
     eps_x_inj=float(ex_inj), eps_y_inj=float(ey_inj), eq_gemitt_x=float(tw.eq_gemitt_x),
-    damping_turns=[float(t) for t in tau_turns], a_x=A_X, a_y=A_Y, **{k: v for k, v in INJ.items()},
+    damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, **{k: v for k, v in INJ.items()},
     use_ecs=USE_ECS, ecs=ECS)
 with open(f'{folder}/injection_summary.json', 'w') as f:
     json.dump(summary, f, indent=4)
@@ -366,7 +372,7 @@ s_sep = (tw['s', 'inj_septum_entry'] - C, tw['s', 'inj_septum_exit'] - C)
 s_tw_wrapped = np.where(tw.s > C - 10, tw.s - C, tw.s)
 order_tw = np.argsort(s_tw_wrapped)
 
-# actual chamber: one segment per magnet (ap_<name>_in -> ap_<name>_out) and the septum
+# chamber: one segment per magnet (ap_<name>_in -> ap_<name>_out) and the septum blade
 _tab = ring.get_table()
 _s = dict(zip(_tab.name, _tab.s))
 ap_seg = []          # (s0, s1, +x, -x, +y, -y)

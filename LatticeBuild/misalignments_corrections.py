@@ -16,7 +16,7 @@ Errors           misalignments (magnets), misalignments_correctors, bpm_reading_
 Correction       orbit_correction, report_eigenvector_counts
 Workflow         prepare_seed_line  - misalign + (optionally) correct one seed
                  setup_spin_reference - set g-2 and energy for spin tracking
-Injection        install_apertures  - chamber apertures on every magnet
+Injection        install_apertures  - cylindrical chamber aperture on every magnet
                  install_injection  - septum blade, injection point, kicker (injection.py)
 
 All error sigmas are in m (shifts) and rad (rolls). Defaults live in config.py.
@@ -1000,24 +1000,22 @@ def prepare_seed_line(base_line, seed, correct, *,
 # Apertures and injection hardware (used by injection.py)
 # ===========================================================================
 
-def install_apertures(pdr, a_x=0.0312, a_y=0.0312, per_element=None, per_type=None,
-                      line_name='ring',
+def install_apertures(pdr, radius=0.0312, line_name='ring',
                       element_types=('Bend', 'Quadrupole', 'Sextupole'),
                       both_ends=True):
-    """Install elliptical chamber apertures (xt.LimitEllipse) at the entry
-    (and exit, if both_ends) of every element of `element_types`.
+    """Model the vacuum chamber as a cylindrical pipe of constant `radius` [m]:
+    a circular xt.LimitEllipse (a = b = radius) at the entry (and exit, if
+    both_ends) of every element of `element_types`.
 
-    Half-axes [m] are taken, in order of priority, from
-        per_element : {element name: (a, b)}, e.g. from macroparticles.py's
-                      chamber_per_magnet_{mode}.csv (chamber_x, chamber_y)
-        per_type    : {element type: (a, b)}, e.g. {'Quadrupole': (0.038, 0.038)}
-        a_x, a_y    : uniform default
+    Use the widest point of the chamber design for the radius, e.g.
+    max(chamber_r) of macroparticles.py's chamber_per_magnet_{mode}.csv.
+    Every drift sits between two magnets and a straight line has its largest
+    offset at its ends, so apertures at the magnet ends cover the drifts too.
 
     Without apertures a particle is only flagged lost when its motion blows
     up, so survival would only reflect the dynamic aperture. Apertures are
     named 'ap_<element>_in' / 'ap_<element>_out' and are not shifted with
-    misaligned magnets (a perfectly aligned chamber). A second call does
-    nothing.
+    misaligned magnets. A second call does nothing.
     """
     ring = pdr.lines[line_name]
     tab = ring.get_table()
@@ -1025,43 +1023,31 @@ def install_apertures(pdr, a_x=0.0312, a_y=0.0312, per_element=None, per_type=No
         print('install_apertures: apertures already present, skipping.')
         return ring
 
-    per_element = per_element or {}
-    per_type = per_type or {}
-    mask = np.isin(tab.element_type, element_types)
-    names = list(dict.fromkeys(tab.name[mask]))
-    types = dict(zip(tab.name[mask], tab.element_type[mask]))
-
-    places, n_from = [], {'element': 0, 'type': 0, 'default': 0}
+    names = list(dict.fromkeys(tab.name[np.isin(tab.element_type, element_types)]))
+    places = []
     for nn in names:
-        if nn in per_element:
-            ab, src = per_element[nn], 'element'
-        elif types[nn] in per_type:
-            ab, src = per_type[types[nn]], 'type'
-        else:
-            ab, src = (a_x, a_y), 'default'
-        n_from[src] += 1
         ends = [('in', 'start'), ('out', 'end')] if both_ends else [('in', 'start')]
         for tag, anchor in ends:
             ap_name = f'ap_{nn}_{tag}'
-            pdr.new(ap_name, xt.LimitEllipse, a=float(ab[0]), b=float(ab[1]))
+            pdr.new(ap_name, xt.LimitEllipse, a=float(radius), b=float(radius))
             places.append(pdr.place(ap_name, at=0.0, from_=nn, from_anchor=anchor))
 
     ring.insert(places, with_progress=False)
-    print(f'install_apertures: {len(places)} apertures on {len(names)} magnets '
-          f'(sizes per element: {n_from["element"]}, per type: {n_from["type"]}, '
-          f'default {a_x*1e3:.1f} x {a_y*1e3:.1f} mm: {n_from["default"]})')
+    print(f'install_apertures: cylindrical chamber, r = {radius*1e3:.2f} mm '
+          f'({len(places)} apertures on {len(names)} magnets)')
     return ring
 
 
 def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
                       septum_offset=0.05, septum_length=0.8, kicker_offset=2.2,
-                      x_blade=0.010, a_x=0.0312, a_y=0.0312, side=+1,
+                      x_blade=0.010, radius=0.0312, side=+1,
                       line_name='ring'):
     """Install a single-turn, off-axis injection system:
 
       inj_septum_entry / inj_septum_exit : xt.LimitRect at the two ends of the
             septum, the blade as seen by the CIRCULATING beam: anything beyond
-            x_blade on the injection side is lost.
+            x_blade on the injection side is lost (elsewhere bounded by the
+            pipe `radius`, as in install_apertures).
       inj_point  : xt.Marker just downstream of the septum exit, where the
             injected bunch is created. The septum field only acts on the
             injected beam, so it is not part of the ring.
@@ -1087,8 +1073,8 @@ def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
         if ss > tab.s[idx + 1]:
             raise ValueError(f'install_injection: element does not fit inside {nn}')
 
-    lims = (dict(min_x=-a_x, max_x=x_blade, min_y=-a_y, max_y=a_y) if side > 0 else
-            dict(min_x=-x_blade, max_x=a_x, min_y=-a_y, max_y=a_y))
+    lims = (dict(min_x=-radius, max_x=x_blade, min_y=-radius, max_y=radius) if side > 0 else
+            dict(min_x=-x_blade, max_x=radius, min_y=-radius, max_y=radius))
 
     pdr['k_inj'] = 0.0
     pdr.new('inj_septum_entry', xt.LimitRect, **lims)
