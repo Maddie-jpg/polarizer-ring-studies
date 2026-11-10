@@ -94,6 +94,8 @@ Results/
         ├── Spin/
         │   ├── Scan/                     spin_tracking.py (misaligned vs corrected)
         │   └── Seed_{seed}/              spin_tracking_single_seed.py
+        ├── Injection/{mode}/             injection.py: septum + kicker injection, first-turn
+        │                                 envelope, beam size / emittance vs turn, loss map
         ├── PhysicalAperture/             macroparticles.py: chamber sizing and pole-tip fields
         └── ToleranceScan/                tolerance_scan.py (BeamStayClear/ = aperture it tracks with)
 ```
@@ -106,6 +108,7 @@ Results/
 | `analysis.py` | Beam optics, tunes, damping, polarization, DA/MA. |
 | `spin_tracking.py`,`spin_tracking_single_seed.py` | Spin-tracking / depolarization studies (single seed or multiple cases). |
 | `macroparticles.py`| Injection efficiency simulations using the macroparticle distributions from the positron linac.|
+| `injection.py` | Single-turn off-axis injection with a septum and a fast kicker: kicker strength from the optics, first-turn envelope against the chamber, beam size and emittance vs turn (damping), losses, optional kicker-error / energy-offset scans (`RUN_SCANS=1`). The chamber is a cylindrical pipe with the radius of the widest point of the `macroparticles.py` chamber design (`mc.install_apertures`, `mc.install_injection`). |
 | `config.py` | **Single source** of beam energy, RF, default working points, error sigmas, seeds and the default study. (`constants.py` is a deprecated alias.) |
 | `paths.py` | Where lattices and results live: `lattice_json_path`, `load_lattice`, `results_dir`, `study_from_env`. Works from any directory. |
 | `tolerance_scan.py` | Alignment/field-error tolerance scan (`--help` for options). Tracks with its own beam-stay-clear aperture (99.9 % beam containment + closed-orbit allowance), which is separate from the chamber design in `macroparticles.py`. |
@@ -135,6 +138,7 @@ All scripts can be launched from any folder.
 | One misaligned (and corrected) machine | `line = mc.prepare_seed_line(pdr.lines['ring'], seed, correct=True)` |
 | Orbit correction with threading fallback | `mc.correct_orbit_with_fallback(line, twiss, seed)` |
 | Spin-tracking reference particle | `mc.setup_spin_reference(line)` |
+| Chamber apertures / injection hardware | `mc.install_apertures(pdr, radius)`, `mc.install_injection(pdr, radius=...)` |
 | Constants, sigmas, seeds | `import config as cfg` → `cfg.E0`, `cfg.MISALIGN_SIGMA`, ... |
 
 (`mc` is `LatticeBuild.misalignments_corrections`.) Corrector errors always use `seed + 1`, so a seed number fully defines a machine.

@@ -16,6 +16,8 @@ Errors           misalignments (magnets), misalignments_correctors, bpm_reading_
 Correction       orbit_correction, report_eigenvector_counts
 Workflow         prepare_seed_line  - misalign + (optionally) correct one seed
                  setup_spin_reference - set g-2 and energy for spin tracking
+Injection        install_apertures  - cylindrical chamber aperture on every magnet
+                 install_injection  - septum blade, injection point, kicker (injection.py)
 
 All error sigmas are in m (shifts) and rad (rolls). Defaults live in config.py.
 """
@@ -995,132 +997,97 @@ def prepare_seed_line(base_line, seed, correct, *,
 
 
 # ===========================================================================
-# Injection hardware
-#
-# An injection septum in one long straight and a fast kicker in another.
-#
-# The septum is inserted FIELD-FREE (knob at 0). That is deliberate: the
-# septum only deflects the beam coming in from the transfer line, which
-# passes on the far side of the blade, while the circulating beam this
-# lattice describes sees nothing but drift. Giving it a strength here would
-# steer the stored beam, which is exactly what a septum must not do. The
-# knob exists so the injected trajectory can be tracked through it on a
-# separate line if wanted.
-#
-# The kicker is a thin horizontal deflector with its strength on a knob,
-# since the kick is the free parameter of the injection study.
+# Apertures and injection hardware (used by injection.py)
 # ===========================================================================
 
-INJ_KICK_KNOB = 'k_inj_kick'        # [rad] horizontal kick, the free parameter
-INJ_SEPT_KNOB = 'k_inj_septum'      # [rad] septum bend, 0 for the stored beam
-INJ_BLADE_VAR = 'septum_blade'      # [m] septum blade thickness
+def install_apertures(pdr, radius=0.0312, line_name='ring',
+                      element_types=('Bend', 'Quadrupole', 'Sextupole'),
+                      both_ends=True):
+    """Model the vacuum chamber as a cylindrical pipe of constant `radius` [m]:
+    a circular xt.LimitEllipse (a = b = radius) at the entry (and exit, if
+    both_ends) of every element of `element_types`.
 
+    Use the widest point of the chamber design for the radius, e.g.
+    max(chamber_r) of macroparticles.py's chamber_per_magnet_{mode}.csv.
+    Every drift sits between two magnets and a straight line has its largest
+    offset at its ends, so apertures at the magnet ends cover the drifts too.
 
-def straight_slots(line, drift_base='DrTripl', min_length=0.0):
-    """Every long straight drift, as dicts with name, s, length and s_centre.
-
-    Length is taken from consecutive s, never from el.length: as soon as the
-    ring has a tracker -- or anything has been inserted into it -- these are
-    DriftSlice objects, which carry weight x parent length and whose .length
-    attribute raises. The s difference is exact for thick, thin and sliced
-    elements alike.
-    """
-    tab = line.get_table()
-    names = list(tab.name)
-    s = np.asarray(tab.s, dtype=float)
-    out = []
-    for i, n in enumerate(names):
-        if not n.startswith(drift_base):
-            continue
-        L = float(s[i + 1] - s[i]) if i + 1 < len(s) else 0.0
-        if L >= min_length:
-            out.append(dict(name=n, s=float(s[i]), length=L,
-                            s_centre=float(s[i]) + L / 2.0))
-    return out
-
-
-def insert_injection(pdr, line_name='ring', septum_slot=0, kicker_slot=1,
-                     septum_length=0.6, kicker_length=0.3, septum_blade=3e-3,
-                     drift_base='DrTripl', margin=0.05, verbose=True):
-    """Insert an injection septum and a fast kicker in two long straights.
-
-    septum_slot, kicker_slot index the straights that are long enough for
-    the hardware, in s order. Numbering is the same for both, so the short
-    stubs the RF cavity leaves behind when it splits its own drift are
-    skipped once rather than shifting one index and not the other. The two
-    must differ: in the same straight sin(dmu) ~ 0 and the kicker has no
-    lever arm at the septum.
-
-    Elements added (all named Inj*, so an extraction set can be added later
-    under its own prefix without clashing):
-
-        Sept_inj_in   marker at the upstream face of the septum -- the
-                      'entrance into the septum' the clearance is judged at
-        Sept_inj      the septum body, field-free (see the note above)
-        Kick_inj      the fast kicker, strength on the INJ_KICK_KNOB knob
-
-    Returns a dict describing what went where, for the analysis to use.
+    Without apertures a particle is only flagged lost when its motion blows
+    up, so survival would only reflect the dynamic aperture. Apertures are
+    named 'ap_<element>_in' / 'ap_<element>_out' and are not shifted with
+    misaligned magnets. A second call does nothing.
     """
     ring = pdr.lines[line_name]
+    tab = ring.get_table()
+    if any(nn.startswith('ap_') for nn in tab.name):
+        print('install_apertures: apertures already present, skipping.')
+        return ring
 
-    # One candidate list for both, sized by the larger element, so a slot
-    # number means the same straight whichever element goes in it. Filtering
-    # the two independently would make slot 0 and slot 2 land in the same
-    # drift, because the short stubs the RF leaves behind pass the kicker's
-    # smaller requirement but not the septum's.
-    need = max(septum_length, kicker_length) + margin
-    slots = straight_slots(ring, drift_base)
-    free = [sl for sl in slots if sl['length'] >= need]
-    for what, idx in (('septum_slot', septum_slot), ('kicker_slot', kicker_slot)):
-        if idx >= len(free):
-            raise RuntimeError(
-                f'insert_injection: {what}={idx} but only {len(free)} '
-                f'straight(s) are >= {need:.2f} m. Lengths found: '
-                f'{[round(sl["length"], 2) for sl in slots]}')
+    names = list(dict.fromkeys(tab.name[np.isin(tab.element_type, element_types)]))
+    places = []
+    for nn in names:
+        ends = [('in', 'start'), ('out', 'end')] if both_ends else [('in', 'start')]
+        for tag, anchor in ends:
+            ap_name = f'ap_{nn}_{tag}'
+            pdr.new(ap_name, xt.LimitEllipse, a=float(radius), b=float(radius))
+            places.append(pdr.place(ap_name, at=0.0, from_=nn, from_anchor=anchor))
 
-    sept = free[septum_slot]
-    kick = free[kicker_slot]
-    if sept['name'] == kick['name']:
-        raise RuntimeError(
-            f'insert_injection: septum and kicker both land in {sept["name"]}. '
-            f'Pick different slots -- in the same straight the phase advance '
-            f'between them is ~0 and the kicker cannot displace the beam at '
-            f'the septum.')
+    ring.insert(places, with_progress=False)
+    print(f'install_apertures: cylindrical chamber, r = {radius*1e3:.2f} mm '
+          f'({len(places)} apertures on {len(names)} magnets)')
+    return ring
 
-    # Both s values are taken BEFORE either insert, and inserting at an
-    # absolute s carves the drift without moving anything downstream, so the
-    # second placement is unaffected by the first.
-    s_sept_c = sept['s_centre']
-    s_kick_c = kick['s_centre']
-    s_sept_in = s_sept_c - septum_length / 2.0
 
-    pdr[INJ_KICK_KNOB] = 0.0
-    pdr[INJ_SEPT_KNOB] = 0.0
-    pdr[INJ_BLADE_VAR] = float(septum_blade)
+def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
+                      septum_offset=0.05, septum_length=0.8, kicker_offset=2.2,
+                      x_blade=0.010, radius=0.0312, side=+1,
+                      line_name='ring'):
+    """Install a single-turn, off-axis injection system:
 
-    ring.insert(pdr.new('Sept_inj', xt.Multipole,
-                        knl=[pdr.ref[INJ_SEPT_KNOB]], length=septum_length),
-                at=s_sept_c)
-    ring.insert(pdr.new('Sept_inj_in', xt.Marker), at=s_sept_in)
-    ring.insert(pdr.new('Kick_inj', xt.Multipole,
-                        knl=[pdr.ref[INJ_KICK_KNOB]], length=kicker_length),
-                at=s_kick_c)
+      inj_septum_entry / inj_septum_exit : xt.LimitRect at the two ends of the
+            septum, the blade as seen by the CIRCULATING beam: anything beyond
+            x_blade on the injection side is lost (elsewhere bounded by the
+            pipe `radius`, as in install_apertures).
+      inj_point  : xt.Marker just downstream of the septum exit, where the
+            injected bunch is created. The septum field only acts on the
+            injected beam, so it is not part of the ring.
+      inj_kicker : thin xt.Multipole with knl[0] on the env knob 'k_inj'
+            (xtrack: dpx = -knl[0]), set to 0 here; injection.py sets it.
 
-    info = dict(septum='Sept_inj', septum_entry='Sept_inj_in',
-                kicker='Kick_inj',
-                s_septum=s_sept_c, s_septum_entry=s_sept_in,
-                s_kicker=s_kick_c,
-                septum_length=septum_length, kicker_length=kicker_length,
-                septum_blade=float(septum_blade),
-                septum_drift=sept['name'], kicker_drift=kick['name'],
-                kick_knob=INJ_KICK_KNOB, septum_knob=INJ_SEPT_KNOB)
-    if verbose:
-        print(f'insert_injection: {len(slots)} long straights, '
-              f'{len(free)} long enough for the hardware')
-        print(f'   Sept_inj   {septum_length:.2f} m at s = {s_sept_c:8.3f} m '
-              f'(in {sept["name"]}, {sept["length"]:.2f} m), '
-              f'blade {septum_blade*1e3:.1f} mm, field-free')
-        print(f'   Kick_inj   {kicker_length:.2f} m at s = {s_kick_c:8.3f} m '
-              f'(in {kick["name"]}, {kick["length"]:.2f} m), '
-              f'strength on {INJ_KICK_KNOB}')
-    return info
+    Positions are offsets [m] from the start of the drifts `septum_at` and
+    `kicker_at`. The defaults put the septum at the start of the first triplet
+    drift of the RF-free straight and the kicker near the end of the second,
+    which gives dmu_x ~ 0.24 on D1 C9 90deg_FDF. side=+1 injects from +x.
+    """
+    ring = pdr.lines[line_name]
+    tab = ring.get_table()
+    if 'inj_point' in tab.name:
+        print('install_injection: injection elements already present, skipping.')
+        return ring
+
+    s_sep0 = tab['s', septum_at] + septum_offset
+    s_sep1 = s_sep0 + septum_length
+    s_kick = tab['s', kicker_at] + kicker_offset
+    for nn, ss in [(septum_at, s_sep1), (kicker_at, s_kick)]:
+        idx = list(tab.name).index(nn)
+        if ss > tab.s[idx + 1]:
+            raise ValueError(f'install_injection: element does not fit inside {nn}')
+
+    lims = (dict(min_x=-radius, max_x=x_blade, min_y=-radius, max_y=radius) if side > 0 else
+            dict(min_x=-x_blade, max_x=radius, min_y=-radius, max_y=radius))
+
+    pdr['k_inj'] = 0.0
+    pdr.new('inj_septum_entry', xt.LimitRect, **lims)
+    pdr.new('inj_septum_exit', xt.LimitRect, **lims)
+    pdr.new('inj_point', xt.Marker)
+    pdr.new('inj_kicker', xt.Multipole, knl=['k_inj'])
+    ring.insert([
+        pdr.place('inj_septum_entry', at=s_sep0),
+        pdr.place('inj_septum_exit', at=s_sep1),
+        pdr.place('inj_point', at=s_sep1 + 1e-4),   # just downstream of the blade
+        pdr.place('inj_kicker', at=s_kick),
+    ], with_progress=False)
+
+    print(f'install_injection: septum {s_sep0:.2f}-{s_sep1:.2f} m, injection point '
+          f'{s_sep1 + 1e-4:.2f} m, kicker {s_kick:.2f} m, blade at x = {side*x_blade*1e3:.1f} mm')
+    return ring
