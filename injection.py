@@ -21,7 +21,7 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
          env: N_PARTICLES, N_TURNS, X_INJ, KICK_ERROR, MATCH_TWISS=1,
-              ENERGY_COMPRESSOR=1, RUN_SCANS=1, SCAN_TURNS, APERTURE_R, N_SIGMA
+              RUN_SCANS=1, SCAN_TURNS, APERTURE_R, N_SIGMA
 Outputs  Results/.../Injection/{mode}/
 
 Run:     python injection.py   (or via run_full_sims.py)
@@ -53,8 +53,6 @@ BEAM_FILE = cfg.INJECTED_BEAM_FILE
 N_PARTICLES = int(os.environ.get('N_PARTICLES', 500))
 SEED = 74
 MAHALANOBIS_R = None     # optional 6-D core cut (as filter_beam_core in macroparticles.py); None = keep main bunch
-USE_ECS = _on(os.environ.get('ENERGY_COMPRESSOR', 'false'))   # off by default: the beam file is already compressed
-ECS = dict(R56=0.352963, Vdeb=-0.048365, Phasdeb=0.29229, freq=3e9)
 MATCH_TWISS = _on(os.environ.get('MATCH_TWISS', '0'))         # rematch beam to ring Twiss at inj_point
 DELTA_OFFSET = 0.0       # mean momentum offset of the injected bunch w.r.t. the ring
 
@@ -129,7 +127,7 @@ print(f'At inj_point: betx = {bx0:.2f} m, alfx = {ax0:.2f}, Dx = {dx0:.3f} m')
 
 # %%
 # ============================================================
-# BEAM: linac distribution (+ ECS), centred, optional Twiss rematch
+# BEAM: injected distribution (energy compression is done upstream), centred, optional Twiss rematch
 # ============================================================
 def select_main_bunch(df, t_col='t[mm/c]', mad_k=10):
     """Same selection as macroparticles.py: drop satellites far from the median t."""
@@ -148,13 +146,6 @@ def filter_beam_core(df, mahalanobis_r):
     keep = np.einsum('ij,jk,ik->i', d, inv, d) <= mahalanobis_r**2
     print(f'Core filter (Mahalanobis r = {mahalanobis_r}): kept {keep.sum()} / {len(df)}')
     return df[keep]
-
-
-def apply_ecs(z, delta, R56, Vdeb, Phasdeb, freq):
-    """Energy compressor: chicane (R56) then RF (Vdeb, Phasdeb). z in m."""
-    k = 2 * np.pi * freq / 299792458.0
-    z_f = z + R56 * delta
-    return z_f, delta + Vdeb * np.sin(k * z_f + Phasdeb)
 
 
 def twiss_from_beam(u, up):
@@ -182,8 +173,6 @@ def load_beam():
         z = df['t[mm/c]'].values * 1e-3                  # c*t [m], larger = later
         p = df['p[MeV/c]'].values
         delta = p / p.mean() - 1
-        if USE_ECS:
-            z, delta = apply_ecs(z, delta, **ECS)
         zeta = -(z - z.mean()) * beta0                  # xsuite: zeta > 0 = ahead
         source = BEAM_FILE
     else:
@@ -354,8 +343,7 @@ summary = dict(
     k_inj_rad=float(k_nominal), kick_error=KICK_ERROR, kicker_intBdl_Tm=float(abs(k_nominal) * Brho),
     mismatch_x=float(Bmag_x), mismatch_y=float(Bmag_y), matched_twiss=MATCH_TWISS,
     eps_x_inj=float(ex_inj), eps_y_inj=float(ey_inj), eq_gemitt_x=float(tw.eq_gemitt_x),
-    damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, **{k: v for k, v in INJ.items()},
-    use_ecs=USE_ECS, ecs=ECS)
+    damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, **{k: v for k, v in INJ.items()})
 with open(f'{folder}/injection_summary.json', 'w') as f:
     json.dump(summary, f, indent=4)
 print(f'Injection efficiency: {summary["efficiency_percent"]:.1f} %  -> {folder}')
