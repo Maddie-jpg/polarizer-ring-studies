@@ -437,12 +437,23 @@ def _index_of(rows, name):
     raise KeyError(f"element '{name}' not found in this line")
 
 
-def _slice_rows(rows, start_name, end_name):
-    """Inclusive slice of rows between two element names."""
+def _slice_rows(rows, start_name, end_name, exclusive_end=False):
+    """Slice of rows between two element names, inclusive by default.
+
+    exclusive_end drops the end element and any zero-length markers sitting
+    on the boundary with it. A span is given by NAMES, and the drifts
+    between magnets all share one name (Drarc), so a boundary like "the
+    drift before the next quad" cannot be named -- it has to be expressed
+    as the quad, excluded.
+    """
     i0 = _index_of(rows, start_name)
     i1 = _index_of(rows, end_name)
     if i1 < i0:
         i0, i1 = i1, i0
+    if exclusive_end:
+        i1 -= 1
+        while i1 > i0 and rows[i1]['length'] == 0:
+            i1 -= 1
     return rows[i0:i1 + 1]
 
 
@@ -589,9 +600,12 @@ def draw_beamline(ax, rows, title=None, show_drifts=True,
                                        edgecolor='black',
                                        linewidth=0.7, zorder=4))
 
-            ax.text(xc, Y_DIAG + DIAG_H + 0.08, r['name'], rotation=90,
-                    ha='center', va='bottom', fontsize=6.0,
-                    color=r['colour'], zorder=5)
+            # Diagnostics names follow show_names like the magnet names do,
+            # so turning names off leaves no element text anywhere.
+            if names_on:
+                ax.text(xc, Y_DIAG + DIAG_H + 0.08, r['name'], rotation=90,
+                        ha='center', va='bottom', fontsize=6.0,
+                        color=r['colour'], zorder=5)
 
     # ---- injection point: a full-height flag --------------------------
     for r in [d for d in diags if d['kind'] == 'inj']:
@@ -761,7 +775,8 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
     Work out, from the element names actually present, where each distinct
     cell type starts and ends in one sextant.
 
-    Returns an ordered dict  {label: (start_name, end_name)}.
+    Returns an ordered dict  {label: (start_name, end_name)} or
+    {label: (start_name, end_name, exclusive_end)}.
 
     The naming convention assumed is the one used throughout
     linear_optics.py:
@@ -803,7 +818,10 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
         for a, b in zip(qfa[:-1], qfa[1:]):
             ia, ib = _index_of(rows, a), _index_of(rows, b)
             if any(r['kind'] in ('sext_f', 'sext_d') for r in rows[ia:ib + 1]):
-                spans['Arc cell with sextupoles'] = (a, b)
+                # Exclusive end: the cell runs up to, but not including, the
+                # next QFA. Ending on it drew the first quad of the
+                # following cell as if it belonged to this one.
+                spans['Arc cell with sextupoles'] = (a, b, True)
                 break
 
     # --- matching cell ----------------------------------------------
@@ -833,6 +851,12 @@ def discover_cells(pdr, sextant='1R', line_name='ring'):
             break
     if head and tail:
         spans['Straight section (insertion)'] = (head, tail)
+
+    # --- dispersion suppressor and triplet as one span ---------------
+    # They are matched as a unit, so the write-up wants them in one figure;
+    # the separate 'Dispersion suppressor' above is kept for the detail.
+    if have(f'QFDS_{sextant}') and tail:
+        spans['Dispersion suppressor and triplet'] = (f'QFDS_{sextant}', tail)
 
     # --- wiggler period, if wigglers were inserted -------------------
     wig = sorted([n for n in present if re.match(r'^WigPos_.*_p0$', n)])
@@ -953,9 +977,11 @@ def sketch_cell_types(pdr, sextant='1R', line_name='ring', spans=None,
     spans = spans or discover_cells(pdr, sextant, line_name)
 
     figs = {}
-    for label, (a, b) in spans.items():
+    for label, span in spans.items():
+        a, b, *rest = span
+        excl = bool(rest[0]) if rest else False
         try:
-            rows = _slice_rows(rows_all, a, b)
+            rows = _slice_rows(rows_all, a, b, exclusive_end=excl)
         except KeyError as e:
             print(f'sketch_cell_types: skipping {label!r} -- {e}')
             continue
@@ -1147,6 +1173,189 @@ def sketch_arc(pdr, sextant='1R', line_name='ring', outdir=None, dpi=200,
         tag = '_beam' if beam is not None else ''
         fig.savefig(os.path.join(outdir, f'arc_{sextant}{tag}.png'),
                     dpi=dpi, bbox_inches='tight')
+    return fig
+
+
+def _survey_sections(line):
+    """Sections of `line` found from its magnet names, as a list of
+    (label, s_start, s_end) in s order. For every sextant tag T (taken from
+    the dispersion-suppressor quad QFDS_T) the sections are
+
+        FODO cells             QFA_T*/QDA_T* (not the matching quads)
+        matching cell          QFA_MT*/QDA_MT*
+        dispersion suppressor  QFDS_T .. BendDS_T
+        doublet                QDDoub_T / QFDoub_T
+        triplet                QFTrip_T* .. QDTripC_T*
+
+    ordered arc -> straight for an R sextant and mirrored for an L one.
+    Neighbouring sections with the same label (the two triplet halves at a
+    straight centre, the FODO cells either side of an arc centre) are merged.
+    """
+    tab = line.get_table()
+    names = [str(n).split('::')[0] for n in tab.name]
+    s = np.asarray(tab.s, dtype=float)
+    s_end = np.append(s[1:], s[-1])
+
+    def where(pattern):
+        rx = re.compile(pattern)
+        idx = [i for i, n in enumerate(names) if rx.match(n)]
+        return (min(s[i] for i in idx), max(s_end[i] for i in idx)) if idx else None
+
+    tags = sorted({n[len('QFDS_'):] for n in names if n.startswith('QFDS_')})
+    sections = []
+    for T in tags:
+        t = re.escape(T)
+        fodo = where(rf'^Q[FD]A_{t}(\d+|CH?)$')
+        match = where(rf'^Q[FD]A_M{t}\d*$')
+        ds_q, ds_b = where(rf'^QFDS_{t}$'), where(rf'^BendDS_{t}$')
+        dbl = where(rf'^Q[FD]Doub_{t}$')
+        trip = where(rf'^Q[FD]Trip(C)?_{t}\d*H?$')
+        if ds_q is None:
+            continue
+        arc = fodo or match
+        r_like = arc is None or arc[0] < ds_q[0]
+        if r_like:
+            if fodo:
+                sections.append(('FODO cells', fodo[0], (match or ds_q)[0]))
+            if match:
+                sections.append(('matching cell', match[0], ds_q[0]))
+            if ds_b:
+                sections.append(('dispersion suppressor', ds_q[0], ds_b[1]))
+        else:
+            if ds_b:
+                sections.append(('dispersion suppressor', ds_b[0], ds_q[1]))
+            if match:
+                sections.append(('matching cell', ds_q[1], match[1]))
+            if fodo:
+                sections.append(('FODO cells', (match or ds_q)[1], fodo[1]))
+        if dbl:
+            sections.append(('doublet', dbl[0], dbl[1]))
+        if trip:
+            sections.append(('triplet', trip[0], trip[1]))
+
+    sections.sort(key=lambda x: x[1])
+    merged = []
+    for lab, a, b in sections:
+        if merged and merged[-1][0] == lab and a - merged[-1][2] < 2.0:
+            merged[-1] = (lab, merged[-1][1], max(b, merged[-1][2]))
+        else:
+            merged.append((lab, a, b))
+    return merged
+
+
+A4_TEXT_WIDTH_IN = 6.3      # 16 cm: the text width of an A4 page with 2.5 cm margins
+
+
+def survey_sections(line, ax=None, figsize=None, element_width=None,
+                    matching_cell=True, outdir=None, fname='survey_sections.png',
+                    dpi=200, a4=False):
+    """
+    xtrack's floor plot of `line` (line.survey().plot()) with the FODO cells,
+    matching cell, dispersion suppressor, doublet and triplet labelled on it.
+
+    Each section gets a bracket running parallel to the beamline, with its
+    name written along it. Brackets alternate between the outside and the
+    inside of the bend so that short neighbouring sections (doublet, triplet)
+    don't overlap. Works on a sextant line (e.g. 'arc1R'), a period or the
+    ring. matching_cell=False leaves the matching cell unlabelled.
+    figsize=None scales the figure with the size of the line (about 3 m of
+    floor per inch, at least 9 x 7 in), so labels on a period or the whole
+    ring stay as readable as on one sextant.
+    a4=True draws the figure at the A4 text width (16 cm) with 9-10 pt text,
+    so it goes into a dissertation at 100 % scale (width = the text width)
+    without the text shrinking, and also saves a vector PDF next
+    to the PNG (300 dpi).
+    Returns the Figure.
+    """
+    import xplt
+    sv = line.survey()
+    sz = np.asarray(sv.Z, dtype=float)
+    sxx = np.asarray(sv.X, dtype=float)
+    ss = np.asarray(sv.s, dtype=float)
+    extent = max(np.ptp(sz), np.ptp(sxx), 1.0)
+    if element_width is None:
+        element_width = 0.03 * extent
+
+    fs_label, fs_tick, fs_axis, fs_leg, lw = 9, 10, 11, 10, 1.1
+    if a4:
+        fs_label, fs_tick, fs_axis, fs_leg, lw = 9, 9, 10, 8, 0.9
+        dpi = max(dpi, 300)
+    if ax is None:
+        if figsize is None:
+            if a4:
+                figsize = (A4_TEXT_WIDTH_IN, 0.8 * A4_TEXT_WIDTH_IN)
+            else:
+                w = max(9.0, extent / 3.0)
+                figsize = (w, 0.78 * w)
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+    plt.sca(ax)
+    sv.plot(element_width=element_width, legend=False, ax=ax)
+
+    def point(sq):
+        return np.interp(sq, ss, sz), np.interp(sq, ss, sxx)
+
+    # Which side is outside the bend: the curve turns clockwise in the
+    # (Z, X) plot when the total turn is negative.
+    th = np.unwrap(np.arctan2(np.gradient(sxx), np.gradient(sz) + 1e-30))
+    turn = th[-1] - th[0]
+    out_sign = 1.0 if turn <= 0 else -1.0
+
+    d = 0.045 * extent              # bracket distance from the beamline
+    tick = 0.012 * extent
+    sections = [x for x in _survey_sections(line)
+                if matching_cell or x[0] != 'matching cell']
+    pts = [np.column_stack([sz, sxx])]
+    for k, (lab, a, b) in enumerate(sections):
+        side = out_sign * (1.0 if k % 2 == 0 else -1.0)
+        sq = np.linspace(a, b, 60)
+        z, x = point(sq)
+        dz, dx = np.gradient(z), np.gradient(x)
+        nrm = np.hypot(dz, dx) + 1e-30
+        nz, nx = -dx / nrm * side, dz / nrm * side       # normal on this side
+        bz, bx = z + d * nz, x + d * nx
+        ax.plot(bz, bx, color='0.25', lw=lw, zorder=6)
+        for i in (0, -1):
+            ax.plot([bz[i] - tick * nz[i], bz[i] + tick * nz[i]],
+                    [bx[i] - tick * nx[i], bx[i] + tick * nx[i]],
+                    color='0.25', lw=lw, zorder=6)
+        m = len(sq) // 2
+        ang = np.degrees(np.arctan2(dx[m], dz[m]))
+        if ang > 90:
+            ang -= 180
+        elif ang < -90:
+            ang += 180
+        text = lab.replace('dispersion suppressor', 'dispersion\nsuppressor') \
+            if a4 else lab
+        off = (1.25 if '\n' in text else 0.9) * d
+        tz, tx = bz[m] + off * nz[m], bx[m] + off * nx[m]
+        ax.text(tz, tx, text, rotation=ang, rotation_mode='anchor',
+                ha='center', va='center', fontsize=fs_label, color='0.15',
+                zorder=7, linespacing=1.0,
+                bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none',
+                          alpha=0.85))
+        pts.append(np.column_stack([tz + 0 * bz, tx + 0 * bx]))
+
+    allp = np.vstack(pts)
+    pad = 2.5 * d
+    ax.set_xlim(allp[:, 0].min() - pad, allp[:, 0].max() + pad)
+    ax.set_ylim(allp[:, 1].min() - pad, allp[:, 1].max() + pad)
+    ax.set_aspect('equal', adjustable='datalim')
+    ax.tick_params(labelsize=fs_tick)
+    ax.set_xlabel(ax.get_xlabel(), fontsize=fs_axis)
+    ax.set_ylabel(ax.get_ylabel(), fontsize=fs_axis)
+    # Legend where the floor plot is empty: away from the start of the line
+    # and the side it bends towards.
+    ax.legend(fontsize=fs_leg, framealpha=0.95,
+              loc='lower left' if out_sign > 0 else 'upper left')
+    fig.tight_layout()
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
+        fig.savefig(os.path.join(outdir, fname), dpi=dpi, bbox_inches='tight')
+        if a4:
+            fig.savefig(os.path.join(outdir, os.path.splitext(fname)[0] + '.pdf'),
+                        bbox_inches='tight')
     return fig
 
 
