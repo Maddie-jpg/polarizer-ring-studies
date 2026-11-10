@@ -62,8 +62,9 @@ FALLBACK_BEAM = dict(nemitt_x=13000e-6, nemitt_y=12000e-6, sigma_z=4.8e-3, sigma
 # --- apertures and injection hardware ---
 APERTURE_R = os.environ.get('APERTURE_R', 'chamber')   # pipe radius [m], or 'chamber' = widest point of the design
 APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
-INJ = dict(septum_at='DrTripl::1', kicker_at='DrTripl::2',
-           septum_offset=0.05, septum_length=0.8, kicker_offset=2.2,
+INJ = dict(septum_at='DrTripl::1', kicker_at='DrDoub::3',
+           septum_length=0.8, kicker_offset=None,      # None = kicker in the centre of its drift
+           target_dmu=0.25, septum_exit_offset=None,   # septum placed for exactly 90 deg to the kicker
            x_blade=0.010, side=+1)
 BLADE_THICKNESS = 0.002           # [m]
 N_SIGMA = float(os.environ.get('N_SIGMA', 5))   # beam half-width in sigma: injection clearance and envelopes
@@ -107,6 +108,8 @@ else:
 A_X = A_Y = R_PIPE
 mc.install_apertures(pdr, radius=R_PIPE)
 mc.install_injection(pdr, radius=R_PIPE, **INJ)
+_t = ring.get_table()
+s_lattice = {nn: float(_t['s', nn]) for nn in ['inj_septum_entry', 'inj_septum_exit', 'inj_point', 'inj_kicker']}
 ring.cycle(name_first_element='inj_point', inplace=True)   # s = 0 at the injection point
 
 ring.configure_radiation(model='mean')
@@ -244,10 +247,10 @@ k_nominal = (p1.px[0] - tw.px[i_k])               # dpx = -knl[0]
 x_at_kicker = p1.x[0] - tw.x[i_k]
 
 Brho = ring.particle_ref.p0c[0] / 299792458.0
-print(f"\nInjection: x_inj = {side*x_inj*1e3:.2f} mm, px_inj = {side*px_inj*1e3:.3f} mrad, "
-      f"dmu(septum->kicker) = {dmu/2/np.pi:.3f} [2pi]")
+print(f"\nInjection: x_inj = {side*x_inj*1e3:.2f} mm, injection angle = {side*px_inj*1e3:.3f} mrad, "
+      f"dmu(septum->kicker) = {dmu/2/np.pi:.4f} [2pi] = {np.degrees(dmu):.1f} deg")
 print(f"  centroid at kicker: x = {x_at_kicker*1e3:.3f} mm (should be ~0)")
-print(f"  kicker: knl0 = {k_nominal*1e3:.3f} mrad, int B dl = {abs(k_nominal)*Brho*1e3:.1f} mT m "
+print(f"  kicker deflection = {-k_nominal*1e3:.3f} mrad, int B dl = {abs(k_nominal)*Brho*1e3:.1f} mT m "
       f"(B rho = {Brho:.2f} T m)")
 
 # %%
@@ -339,8 +342,13 @@ survived = int(np.sum(particles.state > 0))
 summary = dict(
     beam_source=beam['source'], n_particles=n0, n_turns=int(turns[-1] + 1),
     efficiency_percent=100 * survived / n0, lost_on_septum=int(lost_on_septum.sum()),
-    n_sigma=N_SIGMA, x_inj_m=float(side * x_inj), px_inj_rad=float(side * px_inj), dmu_septum_kicker=float(dmu / 2 / np.pi),
-    k_inj_rad=float(k_nominal), kick_error=KICK_ERROR, kicker_intBdl_Tm=float(abs(k_nominal) * Brho),
+    n_sigma=N_SIGMA, x_inj_m=float(side * x_inj),
+    injection_angle_mrad=float(side * px_inj * 1e3),          # beam angle at the septum exit
+    kicker_deflection_mrad=float(-k_nominal * 1e3),            # dpx given by the kicker (= -knl0)
+    kicker_intBdl_Tm=float(abs(k_nominal) * Brho), kick_error=KICK_ERROR,
+    s_septum_m=[s_lattice['inj_septum_entry'], s_lattice['inj_septum_exit']],   # s in the lattice file
+    s_kicker_m=s_lattice['inj_kicker'],
+    dmu_septum_kicker=float(dmu / 2 / np.pi), dmu_septum_kicker_deg=float(np.degrees(dmu)),
     mismatch_x=float(Bmag_x), mismatch_y=float(Bmag_y), matched_twiss=MATCH_TWISS,
     eps_x_inj=float(ex_inj), eps_y_inj=float(ey_inj), eq_gemitt_x=float(tw.eq_gemitt_x),
     damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, **{k: v for k, v in INJ.items()})

@@ -1038,8 +1038,9 @@ def install_apertures(pdr, radius=0.0312, line_name='ring',
     return ring
 
 
-def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
-                      septum_offset=0.05, septum_length=0.8, kicker_offset=2.2,
+def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrDoub::3',
+                      septum_length=0.8, kicker_offset=None,
+                      target_dmu=0.25, septum_exit_offset=None,
                       x_blade=0.010, radius=0.0312, side=+1,
                       line_name='ring'):
     """Install a single-turn, off-axis injection system:
@@ -1054,10 +1055,18 @@ def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
       inj_kicker : thin xt.Multipole with knl[0] on the env knob 'k_inj'
             (xtrack: dpx = -knl[0]), set to 0 here; injection.py sets it.
 
-    Positions are offsets [m] from the start of the drifts `septum_at` and
-    `kicker_at`. The defaults put the septum at the start of the first triplet
-    drift of the RF-free straight and the kicker near the end of the second,
-    which gives dmu_x ~ 0.24 on D1 C9 90deg_FDF. side=+1 injects from +x.
+    Placement
+      kicker : in drift `kicker_at`, `kicker_offset` [m] from its start;
+               None = centre of the drift.
+      septum : in drift `septum_at`. By default its exit is placed so that the
+               horizontal phase advance septum exit -> kicker is exactly
+               `target_dmu` [2pi] (0.25 = 90 deg), using this lattice's own
+               optics. Give `septum_exit_offset` [m from the drift start] to
+               place it by hand instead. Raises if the septum does not fit.
+
+    Defaults (D1 C9 90deg_FDF): kicker centred in DrDoub::3 (s = 111.33 m),
+    septum 104.68-105.48 m in DrTripl::1, dmu_x = 0.25 exactly.
+    side=+1 injects from +x.
     """
     ring = pdr.lines[line_name]
     tab = ring.get_table()
@@ -1065,13 +1074,48 @@ def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
         print('install_injection: injection elements already present, skipping.')
         return ring
 
-    s_sep0 = tab['s', septum_at] + septum_offset
-    s_sep1 = s_sep0 + septum_length
-    s_kick = tab['s', kicker_at] + kicker_offset
-    for nn, ss in [(septum_at, s_sep1), (kicker_at, s_kick)]:
-        idx = list(tab.name).index(nn)
-        if ss > tab.s[idx + 1]:
-            raise ValueError(f'install_injection: element does not fit inside {nn}')
+    names = list(tab.name)
+
+    def drift_span(nn):
+        i = names.index(nn)
+        return tab.s[i], tab.s[i + 1]
+
+    def drift_phase(tw, nn, ds):
+        """Phase advance [2pi] from the start of drift nn to ds metres into it."""
+        b0, a0 = tw['betx', nn], tw['alfx', nn]
+        return np.arctan2(ds, b0 - a0 * ds) / (2 * np.pi)
+
+    k0, k1 = drift_span(kicker_at)
+    k_off = 0.5 * (k1 - k0) if kicker_offset is None else kicker_offset
+    if not 0 <= k_off <= k1 - k0:
+        raise ValueError(f'install_injection: kicker offset {k_off} m is outside {kicker_at}')
+    s_kick = k0 + k_off
+
+    d0, d1 = drift_span(septum_at)
+    _lc = ring.copy()                       # optics without radiation, line itself untouched
+    _lc.build_tracker()
+    _lc.configure_radiation(model=None)
+    tw = _lc.twiss4d()
+    mu_kick = tw['mux', kicker_at] + drift_phase(tw, kicker_at, k_off)
+    if septum_exit_offset is None:
+        # septum exit phase = kicker phase - target; invert the drift phase formula
+        phi = 2 * np.pi * (mu_kick - target_dmu - tw['mux', septum_at])
+        b0, a0 = tw['betx', septum_at], tw['alfx', septum_at]
+        ok = 0 <= phi < np.pi / 2
+        exit_off = b0 * np.tan(phi) / (1 + a0 * np.tan(phi)) if ok else np.nan
+        if not ok or not septum_length <= exit_off <= d1 - d0:
+            raise ValueError(
+                f'install_injection: no septum position in {septum_at} gives dmu = {target_dmu} '
+                f'to a kicker at s = {s_kick:.2f} m (needs exit {exit_off:.2f} m into a '
+                f'{d1 - d0:.2f} m drift, septum length {septum_length} m). '
+                f'Move the kicker or give septum_exit_offset.')
+    else:
+        exit_off = septum_exit_offset
+        if not septum_length <= exit_off <= d1 - d0:
+            raise ValueError(f'install_injection: septum does not fit inside {septum_at}')
+    s_sep1 = d0 + exit_off
+    s_sep0 = s_sep1 - septum_length
+    dmu = mu_kick - (tw['mux', septum_at] + drift_phase(tw, septum_at, exit_off))
 
     lims = (dict(min_x=-radius, max_x=x_blade, min_y=-radius, max_y=radius) if side > 0 else
             dict(min_x=-x_blade, max_x=radius, min_y=-radius, max_y=radius))
@@ -1088,6 +1132,7 @@ def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrTripl::2',
         pdr.place('inj_kicker', at=s_kick),
     ], with_progress=False)
 
-    print(f'install_injection: septum {s_sep0:.2f}-{s_sep1:.2f} m, injection point '
-          f'{s_sep1 + 1e-4:.2f} m, kicker {s_kick:.2f} m, blade at x = {side*x_blade*1e3:.1f} mm')
+    print(f'install_injection: septum {s_sep0:.2f}-{s_sep1:.2f} m ({septum_at}), '
+          f'kicker {s_kick:.2f} m ({kicker_at}, {k_off:.2f} m in), '
+          f'dmu_x = {dmu:.4f} ({dmu*360:.1f} deg), blade at x = {side*x_blade*1e3:.1f} mm')
     return ring
