@@ -81,7 +81,7 @@ APERTURE_R = os.environ.get('APERTURE_R', 'chamber')   # pipe radius [m], 'chamb
 # conditions of macroparticles.py's survival study (ON_AXIS=1 APERTURE_R=none reproduces it).
 ON_AXIS = _on(os.environ.get('ON_AXIS', '0'))
 APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
-SEPTUM_KICKER_DEG = float(os.environ.get('SEPTUM_KICKER_DEG', 60))   # phase advance septum exit -> kicker
+SEPTUM_KICKER_DEG = float(os.environ.get('SEPTUM_KICKER_DEG', 50))   # phase advance septum exit -> kicker
 INJ = dict(septum_at='DrTripl::1', kicker_at='DrTripl::2',
            septum_length=0.8, kicker_offset=None,      # None = kicker in the centre of its drift
            target_dmu=SEPTUM_KICKER_DEG / 360,         # septum placed this phase advance upstream of the kicker
@@ -328,6 +328,8 @@ def load_beam():
 beam = load_beam()
 bbx, abx, ex_inj = twiss_from_beam(beam['x'], beam['px'])
 bby, aby, ey_inj = twiss_from_beam(beam['y'], beam['py'])
+ex_inj= 1.4008607796507153e-6
+ey_inj= 1.3209365638252162e-6
 print(f'Injected beam ({beam["source"]}): eps_x = {ex_inj*1e9:.1f} nm, eps_y = {ey_inj*1e9:.1f} nm, '
       f'sigma_delta = {beam["delta"].std():.2e}, sigma_z = {beam["zeta"].std()*1e3:.2f} mm')
 print(f'  beam Twiss: betx = {bbx:.2f}, alfx = {abx:.2f} | ring: betx = {bx0:.2f}, alfx = {ax0:.2f}')
