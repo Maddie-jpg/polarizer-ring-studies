@@ -7,6 +7,8 @@ Physics:
      (inj_point, just downstream of the septum exit).
   2. The injection angle is chosen so the bunch centroid crosses the closed
      orbit at the kicker:  x'_s = -x_s (cos dmu + a_s sin dmu) / (b_s sin dmu)
+     Default layout: kicker in the centre of the triplet drift DrTripl::2,
+     septum SEPTUM_KICKER_DEG = 60 deg of phase advance upstream of it.
   3. The kicker removes the remaining angle (dpx = -knl[0]), fires once and
      is off on every following turn.
   4. The bunch filaments and radiation-damps towards equilibrium.
@@ -32,7 +34,8 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
          env: N_PARTICLES, N_TURNS, X_BLADE (default optimum), X_INJ, KICK_ERROR, MATCH_TWISS=0,
-              RUN_SCANS=1, SCAN_TURNS, APERTURE_R (or none), N_SIGMA, ON_AXIS=1
+              RUN_SCANS=1, SCAN_TURNS, APERTURE_R (or none), N_SIGMA, ON_AXIS=1,
+              SEPTUM_KICKER_DEG (default 60)
 Outputs  Results/.../Injection/{mode}/
 
 Run:     python injection.py   (or via run_full_sims.py)
@@ -78,9 +81,11 @@ APERTURE_R = os.environ.get('APERTURE_R', 'chamber')   # pipe radius [m], 'chamb
 # conditions of macroparticles.py's survival study (ON_AXIS=1 APERTURE_R=none reproduces it).
 ON_AXIS = _on(os.environ.get('ON_AXIS', '0'))
 APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
-INJ = dict(septum_at='DrTripl::1', kicker_at='DrDoub::3',
+SEPTUM_KICKER_DEG = float(os.environ.get('SEPTUM_KICKER_DEG', 60))   # phase advance septum exit -> kicker
+INJ = dict(septum_at='DrTripl::1', kicker_at='DrTripl::2',
            septum_length=0.8, kicker_offset=None,      # None = kicker in the centre of its drift
-           target_dmu=0.25, septum_exit_offset=None,   # septum placed for exactly 90 deg to the kicker
+           target_dmu=SEPTUM_KICKER_DEG / 360,         # septum placed this phase advance upstream of the kicker
+           septum_exit_offset=None,
            x_blade=0.010, side=+1)   # blade face [m]; replaced by the optimum unless X_BLADE is a number
 BLADE_THICKNESS = 0.002           # [m]
 N_SIGMA = float(os.environ.get('N_SIGMA', 5))   # beam half-width in sigma: injection clearance and envelopes
@@ -617,14 +622,60 @@ def envelope(e):
     out['s'] = e['s'][np.argmax(al.sum(1))]           # s of a surviving particle at each element
     return out
 
+u_lim = 1.3 * (R_PIPE if R_PIPE is not None else 0.03)          # plotted half range [m]
+
 env0 = envelope(ebe)
 alive0 = ebe['state'] > 0
 cx, sx, cy, sy, s_ebe = env0['x'], env0['sx'], env0['y'], env0['sy'], env0['s']
 env_stored = {t: envelope(e) for t, e in ebe_stored.items()}
 stored_style = {0: ('C4', '--'), 1: ('C5', '-.')}
 
+# lattice layout strip drawn above the envelope plots
+from matplotlib.patches import Rectangle, Patch
+from matplotlib.lines import Line2D
+_lt = ring.get_table()
+_ls = np.array(_lt.s)
+LATTICE_STYLE = {'Bend': ('tab:blue', -0.35, 0.35), 'RBend': ('tab:blue', -0.35, 0.35),
+                 'Quadrupole': ('tab:red', None, None), 'Sextupole': ('goldenrod', -0.5, 0.5),
+                 'Octupole': ('tab:brown', -0.4, 0.4), 'Cavity': ('tab:purple', -0.8, 0.8)}
+
+def draw_lattice(ax, wrap, show_rf=True):
+    ax.axhline(0, color='k', lw=0.8)
+    for i, (nn, tt) in enumerate(zip(_lt.name, _lt.element_type)):
+        if tt not in LATTICE_STYLE or i + 1 >= len(_ls):
+            continue
+        s0, s1 = _ls[i], _ls[i + 1]
+        if s1 <= s0:
+            continue
+        if wrap and s0 > C - 10:
+            s0, s1 = s0 - C, s1 - C
+        col, y0, y1 = LATTICE_STYLE[tt]
+        if tt == 'Quadrupole':                        # focusing up, defocusing down
+            y0, y1 = (0, 0.75) if ring[nn].k1 >= 0 else (-0.75, 0)
+        ax.add_patch(Rectangle((s0, y0), s1 - s0, y1 - y0, color=col, lw=0))
+    if not ON_AXIS:
+        ax.add_patch(Rectangle((s_sep[0] if wrap else s_sep[0] + C, -0.9), s_sep[1] - s_sep[0], 1.8,
+                               color='C2', lw=0))
+    ax.plot([s_kick, s_kick], [-0.95, 0.95], color='C3', lw=2.5)
+    ax.set_ylim(-1, 1); ax.set_yticks([])
+    for sp in ('left', 'right', 'top'):
+        ax.spines[sp].set_visible(False)
+    handles = [Patch(color='tab:blue', label='dipole'), Patch(color='tab:red', label='quad (F up / D down)'),
+               Patch(color='goldenrod', label='sextupole')]
+    if show_rf:
+        handles.append(Patch(color='tab:purple', label='RF cavity'))
+    handles += [Patch(color='C2', label='septum'), Line2D([], [], color='C3', lw=2.5, label='kicker')]
+    ax.legend(handles=handles, ncol=len(handles), fontsize=7.5, frameon=False, loc='lower center',
+              bbox_to_anchor=(0.5, 1.0))
+
+from matplotlib.gridspec import GridSpec
 for tag, xlim in [('injection_region', (s_sep[0] - 1, s_kick + 6)), ('full_ring', (0, C))]:
-    fig, axs = plt.subplots(2, 1, figsize=(11, 7.5), sharex=True)
+    fig = plt.figure(figsize=(11, 8.4))
+    gs = GridSpec(3, 1, figure=fig, height_ratios=[0.55, 4, 4], hspace=0.12)
+    ax_lat = fig.add_subplot(gs[0])
+    axs = [fig.add_subplot(gs[1], sharex=ax_lat), fig.add_subplot(gs[2], sharex=ax_lat)]
+    draw_lattice(ax_lat, wrap=(tag == 'injection_region'), show_rf=(tag == 'full_ring'))
+    plt.setp(ax_lat.get_xticklabels(), visible=False); plt.setp(axs[0].get_xticklabels(), visible=False)
     s_st = s_tw_wrapped[order_tw] if tag == 'injection_region' else s_tw
     idx = order_tw if tag == 'injection_region' else slice(None)
     for ax_, c, s_, lab, sig_e in [(axs[0], cx, sx, 'x', sigma_eq('x')),
@@ -661,13 +712,15 @@ for tag, xlim in [('injection_region', (s_sep[0] - 1, s_kick + 6)), ('full_ring'
                        label='chamber aperture' if c_ == cols[0] else None)
         ax_.axvline(s_kick, color='C3', ls='--', label='kicker')
         ax_.set_ylabel(f'{lab} [mm]'); ax_.grid(alpha=0.3)
+        ax_.set_ylim(-1e3 * u_lim, 1e3 * u_lim)
     if not ON_AXIS:
         axs[0].plot(s_sep, [side * 1e3 * INJ['x_blade']] * 2, color='C2', lw=4, label='septum blade')
         axs[0].plot(s_sep, [side * 1e3 * (INJ['x_blade'] + BLADE_THICKNESS)] * 2, color='C2', lw=4)
     axs[0].legend(fontsize=7.5, loc='lower right', ncol=2)
     axs[1].set_xlabel('s from injection point [m]'); axs[1].set_xlim(*xlim)
-    axs[0].set_title(f'Beam envelope at injection (D{design} C{config} {phase}deg{"_" + changes if changes else ""}, {mode})')
-    plt.tight_layout(); plt.savefig(f'{folder}/envelope_{tag}.png', dpi=150); plt.close()
+    fig.suptitle(f'Beam envelope at injection (D{design} C{config} {phase}deg{"_" + changes if changes else ""}, {mode})',
+                 y=0.97)
+    plt.savefig(f'{folder}/envelope_{tag}.png', dpi=150, bbox_inches='tight'); plt.close()
 
 # ---- 3: phase space at the septum exit + normalised phase space at the kicker ----
 i_k_ebe = int(np.argmin(np.abs(s_ebe - s_kick)))
