@@ -11,6 +11,17 @@ Physics:
      is off on every following turn.
   4. The bunch filaments and radiation-damps towards equilibrium.
 
+Septum geometry (X_BLADE=optimum, the default). At the septum, with pipe
+radius R, blade thickness t, clearance n sigma and sigma = sqrt(eps_inj beta_x):
+     injected bunch clears the blade:      x_s - n sigma >= b + t
+     injected bunch inside the pipe:       x_s + n sigma <= R
+     stored beam (the same bunch, back on
+     turn 1 on the orbit) clears the blade: n sigma <= b
+  -> optimum  b = n sigma,  x_s = 2 n sigma + t,  possible if R >= 3 n sigma + t.
+  If it does not fit, the clearance is reduced to the largest n that fits all the
+  way from septum to kicker (where beta is larger): n <= (R - A t)/(2 A sigma + sigma(s)),
+  with A(s) the linear transport of the centroid, x_c(s) = A(s) x_s.
+
 Lattice elements are installed on the fly with mc.install_apertures and
 mc.install_injection (LatticeBuild/misalignments_corrections.py). The ring is
 then cycled so s = 0 is the injection point: all turn-by-turn data are
@@ -20,8 +31,8 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          cylindrical chamber: radius = widest point of the macroparticles.py
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
-         env: N_PARTICLES, N_TURNS, X_INJ, X_BLADE, KICK_ERROR, MATCH_TWISS=0,
-              RUN_SCANS=1, SCAN_TURNS, APERTURE_R, N_SIGMA
+         env: N_PARTICLES, N_TURNS, X_BLADE (default optimum), X_INJ, KICK_ERROR, MATCH_TWISS=0,
+              RUN_SCANS=1, SCAN_TURNS, APERTURE_R (or none), N_SIGMA, ON_AXIS=1
 Outputs  Results/.../Injection/{mode}/
 
 Run:     python injection.py   (or via run_full_sims.py)
@@ -51,8 +62,8 @@ _on = lambda v: str(v).strip().lower() not in ('0', 'false', 'off', 'no', '')
 # --- beam ---
 BEAM_FILE = cfg.INJECTED_BEAM_FILE
 N_PARTICLES = int(os.environ.get('N_PARTICLES', 500))
-SEED = 74
-MAHALANOBIS_R = None     # optional 6-D core cut (as filter_beam_core in macroparticles.py); None = keep main bunch
+SEED = 74                # same sample of the filtered beam as macroparticles.py (n_subset=500, seed 74)
+MOMENT_ITERS = 5         # moment-based core filter (filter_by_moment_core), as in macroparticles.py
 # Match the beam to the ring Twiss at inj_point (the transfer line delivers a matched beam),
 # as match_coordinates in macroparticles.py does. MATCH_TWISS=0 injects the beam file's optics as-is.
 MATCH_TWISS = _on(os.environ.get('MATCH_TWISS', '1'))
@@ -62,15 +73,22 @@ DELTA_OFFSET = 0.0       # mean momentum offset of the injected bunch w.r.t. the
 FALLBACK_BEAM = dict(nemitt_x=13000e-6, nemitt_y=12000e-6, sigma_z=4.8e-3, sigma_delta=2e-3)
 
 # --- apertures and injection hardware ---
-APERTURE_R = os.environ.get('APERTURE_R', 'chamber')   # pipe radius [m], or 'chamber' = widest point of the design
+APERTURE_R = os.environ.get('APERTURE_R', 'chamber')   # pipe radius [m], 'chamber' = widest point of the design, 'none' = no pipe
+# Reference run: ON_AXIS=1 injects on the closed orbit with the kicker off and no septum blade, i.e. the
+# conditions of macroparticles.py's survival study (ON_AXIS=1 APERTURE_R=none reproduces it).
+ON_AXIS = _on(os.environ.get('ON_AXIS', '0'))
 APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
 INJ = dict(septum_at='DrTripl::1', kicker_at='DrDoub::3',
            septum_length=0.8, kicker_offset=None,      # None = kicker in the centre of its drift
            target_dmu=0.25, septum_exit_offset=None,   # septum placed for exactly 90 deg to the kicker
-           x_blade=float(os.environ.get('X_BLADE', 0.010)), side=+1)   # septum blade [m] (placeholder)
+           x_blade=0.010, side=+1)   # blade face [m]; replaced by the optimum unless X_BLADE is a number
 BLADE_THICKNESS = 0.002           # [m]
 N_SIGMA = float(os.environ.get('N_SIGMA', 5))   # beam half-width in sigma: injection clearance and envelopes
-X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = blade + thickness + N_SIGMA sigma_x
+X_BLADE = os.environ.get('X_BLADE', 'optimum')   # blade face [m], or 'optimum' (see docstring)
+if X_BLADE != 'optimum':
+    INJ['x_blade'] = float(X_BLADE)
+X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = optimum
+                                          # (2 n sigma + t), or blade + t + N_SIGMA sigma for a fixed blade
 KICK_ERROR = float(os.environ.get('KICK_ERROR', 0.0))   # relative kicker strength error
 
 # --- tracking ---
@@ -105,11 +123,19 @@ if APERTURE_R == 'chamber':
     else:
         print(f'No chamber_per_magnet csv (run macroparticles.py first): '
               f'pipe radius {R_PIPE*1e3:.1f} mm')
+elif APERTURE_R == 'none':
+    R_PIPE = None
 else:
     R_PIPE = float(APERTURE_R)
-A_X = A_Y = R_PIPE
-mc.install_apertures(pdr, radius=R_PIPE)
-mc.install_injection(pdr, radius=R_PIPE, **INJ)
+R_LIM = R_PIPE if R_PIPE is not None else 1.0     # septum frame when there is no pipe
+A_X = A_Y = R_LIM
+if ON_AXIS:
+    INJ['x_blade'] = R_LIM                       # no blade in the reference run
+if R_PIPE is not None:
+    mc.install_apertures(pdr, radius=R_PIPE)
+else:
+    print('APERTURE_R=none: no chamber apertures (losses = dynamic aperture only)')
+mc.install_injection(pdr, radius=R_LIM, **INJ)
 _t = ring.get_table()
 s_lattice = {nn: float(_t['s', nn]) for nn in ['inj_septum_entry', 'inj_septum_exit', 'inj_point', 'inj_kicker']}
 ring.cycle(name_first_element='inj_point', inplace=True)   # s = 0 at the injection point
@@ -134,23 +160,112 @@ print(f'At inj_point: betx = {bx0:.2f} m, alfx = {ax0:.2f}, Dx = {dx0:.3f} m')
 # ============================================================
 # BEAM: injected distribution (energy compression is done upstream), centred, optional Twiss rematch
 # ============================================================
-def select_main_bunch(df, t_col='t[mm/c]', mad_k=10):
-    """Same selection as macroparticles.py: drop satellites far from the median t."""
-    t = df[t_col].values
-    med = np.median(t)
-    mad = np.median(np.abs(t - med))
-    if mad == 0:
-        return df
-    return df[np.abs(t - med) < mad_k * mad * 1.4826]
+# --- beam core: copied unchanged from macroparticles.py so both scripts track the same beam ---
+from scipy.optimize import curve_fit
+
+def getrms_gaussfit(xis, maxnmax=50, max_doublings=20):
+    """Robust average/variance via histogram + Gaussian fit, adapted from
+    the supervisor's getrms(). Doubles nbins until the tallest bin drops
+    below maxnmax counts, then fits a Gaussian to the histogram -- the fit
+    itself is what makes this robust to a handful of far-out particles,
+    since they barely move where a fitted peak sits, unlike a raw
+    np.var() which they can dominate."""
+    xis = np.asarray(xis, dtype=float)
+    minxi = xis.min() - 0.001 * (xis.max() - xis.min())
+    maxxi = xis.max() + 0.001 * (xis.max() - xis.min())
+    nbins = max(2 ** int(np.floor(np.log2(len(xis) / maxnmax))), 1)
+    nmax = 2 * maxnmax
+    n_doublings = 0
+    counts, edges = None, None
+    while nmax > maxnmax and n_doublings < max_doublings:
+        nbins *= 2
+        counts, edges = np.histogram(xis, nbins, range=[minxi, maxxi])
+        nmax = counts.max()
+        n_doublings += 1
+    centers = (edges[:-1] + edges[1:]) / 2
+
+    def gauss(x, amp, xav, xvar):
+        return amp * np.exp(-(x - xav) ** 2 / (2 * xvar))
+
+    p0 = [counts.max(), xis.mean(), xis.var()]
+    popt, _ = curve_fit(gauss, centers, counts, p0=p0)
+    return popt[1], popt[2]
 
 
-def filter_beam_core(df, mahalanobis_r):
-    cols = ['x[mm]', 'xp[mrad]', 'y[mm]', 'yp[mrad]', 't[mm/c]', 'p[MeV/c]']
-    d = (df[cols] - df[cols].mean()).values
-    inv = np.linalg.inv(np.cov(d, rowvar=False))
-    keep = np.einsum('ij,jk,ik->i', d, inv, d) <= mahalanobis_r**2
-    print(f'Core filter (Mahalanobis r = {mahalanobis_r}): kept {keep.sum()} / {len(df)}')
-    return df[keep]
+def moment_based_twiss(df, position, angle, p_col='p[MeV/c]', p0_mev=2860.0,
+                        iters=5, maxnmax=50):
+    """Iterative moment/projection-based Twiss reconstruction, ported from
+    the supervisor's analysedataProj(). At each iteration: normalize the
+    (dispersion-subtracted) coordinates using the current beta/alpha
+    guess, take three projections at 0/120/240 degrees in that normalized
+    frame, get each projection's variance via getrms_gaussfit(), and
+    reconstruct an updated beta/alpha/emittance from the three variances.
+    Returns (history, Dt, Dpt) where history is a list of
+    (iteration, eps, beta, alfa) tuples, one per iteration, so the
+    convergence itself can be plotted -- distinct from filter_by_action(),
+    which this is meant to be compared against, not replace."""
+    pos = df[position].values
+    ang = df[angle].values
+    delta = (df[p_col].values - p0_mev) / p0_mev
+
+    pos_av, ang_av, delta_av = pos.mean(), ang.mean(), delta.mean()
+    var_delta = np.var(delta)
+
+    Dt = np.cov(pos, delta, ddof=0)[0, 1] / var_delta
+    Dpt = np.cov(ang, delta, ddof=0)[0, 1] / var_delta
+
+    pos_beta = pos - Dt * (delta - delta_av)
+    ang_beta = ang - Dpt * (delta - delta_av)
+
+    xxbet = np.mean((pos - pos_av - Dt * (delta - delta_av)) ** 2)
+    xpxpbet = np.mean((ang - ang_av - Dpt * (delta - delta_av)) ** 2)
+    xxpbet = np.mean((pos - pos_av - Dt * (delta - delta_av)) * (ang - ang_av - Dpt * (delta - delta_av)))
+    eps_ref = np.sqrt(xxbet * xpxpbet - xxpbet ** 2)
+    beta_ref, alfa_ref = xxbet / eps_ref, -xxpbet / eps_ref
+
+    history = []
+    for it in range(iters):
+        xi = pos_beta / np.sqrt(beta_ref)
+        xip = np.sqrt(beta_ref) * ang_beta + alfa_ref * pos_beta / np.sqrt(beta_ref)
+        xi1 = (-xi + np.sqrt(3) * xip) / 2
+        xi2 = (xi + np.sqrt(3) * xip) / 2
+
+        _, xivar = getrms_gaussfit(xi, maxnmax)
+        _, xi1var = getrms_gaussfit(xi1, maxnmax)
+        _, xi2var = getrms_gaussfit(xi2, maxnmax)
+
+        betnoreps = xivar
+        alfnoreps = (xi1var - xi2var) / np.sqrt(3)
+        gamnoreps = (2 * (xi1var + xi2var) - xivar) / 3
+        eps = np.sqrt(betnoreps * gamnoreps - alfnoreps ** 2)
+        betn, alfn = betnoreps / eps, alfnoreps / eps
+        alfa_ref = betn * alfa_ref + alfn
+        beta_ref = betn * beta_ref
+
+        history.append((it + 1, eps, beta_ref, alfa_ref))
+    return history, Dt, Dpt
+
+
+def filter_by_moment_core(df_in, position, angle, iters=5, max_passes=20,
+                          p_col='p[MeV/c]', p0_mev=2860.0):
+    df_iter = df_in.copy()
+    for _ in range(max_passes):
+        history, Dt, Dpt = moment_based_twiss(df_iter, position, angle,
+                                              p_col=p_col, p0_mev=p0_mev, iters=iters)
+        _, eps, beta, alfa = history[-1]
+        delta = (df_iter[p_col].values - p0_mev) / p0_mev
+        pos = df_iter[position].values - Dt * (delta - delta.mean())
+        ang = df_iter[angle].values - Dpt * (delta - delta.mean())
+        pos = pos - pos.mean()
+        ang = ang - ang.mean()
+        gamma = (1 + alfa**2) / beta
+        J = gamma * pos**2 + 2 * alfa * pos * ang + beta * ang**2
+        J_max = 2 * eps * np.log(2 * len(df_iter))
+        mask = J <= J_max
+        if mask.all():
+            break
+        df_iter = df_iter[mask].copy()
+    return df_iter, {'eps': eps, 'beta': beta, 'alfa': alfa, 'J_max': J_max, 'Dt': Dt, 'Dpt': Dpt}
 
 
 def twiss_from_beam(u, up):
@@ -169,10 +284,13 @@ def rematch(u, up, b_beam, a_beam, b_ring, a_ring):
 def load_beam():
     beta0 = ring.particle_ref.beta0[0]
     if os.path.exists(BEAM_FILE):
-        df = select_main_bunch(pd.read_csv(BEAM_FILE, sep=r'\s+'))
-        if MAHALANOBIS_R:
-            df = filter_beam_core(df, MAHALANOBIS_R)
-        df = df.sample(n=min(N_PARTICLES, len(df)), random_state=SEED)
+        df_raw = pd.read_csv(BEAM_FILE, sep=r'\s+')
+        # moment-based core in x then y, as macroparticles.py (df_clean), then the same sample
+        df_core_x, _ = filter_by_moment_core(df_raw, 'x[mm]', 'xp[mrad]', iters=MOMENT_ITERS)
+        df_clean, _ = filter_by_moment_core(df_core_x, 'y[mm]', 'yp[mrad]', iters=MOMENT_ITERS)
+        print(f'Moment-based core: kept {len(df_clean)}/{len(df_raw)} particles '
+              f'({100*len(df_clean)/len(df_raw):.1f}%)')
+        df = df_clean.sample(n=min(N_PARTICLES, len(df_clean)), random_state=SEED)
         x, px = df['x[mm]'].values * 1e-3, df['xp[mrad]'].values * 1e-3
         y, py = df['y[mm]'].values * 1e-3, df['yp[mrad]'].values * 1e-3
         z = df['t[mm/c]'].values * 1e-3                  # c*t [m], larger = later
@@ -227,7 +345,50 @@ if MATCH_TWISS:
 # ============================================================
 side = INJ['side']
 sig_x_inj = np.sqrt(ex_inj * (bx0 if MATCH_TWISS else bbx))
-x_inj = (INJ['x_blade'] + BLADE_THICKNESS + N_SIGMA * sig_x_inj) if X_INJ == 'auto' else float(X_INJ)
+R_required = 3 * N_SIGMA * sig_x_inj + BLADE_THICKNESS      # pipe needed for N_SIGMA clearance
+n_clear = N_SIGMA                                          # clearance actually used [sigma]
+if ON_AXIS:
+    x_inj = 0.0
+else:
+    if X_BLADE == 'optimum':
+        if R_PIPE is not None:
+            # Clearance must also hold between septum and kicker, where beta is larger. With the
+            # linear optics the centroid there is A(s) x_s (x'_s is proportional to x_s) and the size
+            # is sigma(s) = sqrt(eps beta(s)); with x_s = 2 n sigma + t, fitting in the pipe gives
+            #     n <= (R - A t) / (2 A sigma + sigma(s))     (A = 1, sigma(s) = sigma at the septum)
+            _ik = list(tw.name).index('inj_kicker')
+            _phi = 2 * np.pi * (tw.mux[:_ik + 1] - tw.mux[0])
+            _b = tw.betx[:_ik + 1]
+            _dmu = _phi[-1]
+            _xp_over_x = -(np.cos(_dmu) + ax0 * np.sin(_dmu)) / (bx0 * np.sin(_dmu))
+            _A = (np.sqrt(_b / bx0) * (np.cos(_phi) + ax0 * np.sin(_phi))
+                  + np.sqrt(bx0 * _b) * np.sin(_phi) * _xp_over_x)
+            _sig_s = np.sqrt(ex_inj * _b)
+            _Ap = np.clip(_A, 0, None)
+            _n_s = (R_PIPE - _Ap * BLADE_THICKNESS) / (2 * _Ap * sig_x_inj + _sig_s)
+            _i = int(np.argmin(_n_s))
+            n_fit = float(_n_s[_i])
+            if n_fit < N_SIGMA:
+                n_clear = n_fit
+                print(f'\nNOTE: {N_SIGMA:g} sigma clearance needs R >= 3 n sigma + t = {R_required*1e3:.1f} mm '
+                      f'at the septum; pipe is {R_PIPE*1e3:.2f} mm -> using the largest clearance that fits '
+                      f'from septum to kicker, {n_clear:.2f} sigma (limited at s = {tw.s[_i]:.2f} m, '
+                      f'{tw.name[_i]})')
+        INJ['x_blade'] = n_clear * sig_x_inj
+        for nn in ('inj_septum_entry', 'inj_septum_exit'):     # move the blade in the lattice
+            if side > 0:
+                ring[nn].max_x = INJ['x_blade']
+            else:
+                ring[nn].min_x = -INJ['x_blade']
+        x_auto = 2 * n_clear * sig_x_inj + BLADE_THICKNESS
+    else:
+        x_auto = INJ['x_blade'] + BLADE_THICKNESS + N_SIGMA * sig_x_inj
+    x_inj = x_auto if X_INJ == 'auto' else float(X_INJ)
+    print(f"\nSeptum: blade {INJ['x_blade']*1e3:.2f} mm ({'optimum' if X_BLADE == 'optimum' else 'fixed'}), "
+          f"thickness {BLADE_THICKNESS*1e3:.1f} mm, sigma_x = {sig_x_inj*1e3:.2f} mm, "
+          f"clearance {n_clear:.2f} sigma, bunch centre {x_inj*1e3:.2f} mm, "
+          f"outer edge {(x_inj + n_clear*sig_x_inj)*1e3:.2f} mm"
+          + (f" (pipe {R_PIPE*1e3:.2f} mm)" if R_PIPE is not None else ''))
 
 i_k = list(tw.name).index('inj_kicker')
 dmu = 2 * np.pi * (tw.mux[i_k] - tw.mux[0])
@@ -243,16 +404,28 @@ def make_particles(dx_, dpx_, x, px, y, py, zeta, delta):
         py=co0['py'] + dpy0 * (d - co0['delta']) + py,
         zeta=co0['zeta'] + zeta, delta=d)
 
-# kicker strength from a single on-momentum particle (mean radiation)
+# kicker strength from the linear optics between septum exit and kicker (only quadrupoles there):
+# angle of the centroid at the kicker, which the kick cancels (xtrack: dpx = -knl[0])
+bk, ak = tw.betx[i_k], tw.alfx[i_k]
+xp_at_kicker = side * (((ax0 - ak) * np.cos(dmu) - (1 + ax0 * ak) * np.sin(dmu)) / np.sqrt(bx0 * bk) * x_inj
+                       + np.sqrt(bx0 / bk) * (np.cos(dmu) - ak * np.sin(dmu)) * px_inj)
+k_nominal = xp_at_kicker
+
+# check with one on-momentum particle tracked through the real lattice (mean radiation)
 p1 = make_particles(x_inj, px_inj, *np.zeros((6, 1)))
 ring.track(p1, ele_stop='inj_kicker')
-k_nominal = (p1.px[0] - tw.px[i_k])               # dpx = -knl[0]
-x_at_kicker = p1.x[0] - tw.x[i_k]
+x_at_kicker = p1.x[0] - tw.x[i_k] if p1.state[0] > 0 else np.nan
+if R_PIPE is not None and x_inj >= R_PIPE:
+    print(f'\nWARNING: injected centroid x_inj = {x_inj*1e3:.2f} mm is outside the pipe '
+          f'(r = {R_PIPE*1e3:.2f} mm). Use X_BLADE=optimum or a smaller X_INJ.')
+elif p1.state[0] <= 0:
+    print('\nWARNING: the on-momentum centroid is lost before the kicker')
 
 Brho = ring.particle_ref.p0c[0] / 299792458.0
 print(f"\nInjection: x_inj = {side*x_inj*1e3:.2f} mm, injection angle = {side*px_inj*1e3:.3f} mrad, "
       f"dmu(septum->kicker) = {dmu/2/np.pi:.4f} [2pi] = {np.degrees(dmu):.1f} deg")
-print(f"  centroid at kicker: x = {x_at_kicker*1e3:.3f} mm (should be ~0)")
+print(f"  centroid at kicker: x = {x_at_kicker*1e3:.3f} mm (should be ~0)" if not ON_AXIS else
+      "  ON_AXIS reference run: injected on the closed orbit, kicker off, no blade")
 print(f"  kicker deflection = {-k_nominal*1e3:.3f} mrad, int B dl = {abs(k_nominal)*Brho*1e3:.1f} mT m "
       f"(B rho = {Brho:.2f} T m)")
 
@@ -294,7 +467,8 @@ particles = make_particles(x_inj, px_inj, beam['x'], beam['px'], beam['y'], beam
 n0 = len(particles.x)
 
 # particles that start inside the blade (field side) never make it through the septum
-lost_on_septum = side * (particles.x - co0['x']) < INJ['x_blade'] + BLADE_THICKNESS
+lost_on_septum = (np.zeros(n0, bool) if ON_AXIS else
+                  side * (particles.x - co0['x']) < INJ['x_blade'] + BLADE_THICKNESS)
 particles.state[lost_on_septum] = 0
 print(f'\n{lost_on_septum.sum()} / {n0} particles hit the septum blade on the way in')
 
@@ -324,6 +498,18 @@ def moments_from_ebe(e):
 t_start = time.time()
 ebe = track_ebe_turn()
 pdr['k_inj'] = 0.0                                   # kicker off from turn 1 on
+
+# clearance between septum and kicker on turn 0 (higher beta than at the septum)
+if not ON_AXIS and R_PIPE is not None:
+    with np.errstate(invalid='ignore'):
+        _al = ebe['state'] > 0
+        _c = np.nanmean(np.where(_al, ebe['x'], np.nan), 0)
+        _sg = np.nanstd(np.where(_al, ebe['x'], np.nan), 0)
+        _ss = ebe['s'][np.argmax(_al.sum(1))]
+        _m = _ss <= tw['s', 'inj_kicker']
+        _edge = side * _c[_m] + n_clear * _sg[_m]
+    print(f'Septum -> kicker: largest |centroid| + {n_clear:.2f} sigma = {np.nanmax(_edge)*1e3:.2f} mm '
+          f'at s = {_ss[_m][np.nanargmax(_edge)]:.2f} m (pipe {R_PIPE*1e3:.2f} mm)')
 print(f'Turn 0 done in {time.time()-t_start:.1f}s; tracking {N_TURNS} turns '
       f'(estimated {(time.time()-t_start)*N_TURNS/60:.0f} min)...')
 
@@ -379,7 +565,9 @@ summary = dict(
     dmu_septum_kicker=float(dmu / 2 / np.pi), dmu_septum_kicker_deg=float(np.degrees(dmu)),
     mismatch_x=float(Bmag_x), mismatch_y=float(Bmag_y), matched_twiss=MATCH_TWISS,
     eps_x_inj=float(ex_inj), eps_y_inj=float(ey_inj), eq_gemitt_x=float(tw.eq_gemitt_x),
-    damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, **{k: v for k, v in INJ.items()})
+    damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, on_axis=ON_AXIS,
+    blade_mode=X_BLADE if X_BLADE == 'optimum' else 'fixed', blade_thickness=BLADE_THICKNESS,
+    sigma_x_septum=float(sig_x_inj), n_sigma_clearance=float(n_clear), pipe_radius_required_m=float(R_required), **{k: v for k, v in INJ.items()})
 with open(f'{folder}/injection_summary.json', 'w') as f:
     json.dump(summary, f, indent=4)
 print(f'Injection efficiency: {summary["efficiency_percent"]:.1f} %  -> {folder}')
@@ -405,9 +593,10 @@ for nn in _tab.name:
     if nn.startswith('ap_') and nn.endswith('_in') and nn[:-3] + '_out' in _s:
         e = ring[nn]
         ap_seg.append((_s[nn], _s[nn[:-3] + '_out'], e.a, -e.a, e.b, -e.b))
-e = ring['inj_septum_entry']
-ap_seg.append((_s['inj_septum_entry'], _s['inj_septum_exit'], e.max_x, e.min_x, e.max_y, e.min_y))
-ap_seg = np.array(ap_seg)
+if R_PIPE is not None and not ON_AXIS:
+    e = ring['inj_septum_entry']
+    ap_seg.append((_s['inj_septum_entry'], _s['inj_septum_exit'], e.max_x, e.min_x, e.max_y, e.min_y))
+ap_seg = np.array(ap_seg).reshape(-1, 6)
 
 def sigma_eq(plane):
     if plane == 'x':
@@ -472,8 +661,9 @@ for tag, xlim in [('injection_region', (s_sep[0] - 1, s_kick + 6)), ('full_ring'
                        label='chamber aperture' if c_ == cols[0] else None)
         ax_.axvline(s_kick, color='C3', ls='--', label='kicker')
         ax_.set_ylabel(f'{lab} [mm]'); ax_.grid(alpha=0.3)
-    axs[0].plot(s_sep, [side * 1e3 * INJ['x_blade']] * 2, color='C2', lw=4, label='septum blade')
-    axs[0].plot(s_sep, [side * 1e3 * (INJ['x_blade'] + BLADE_THICKNESS)] * 2, color='C2', lw=4)
+    if not ON_AXIS:
+        axs[0].plot(s_sep, [side * 1e3 * INJ['x_blade']] * 2, color='C2', lw=4, label='septum blade')
+        axs[0].plot(s_sep, [side * 1e3 * (INJ['x_blade'] + BLADE_THICKNESS)] * 2, color='C2', lw=4)
     axs[0].legend(fontsize=7.5, loc='lower right', ncol=2)
     axs[1].set_xlabel('s from injection point [m]'); axs[1].set_xlim(*xlim)
     axs[0].set_title(f'Beam envelope at injection (D{design} C{config} {phase}deg{"_" + changes if changes else ""}, {mode})')
@@ -490,8 +680,9 @@ th = np.linspace(0, 2 * np.pi, 200)
 xe = N_SIGMA * np.sqrt(tw.eq_gemitt_x * bx0) * np.cos(th)
 axs[0].plot(1e3 * xe, 1e3 * N_SIGMA * np.sqrt(tw.eq_gemitt_x / bx0) * (-ax0 * np.cos(th) - np.sin(th)),
             'C1', label=f'stored beam ${N_SIGMA:g}\\sigma$')
-axs[0].axvline(side * 1e3 * INJ['x_blade'], color='C2', lw=3, label='blade')
-axs[0].axvline(side * 1e3 * (INJ['x_blade'] + BLADE_THICKNESS), color='C2', lw=3)
+if not ON_AXIS:
+    axs[0].axvline(side * 1e3 * INJ['x_blade'], color='C2', lw=3, label='blade')
+    axs[0].axvline(side * 1e3 * (INJ['x_blade'] + BLADE_THICKNESS), color='C2', lw=3)
 axs[0].set_xlabel('x - x$_{co}$ [mm]'); axs[0].set_ylabel("x' - x'$_{co}$ [mrad]")
 axs[0].set_title('Septum exit, turn 0'); axs[0].legend(fontsize=8); axs[0].grid(alpha=0.3)
 
