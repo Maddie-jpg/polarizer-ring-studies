@@ -1064,8 +1064,9 @@ def install_injection(pdr, septum_at='DrTripl::1', kicker_at='DrDoub::3',
                optics. Give `septum_exit_offset` [m from the drift start] to
                place it by hand instead. Raises if the septum does not fit.
 
-    Defaults (D1 C9 90deg_FDF): kicker centred in DrDoub::3 (s = 111.33 m),
-    septum 104.68-105.48 m in DrTripl::1, dmu_x = 0.25 exactly.
+    injection.py uses (D1 C9 90deg_FDF): kicker centred in the triplet drift
+    DrTripl::2 (s = 109.65 m), septum 60 deg upstream (target_dmu = 1/6):
+    105.02-105.82 m in DrTripl::1.
     side=+1 injects from +x.
     """
     ring = pdr.lines[line_name]
