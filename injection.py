@@ -11,6 +11,17 @@ Physics:
      is off on every following turn.
   4. The bunch filaments and radiation-damps towards equilibrium.
 
+Septum geometry (X_BLADE=optimum, the default). At the septum, with pipe
+radius R, blade thickness t, clearance n sigma and sigma = sqrt(eps_inj beta_x):
+     injected bunch clears the blade:      x_s - n sigma >= b + t
+     injected bunch inside the pipe:       x_s + n sigma <= R
+     stored beam (the same bunch, back on
+     turn 1 on the orbit) clears the blade: n sigma <= b
+  -> optimum  b = n sigma,  x_s = 2 n sigma + t,  possible if R >= 3 n sigma + t.
+  If it does not fit, the clearance is reduced to the largest n that fits all the
+  way from septum to kicker (where beta is larger): n <= (R - A t)/(2 A sigma + sigma(s)),
+  with A(s) the linear transport of the centroid, x_c(s) = A(s) x_s.
+
 Lattice elements are installed on the fly with mc.install_apertures and
 mc.install_injection (LatticeBuild/misalignments_corrections.py). The ring is
 then cycled so s = 0 is the injection point: all turn-by-turn data are
@@ -20,7 +31,7 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          cylindrical chamber: radius = widest point of the macroparticles.py
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
-         env: N_PARTICLES, N_TURNS, X_INJ, X_BLADE, KICK_ERROR, MATCH_TWISS=0,
+         env: N_PARTICLES, N_TURNS, X_BLADE (default optimum), X_INJ, KICK_ERROR, MATCH_TWISS=0,
               RUN_SCANS=1, SCAN_TURNS, APERTURE_R (or none), N_SIGMA, ON_AXIS=1
 Outputs  Results/.../Injection/{mode}/
 
@@ -70,10 +81,14 @@ APERTURE_R_FALLBACK = 0.0312     # [m] if no chamber design is found
 INJ = dict(septum_at='DrTripl::1', kicker_at='DrDoub::3',
            septum_length=0.8, kicker_offset=None,      # None = kicker in the centre of its drift
            target_dmu=0.25, septum_exit_offset=None,   # septum placed for exactly 90 deg to the kicker
-           x_blade=float(os.environ.get('X_BLADE', 0.010)), side=+1)   # septum blade [m] (placeholder)
+           x_blade=0.010, side=+1)   # blade face [m]; replaced by the optimum unless X_BLADE is a number
 BLADE_THICKNESS = 0.002           # [m]
 N_SIGMA = float(os.environ.get('N_SIGMA', 5))   # beam half-width in sigma: injection clearance and envelopes
-X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = blade + thickness + N_SIGMA sigma_x
+X_BLADE = os.environ.get('X_BLADE', 'optimum')   # blade face [m], or 'optimum' (see docstring)
+if X_BLADE != 'optimum':
+    INJ['x_blade'] = float(X_BLADE)
+X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'auto' = optimum
+                                          # (2 n sigma + t), or blade + t + N_SIGMA sigma for a fixed blade
 KICK_ERROR = float(os.environ.get('KICK_ERROR', 0.0))   # relative kicker strength error
 
 # --- tracking ---
@@ -330,10 +345,50 @@ if MATCH_TWISS:
 # ============================================================
 side = INJ['side']
 sig_x_inj = np.sqrt(ex_inj * (bx0 if MATCH_TWISS else bbx))
+R_required = 3 * N_SIGMA * sig_x_inj + BLADE_THICKNESS      # pipe needed for N_SIGMA clearance
+n_clear = N_SIGMA                                          # clearance actually used [sigma]
 if ON_AXIS:
     x_inj = 0.0
 else:
-    x_inj = (INJ['x_blade'] + BLADE_THICKNESS + N_SIGMA * sig_x_inj) if X_INJ == 'auto' else float(X_INJ)
+    if X_BLADE == 'optimum':
+        if R_PIPE is not None:
+            # Clearance must also hold between septum and kicker, where beta is larger. With the
+            # linear optics the centroid there is A(s) x_s (x'_s is proportional to x_s) and the size
+            # is sigma(s) = sqrt(eps beta(s)); with x_s = 2 n sigma + t, fitting in the pipe gives
+            #     n <= (R - A t) / (2 A sigma + sigma(s))     (A = 1, sigma(s) = sigma at the septum)
+            _ik = list(tw.name).index('inj_kicker')
+            _phi = 2 * np.pi * (tw.mux[:_ik + 1] - tw.mux[0])
+            _b = tw.betx[:_ik + 1]
+            _dmu = _phi[-1]
+            _xp_over_x = -(np.cos(_dmu) + ax0 * np.sin(_dmu)) / (bx0 * np.sin(_dmu))
+            _A = (np.sqrt(_b / bx0) * (np.cos(_phi) + ax0 * np.sin(_phi))
+                  + np.sqrt(bx0 * _b) * np.sin(_phi) * _xp_over_x)
+            _sig_s = np.sqrt(ex_inj * _b)
+            _Ap = np.clip(_A, 0, None)
+            _n_s = (R_PIPE - _Ap * BLADE_THICKNESS) / (2 * _Ap * sig_x_inj + _sig_s)
+            _i = int(np.argmin(_n_s))
+            n_fit = float(_n_s[_i])
+            if n_fit < N_SIGMA:
+                n_clear = n_fit
+                print(f'\nNOTE: {N_SIGMA:g} sigma clearance needs R >= 3 n sigma + t = {R_required*1e3:.1f} mm '
+                      f'at the septum; pipe is {R_PIPE*1e3:.2f} mm -> using the largest clearance that fits '
+                      f'from septum to kicker, {n_clear:.2f} sigma (limited at s = {tw.s[_i]:.2f} m, '
+                      f'{tw.name[_i]})')
+        INJ['x_blade'] = n_clear * sig_x_inj
+        for nn in ('inj_septum_entry', 'inj_septum_exit'):     # move the blade in the lattice
+            if side > 0:
+                ring[nn].max_x = INJ['x_blade']
+            else:
+                ring[nn].min_x = -INJ['x_blade']
+        x_auto = 2 * n_clear * sig_x_inj + BLADE_THICKNESS
+    else:
+        x_auto = INJ['x_blade'] + BLADE_THICKNESS + N_SIGMA * sig_x_inj
+    x_inj = x_auto if X_INJ == 'auto' else float(X_INJ)
+    print(f"\nSeptum: blade {INJ['x_blade']*1e3:.2f} mm ({'optimum' if X_BLADE == 'optimum' else 'fixed'}), "
+          f"thickness {BLADE_THICKNESS*1e3:.1f} mm, sigma_x = {sig_x_inj*1e3:.2f} mm, "
+          f"clearance {n_clear:.2f} sigma, bunch centre {x_inj*1e3:.2f} mm, "
+          f"outer edge {(x_inj + n_clear*sig_x_inj)*1e3:.2f} mm"
+          + (f" (pipe {R_PIPE*1e3:.2f} mm)" if R_PIPE is not None else ''))
 
 i_k = list(tw.name).index('inj_kicker')
 dmu = 2 * np.pi * (tw.mux[i_k] - tw.mux[0])
@@ -362,8 +417,7 @@ ring.track(p1, ele_stop='inj_kicker')
 x_at_kicker = p1.x[0] - tw.x[i_k] if p1.state[0] > 0 else np.nan
 if R_PIPE is not None and x_inj >= R_PIPE:
     print(f'\nWARNING: injected centroid x_inj = {x_inj*1e3:.2f} mm is outside the pipe '
-          f'(r = {R_PIPE*1e3:.2f} mm): blade + thickness + {N_SIGMA:g} sigma does not fit. '
-          f'Reduce X_BLADE / N_SIGMA or set X_INJ.')
+          f'(r = {R_PIPE*1e3:.2f} mm). Use X_BLADE=optimum or a smaller X_INJ.')
 elif p1.state[0] <= 0:
     print('\nWARNING: the on-momentum centroid is lost before the kicker')
 
@@ -444,6 +498,18 @@ def moments_from_ebe(e):
 t_start = time.time()
 ebe = track_ebe_turn()
 pdr['k_inj'] = 0.0                                   # kicker off from turn 1 on
+
+# clearance between septum and kicker on turn 0 (higher beta than at the septum)
+if not ON_AXIS and R_PIPE is not None:
+    with np.errstate(invalid='ignore'):
+        _al = ebe['state'] > 0
+        _c = np.nanmean(np.where(_al, ebe['x'], np.nan), 0)
+        _sg = np.nanstd(np.where(_al, ebe['x'], np.nan), 0)
+        _ss = ebe['s'][np.argmax(_al.sum(1))]
+        _m = _ss <= tw['s', 'inj_kicker']
+        _edge = side * _c[_m] + n_clear * _sg[_m]
+    print(f'Septum -> kicker: largest |centroid| + {n_clear:.2f} sigma = {np.nanmax(_edge)*1e3:.2f} mm '
+          f'at s = {_ss[_m][np.nanargmax(_edge)]:.2f} m (pipe {R_PIPE*1e3:.2f} mm)')
 print(f'Turn 0 done in {time.time()-t_start:.1f}s; tracking {N_TURNS} turns '
       f'(estimated {(time.time()-t_start)*N_TURNS/60:.0f} min)...')
 
@@ -499,7 +565,9 @@ summary = dict(
     dmu_septum_kicker=float(dmu / 2 / np.pi), dmu_septum_kicker_deg=float(np.degrees(dmu)),
     mismatch_x=float(Bmag_x), mismatch_y=float(Bmag_y), matched_twiss=MATCH_TWISS,
     eps_x_inj=float(ex_inj), eps_y_inj=float(ey_inj), eq_gemitt_x=float(tw.eq_gemitt_x),
-    damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, on_axis=ON_AXIS, **{k: v for k, v in INJ.items()})
+    damping_turns=[float(t) for t in tau_turns], pipe_radius=R_PIPE, on_axis=ON_AXIS,
+    blade_mode=X_BLADE if X_BLADE == 'optimum' else 'fixed', blade_thickness=BLADE_THICKNESS,
+    sigma_x_septum=float(sig_x_inj), n_sigma_clearance=float(n_clear), pipe_radius_required_m=float(R_required), **{k: v for k, v in INJ.items()})
 with open(f'{folder}/injection_summary.json', 'w') as f:
     json.dump(summary, f, indent=4)
 print(f'Injection efficiency: {summary["efficiency_percent"]:.1f} %  -> {folder}')
