@@ -622,28 +622,7 @@ def envelope(e):
     out['s'] = e['s'][np.argmax(al.sum(1))]           # s of a surviving particle at each element
     return out
 
-def density_map(e, coord, s_grid, u_edges):
-    """Particle density of an element-by-element turn: each particle's coordinate is
-    interpolated onto a uniform s grid (linear in drifts) up to where it is lost, then
-    histogrammed. Returns counts / (N injected * bin width in mm) = fraction per mm."""
-    al = e['state'] > 0
-    s_ref = e['s'][np.argmax(al.sum(1))]
-    ss_all, uu_all = [], []
-    for i in range(al.shape[0]):
-        if not al[i].any():
-            continue
-        s_last = s_ref[al[i]].max()
-        ok = s_grid <= s_last
-        ss_all.append(s_grid[ok])
-        uu_all.append(np.interp(s_grid[ok], s_ref[al[i]], e[coord][i][al[i]]))
-    ds = s_grid[1] - s_grid[0]
-    s_edges = np.r_[s_grid - ds / 2, s_grid[-1] + ds / 2]
-    H, _, _ = np.histogram2d(np.concatenate(ss_all), np.concatenate(uu_all), bins=[s_edges, u_edges])
-    return s_edges, H / (al.shape[0] * np.diff(u_edges)[0] * 1e3)
-
-from matplotlib.colors import LogNorm
 u_lim = 1.3 * (R_PIPE if R_PIPE is not None else 0.03)          # plotted half range [m]
-u_edges = np.linspace(-u_lim, u_lim, 161)
 
 env0 = envelope(ebe)
 alive0 = ebe['state'] > 0
@@ -660,7 +639,7 @@ LATTICE_STYLE = {'Bend': ('tab:blue', -0.35, 0.35), 'RBend': ('tab:blue', -0.35,
                  'Quadrupole': ('tab:red', None, None), 'Sextupole': ('goldenrod', -0.5, 0.5),
                  'Octupole': ('tab:brown', -0.4, 0.4), 'Cavity': ('tab:purple', -0.8, 0.8)}
 
-def draw_lattice(ax, wrap):
+def draw_lattice(ax, wrap, show_rf=True):
     ax.axhline(0, color='k', lw=0.8)
     for i, (nn, tt) in enumerate(zip(_lt.name, _lt.element_type)):
         if tt not in LATTICE_STYLE or i + 1 >= len(_ls):
@@ -682,36 +661,27 @@ def draw_lattice(ax, wrap):
     for sp in ('left', 'right', 'top'):
         ax.spines[sp].set_visible(False)
     handles = [Patch(color='tab:blue', label='dipole'), Patch(color='tab:red', label='quad (F up / D down)'),
-               Patch(color='goldenrod', label='sextupole'), Patch(color='tab:purple', label='RF cavity'),
-               Patch(color='C2', label='septum'), Line2D([], [], color='C3', lw=2.5, label='kicker')]
-    ax.legend(handles=handles, ncol=6, fontsize=7.5, frameon=False, loc='lower center',
+               Patch(color='goldenrod', label='sextupole')]
+    if show_rf:
+        handles.append(Patch(color='tab:purple', label='RF cavity'))
+    handles += [Patch(color='C2', label='septum'), Line2D([], [], color='C3', lw=2.5, label='kicker')]
+    ax.legend(handles=handles, ncol=len(handles), fontsize=7.5, frameon=False, loc='lower center',
               bbox_to_anchor=(0.5, 1.0))
 
 from matplotlib.gridspec import GridSpec
 for tag, xlim in [('injection_region', (s_sep[0] - 1, s_kick + 6)), ('full_ring', (0, C))]:
-    fig = plt.figure(figsize=(12.5, 8.6))
-    gs = GridSpec(3, 2, figure=fig, height_ratios=[0.55, 4, 4], width_ratios=[60, 1.1],
-                  hspace=0.12, wspace=0.02)
-    ax_lat = fig.add_subplot(gs[0, 0])
-    axs = [fig.add_subplot(gs[1, 0], sharex=ax_lat), None]
-    axs[1] = fig.add_subplot(gs[2, 0], sharex=ax_lat)
-    caxs = [fig.add_subplot(gs[1, 1]), fig.add_subplot(gs[2, 1])]
-    draw_lattice(ax_lat, wrap=(tag == 'injection_region'))
+    fig = plt.figure(figsize=(11, 8.4))
+    gs = GridSpec(3, 1, figure=fig, height_ratios=[0.55, 4, 4], hspace=0.12)
+    ax_lat = fig.add_subplot(gs[0])
+    axs = [fig.add_subplot(gs[1], sharex=ax_lat), fig.add_subplot(gs[2], sharex=ax_lat)]
+    draw_lattice(ax_lat, wrap=(tag == 'injection_region'), show_rf=(tag == 'full_ring'))
     plt.setp(ax_lat.get_xticklabels(), visible=False); plt.setp(axs[0].get_xticklabels(), visible=False)
     s_st = s_tw_wrapped[order_tw] if tag == 'injection_region' else s_tw
     idx = order_tw if tag == 'injection_region' else slice(None)
-    s_grid = np.arange(0, (s_kick + 6) if tag == 'injection_region' else C, 0.02 if tag == 'injection_region' else 0.1)
-    for ax_, cax_, c, s_, lab, sig_e in [(axs[0], caxs[0], cx, sx, 'x', sigma_eq('x')),
-                                         (axs[1], caxs[1], cy, sy, 'y', sigma_eq('y'))]:
-        # density of the injected bunch on turn 0 (log scale, so sparse tails stay visible)
-        s_edges, D = density_map(ebe, lab, s_grid, u_edges)
-        D = np.ma.masked_less_equal(D, 0)
-        pcm = ax_.pcolormesh(s_edges, 1e3 * u_edges, D.T, cmap='Blues', shading='flat', rasterized=True,
-                             norm=LogNorm(vmin=1 / (n0 * np.diff(u_edges)[0] * 1e3), vmax=D.max()), zorder=0)
-        fig.colorbar(pcm, cax=cax_, label='injected bunch (turn 0):\nfraction of particles per mm')
-        for sign in (+1, -1):
-            ax_.plot(s_ebe, 1e3 * (c + sign * N_SIGMA * s_), 'C0', lw=1,
-                     label=f'injected bunch, $\\pm{N_SIGMA:g}\\sigma$ (turn 0)' if sign > 0 else None)
+    for ax_, c, s_, lab, sig_e in [(axs[0], cx, sx, 'x', sigma_eq('x')),
+                                   (axs[1], cy, sy, 'y', sigma_eq('y'))]:
+        ax_.fill_between(s_ebe, 1e3 * (c - N_SIGMA * s_), 1e3 * (c + N_SIGMA * s_), color='C0', alpha=0.3,
+                         label=f'injected bunch, $\\pm{N_SIGMA:g}\\sigma$ (turn 0)')
         ax_.plot(s_ebe, 1e3 * c, 'C0', lw=1.5, label='injected centroid')
         ax_.fill_between(s_st, 1e3 * (tw[lab][idx] - N_SIGMA * sig_e[idx]), 1e3 * (tw[lab][idx] + N_SIGMA * sig_e[idx]),
                          color='C1', alpha=0.5, label=f'stored beam at equilibrium, $\\pm{N_SIGMA:g}\\sigma$')
