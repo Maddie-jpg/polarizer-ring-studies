@@ -54,6 +54,11 @@ DEFAULT_STUDY = dict(design=1, config=9, mode='perfect', phase=90, changes='FDF'
 # -----------------------------------------------------------------------------
 import os as _os
 from pathlib import Path as _Path
+# Particles tracked by macroparticles.py and injection.py: False = a 500-particle sample of the
+# filtered beam (df_clean, seed 74); True = every particle of the filtered beam (~22k: much slower).
+# Override per run with the environment variable USE_ALL_PARTICLES=1 / 0.
+USE_ALL_PARTICLES = False
+
 INJECTED_BEAM_FILE = _os.environ.get(
     'BEAM_FILE',
     str(_Path(__file__).resolve().parent / 'PositronBeam_2p86GeV' / 'beam_ECS_09102026.dat'))
