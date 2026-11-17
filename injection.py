@@ -33,7 +33,7 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          cylindrical chamber: radius = widest point of the macroparticles.py
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
-         env: N_PARTICLES, N_TURNS, X_BLADE (default optimum), X_INJ, KICK_ERROR, MATCH_TWISS=0,
+         env: USE_ALL_PARTICLES (default config.py), N_PARTICLES, N_TURNS, X_BLADE (default optimum), X_INJ, KICK_ERROR, MATCH_TWISS=0,
               RUN_SCANS=1, SCAN_TURNS, APERTURE_R (or none), N_SIGMA, ON_AXIS=1,
               SEPTUM_KICKER_DEG (default 60)
 Outputs  Results/.../Injection/{mode}/
@@ -64,8 +64,12 @@ _on = lambda v: str(v).strip().lower() not in ('0', 'false', 'off', 'no', '')
 
 # --- beam ---
 BEAM_FILE = cfg.INJECTED_BEAM_FILE
-N_PARTICLES = int(os.environ.get('N_PARTICLES', 500))
+USE_ALL_PARTICLES = _on(os.environ.get('USE_ALL_PARTICLES', cfg.USE_ALL_PARTICLES))  # toggle in config.py
+N_PARTICLES = int(os.environ.get('N_PARTICLES', 500))   # sample size when USE_ALL_PARTICLES is off
 SEED = 74                # same sample of the filtered beam as macroparticles.py (n_subset=500, seed 74)
+EBE_MAX_PARTICLES = int(os.environ.get('EBE_MAX_PARTICLES', 2000))   # element-by-element turns (envelope
+                         # plots) are recorded for at most this many particles: one such turn for 22k
+                         # particles would need ~3 GB
 MOMENT_ITERS = 5         # moment-based core filter (filter_by_moment_core), as in macroparticles.py
 # Match the beam to the ring Twiss at inj_point (the transfer line delivers a matched beam),
 # as match_coordinates in macroparticles.py does. MATCH_TWISS=0 injects the beam file's optics as-is.
@@ -295,7 +299,8 @@ def load_beam():
         df_clean, _ = filter_by_moment_core(df_core_x, 'y[mm]', 'yp[mrad]', iters=MOMENT_ITERS)
         print(f'Moment-based core: kept {len(df_clean)}/{len(df_raw)} particles '
               f'({100*len(df_clean)/len(df_raw):.1f}%)')
-        df = df_clean.sample(n=min(N_PARTICLES, len(df_clean)), random_state=SEED)
+        df = df_clean if USE_ALL_PARTICLES else df_clean.sample(n=min(N_PARTICLES, len(df_clean)), random_state=SEED)
+        print(f'Tracking {"all" if USE_ALL_PARTICLES else "a sample of"} {len(df)} particles of the filtered beam')
         x, px = df['x[mm]'].values * 1e-3, df['xp[mrad]'].values * 1e-3
         y, py = df['y[mm]'].values * 1e-3, df['yp[mrad]'].values * 1e-3
         z = df['t[mm/c]'].values * 1e-3                  # c*t [m], larger = later
@@ -491,15 +496,31 @@ take_snap(0, particles)
 mom = [moments(*[getattr(particles, a)[:, None] for a in ['state', 'x', 'px', 'y', 'py', 'zeta', 'delta']])]
 
 EBE_KEYS = ['x', 'px', 'y', 'py', 'zeta', 'delta', 'state', 's']
+ebe_idx = (np.arange(n0) if n0 <= EBE_MAX_PARTICLES else
+           np.sort(rng.choice(n0, size=EBE_MAX_PARTICLES, replace=False)))
+if n0 > EBE_MAX_PARTICLES:
+    print(f'Envelope plots use a sample of {EBE_MAX_PARTICLES} of the {n0} particles '
+          f'(EBE_MAX_PARTICLES); all particles are tracked for everything else')
+
 def track_ebe_turn():
-    """Track one turn recording every element (for the envelope plots)."""
-    ring.track(particles, num_turns=1, turn_by_turn_monitor='ONE_TURN_EBE')
+    """Track one turn of all particles, recording every element (for the envelope plots)
+    for all of them or, for a large beam, for the sample ebe_idx tracked alongside on a copy."""
+    if n0 <= EBE_MAX_PARTICLES:
+        ring.track(particles, num_turns=1, turn_by_turn_monitor='ONE_TURN_EBE')
+        m_ = ring.record_last_track
+        return {a: getattr(m_, a).copy() for a in EBE_KEYS}
+    sample = ring.build_particles(**{a: getattr(particles, a)[ebe_idx] for a in
+                                     ['x', 'px', 'y', 'py', 'zeta', 'delta']})
+    sample.state[:] = particles.state[ebe_idx]
+    sample.at_turn[:] = particles.at_turn[ebe_idx]
+    ring.track(particles, num_turns=1)
+    ring.track(sample, num_turns=1, turn_by_turn_monitor='ONE_TURN_EBE')
     m_ = ring.record_last_track
     return {a: getattr(m_, a).copy() for a in EBE_KEYS}
 
-def moments_from_ebe(e):
-    """Moments at the start of an element-by-element turn (= at inj_point)."""
-    return moments(*[e[a][:, :1] for a in ['state', 'x', 'px', 'y', 'py', 'zeta', 'delta']])
+def moments_now():
+    """Moments of all particles at the start of the next turn (= at inj_point)."""
+    return moments(*[getattr(particles, a)[:, None] for a in ['state', 'x', 'px', 'y', 'py', 'zeta', 'delta']])
 
 # turn 0: injection, kicker ON
 t_start = time.time()
@@ -523,10 +544,10 @@ print(f'Turn 0 done in {time.time()-t_start:.1f}s; tracking {N_TURNS} turns '
 # turn 1: first turn as a stored beam, element by element
 ebe_stored = {}
 if N_TURNS > 1 and np.any(particles.state > 0):
-    ebe_stored[1] = track_ebe_turn()
-    mom.append(moments_from_ebe(ebe_stored[1]))
+    mom.append(moments_now())
     if 1 in SNAP_TURNS:
-        snap[1] = {a: ebe_stored[1][a][:, 0].copy() for a in ['x', 'px', 'y', 'py', 'zeta', 'delta', 'state']}
+        take_snap(1, particles)
+    ebe_stored[1] = track_ebe_turn()
 
 # turns 2 .. N_TURNS-2 in chunks
 turn = 2
@@ -544,8 +565,8 @@ while turn < N_TURNS - 1 and np.any(particles.state > 0):
 
 # last turn: stored beam after N_TURNS, element by element
 if N_TURNS > 2 and np.any(particles.state > 0):
+    mom.append(moments_now())
     ebe_stored[turn] = track_ebe_turn()
-    mom.append(moments_from_ebe(ebe_stored[turn]))
     turn += 1
 take_snap(turn, particles)
 print(f'\nTracking finished in {(time.time()-t_start)/60:.1f} min')
@@ -561,7 +582,8 @@ pd.DataFrame(dict(turn=turns, **mom)).to_csv(f'{folder}/beam_moments_vs_turn.csv
 
 survived = int(np.sum(particles.state > 0))
 summary = dict(
-    beam_source=beam['source'], n_particles=n0, n_turns=int(turns[-1] + 1),
+    beam_source=beam['source'], n_particles=n0, use_all_particles=USE_ALL_PARTICLES,
+    envelope_sample=int(min(n0, EBE_MAX_PARTICLES)), n_turns=int(turns[-1] + 1),
     efficiency_percent=100 * survived / n0, lost_on_septum=int(lost_on_septum.sum()),
     n_sigma=N_SIGMA, x_inj_m=float(side * x_inj),
     injection_angle_mrad=float(side * px_inj * 1e3),          # beam angle at the septum exit

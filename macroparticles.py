@@ -1997,7 +1997,12 @@ plt.show()
 # %%
 rand_num = 74
 n_subset = 500
-df_subset = df_clean.sample(n=min(n_subset, len(df_clean)), random_state=rand_num)
+# Toggle in config.py (USE_ALL_PARTICLES), or per run with the environment variable USE_ALL_PARTICLES=1/0:
+# off = a 500-particle sample of df_clean (seed 74), on = every particle of the filtered beam.
+USE_ALL_PARTICLES = str(os.environ.get('USE_ALL_PARTICLES', cfg.USE_ALL_PARTICLES)).strip().lower() \
+    not in ('0', 'false', 'off', 'no', '')
+df_subset = df_clean if USE_ALL_PARTICLES else df_clean.sample(n=min(n_subset, len(df_clean)), random_state=rand_num)
+print(f'Tracking {"all" if USE_ALL_PARTICLES else "a sample of"} {len(df_subset)} particles of the filtered beam')
 
 p0c_avg_mev = df_clean['p[MeV/c]'].mean()
 p0c_avg = p0c_avg_mev * 1e6
@@ -2265,6 +2270,57 @@ energies_to_track = {
 turns_to_plot = [0, 1, 2, 3]
 trnplt = [1, 2000, 4000, 6000]
 
+
+class _TurnSnapshots:
+    """data.x[:, turn]-style access to the turns kept by track_recording."""
+    def __init__(self, snaps):
+        self._s = snaps
+
+    def __getitem__(self, key):
+        rows, turn = key
+        if turn not in self._s:
+            raise KeyError(f'turn {turn} was not recorded with USE_ALL_PARTICLES; kept: {sorted(self._s)}')
+        return self._s[turn][rows]
+
+
+class _SparseRecord:
+    """Stand-in for record_last_track holding only the kept turns."""
+    def __init__(self, snaps):
+        for a in ('x', 'px', 'y', 'py', 'zeta', 'delta', 'state'):
+            setattr(self, a, _TurnSnapshots({t: v[a] for t, v in snaps.items()}))
+
+
+def track_recording(line, particles, num_turns, with_progress=False,
+                    keep_turns=tuple(sorted(set(turns_to_plot) | set(trnplt))), chunk=100):
+    """Track and return (data, survival count per turn).
+
+    Sample (USE_ALL_PARTICLES off): exactly as before, a full turn-by-turn monitor.
+    Full beam: a full monitor for ~22k particles x 7000 turns would need >10 GB, so the
+    beam is tracked in chunks and only the turns in keep_turns (the ones plotted) are
+    kept, plus the survival count of every turn. data.x[:, turn] etc. work as before
+    for the kept turns."""
+    if not USE_ALL_PARTICLES:
+        line.track(particles, num_turns=num_turns, turn_by_turn_monitor=True, with_progress=with_progress)
+        data = line.record_last_track
+        return data, np.sum(data.state > 0, axis=0)
+    n = len(particles.x)
+    snaps, counts, t = {}, [], 0
+    while t < num_turns:
+        nt = min(chunk, num_turns - t)
+        mon = xt.ParticlesMonitor(start_at_turn=t, stop_at_turn=t + nt, num_particles=n)
+        line.track(particles, num_turns=nt, turn_by_turn_monitor=mon)
+        counts.append(np.sum(mon.state > 0, axis=0))
+        for k in keep_turns:
+            if t <= k < t + nt:
+                snaps[k] = {a: getattr(mon, a)[:, k - t].copy()
+                            for a in ('x', 'px', 'y', 'py', 'zeta', 'delta', 'state')}
+        t += nt
+        if with_progress:
+            print(f'  turn {t}/{num_turns}: {np.sum(particles.state > 0)} / {n} alive', end='\r')
+    if with_progress:
+        print()
+    return _SparseRecord(snaps), np.concatenate(counts)
+
 col_labels = [
     ("$x$ (mm)", "$x'$ (mrad)"),
     ("$y$ (mm)", "$y'$ (mrad)"),
@@ -2303,8 +2359,7 @@ def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
 
         n_track = len(particles.x)
         track_line.configure_radiation(model='quantum')
-        track_line.track(particles, num_turns=7000, turn_by_turn_monitor=True, with_progress=True)
-        data = track_line.record_last_track
+        data, survival_counts_all = track_recording(track_line, particles, num_turns=7000, with_progress=True)
 
         folder2 = mf.results_dir(design, config, phase, changes=changes,
                                   metric='InjectionEfficiency', sub=mode_tag,
@@ -2354,7 +2409,7 @@ def run_energy_diagnostics(track_line, track_tw, mode_tag, energies_to_track,
         plt.savefig(f'{folder2}/initial_turns_{rand_num}_{e_mev:.0f}MeV.png')
         plt.show()
 
-        survival_counts = np.sum(data.state > 0, axis=0)
+        survival_counts = survival_counts_all
         turns = np.arange(len(survival_counts))
 
         tau=mf.calculate_lifetime(survival_counts, track_line, ref_particle, fit_start_turn=500)
@@ -2559,10 +2614,7 @@ if mode == 'perfect':
         )
 
         seed_line.configure_radiation(model='quantum')
-        seed_line.track(particles, num_turns=7000,
-                         turn_by_turn_monitor=True, with_progress=False)
-        data_seed = seed_line.record_last_track
-        survival_counts_seed = np.sum(data_seed.state > 0, axis=0)
+        data_seed, survival_counts_seed = track_recording(seed_line, particles, num_turns=7000)
 
         
         t0 = seed_tw.rows[marker_name]
