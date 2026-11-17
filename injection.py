@@ -33,7 +33,7 @@ Inputs   lattice from DESIGN/CONFIG/MODE/PHASE/CHANGES (paths.study_from_env)
          cylindrical chamber: radius = widest point of the macroparticles.py
          chamber design, max(chamber_r) in PhysicalAperture/{mode}/
          chamber_per_magnet_{mode}.csv (APERTURE_R overrides; fallback 31.2 mm)
-         env: USE_ALL_PARTICLES (default config.py), N_PARTICLES, N_TURNS, X_BLADE (default optimum), X_INJ, KICK_ERROR, MATCH_TWISS=0,
+         env: USE_ALL_PARTICLES (default config.py), N_PARTICLES, N_TURNS, N_DAMPING_TIMES, X_BLADE (default optimum), X_INJ, KICK_ERROR, MATCH_TWISS=0,
               RUN_SCANS=1, SCAN_TURNS, APERTURE_R (or none), N_SIGMA, ON_AXIS=1,
               SEPTUM_KICKER_DEG (default 60)
 Outputs  Results/.../Injection/{mode}/
@@ -101,7 +101,8 @@ X_INJ = os.environ.get('X_INJ', 'auto')   # bunch centre at septum exit [m]; 'au
 KICK_ERROR = float(os.environ.get('KICK_ERROR', 0.0))   # relative kicker strength error
 
 # --- tracking ---
-N_TURNS = os.environ.get('N_TURNS', 'auto')     # 'auto' = 3 horizontal damping times
+N_DAMPING_TIMES = float(os.environ.get('N_DAMPING_TIMES', 1))   # tracking length for N_TURNS='auto'
+N_TURNS = os.environ.get('N_TURNS', 'auto')     # 'auto' = N_DAMPING_TIMES horizontal damping times
 CHUNK = 200                                      # turns per monitor chunk (memory)
 SNAP_TURNS = [0, 1, 10, 100, 1000, 5000]         # full-coordinate snapshots (+ last turn)
 RUN_SCANS = _on(os.environ.get('RUN_SCANS', '0'))
@@ -448,7 +449,8 @@ print(f"  kicker deflection = {-k_nominal*1e3:.3f} mrad, int B dl = {abs(k_nomin
 #   turns 1..N: kicker OFF, chunks of CHUNK turns, moments per turn
 # ============================================================
 if N_TURNS == 'auto':
-    N_TURNS = int(3 * tau_turns[0])
+    N_TURNS = int(N_DAMPING_TIMES * tau_turns[0])
+    print(f'Tracking {N_DAMPING_TIMES:g} horizontal damping time(s) = {N_TURNS} turns')
 N_TURNS = int(N_TURNS)
 
 def moments(st, x, px, y, py, zeta, delta):
